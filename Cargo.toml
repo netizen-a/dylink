@@ -1,0 +1,12 @@
+[package]
+name = "dylink"
+version = "0.0.0"
+authors = ["Jonathan Thomason"]
+edition = "2018"
+
+[dependencies]
+once_cell = "*"
+dylink_macro = "0.1.0"
+
+[unstable]
+cargo-features = ["once_cell"]
