@@ -16,7 +16,7 @@ use std::os::{
 };
 use std::ptr::null_mut;
 use std::sync::{
-    atomic::{AtomicPtr, Ordering},
+    atomic::{AtomicU64, Ordering},
     Mutex,
 };
 
@@ -42,28 +42,29 @@ type DllHandle = Mutex<UnsafeCell<Vec<(String, isize)>>>;
 static DLL_DATA: Lazy<DllHandle> = Lazy::new(|| Mutex::new(UnsafeCell::new(Vec::new())));
 
 /// Context is used in place of `VkInstance` to invoke the vulkan specialization.
+// VkInstance and VkDevice are both dispatchable and therefore cannonically 64-bit integers
 #[repr(C)]
 pub struct Context {
-    instance: AtomicPtr<c_void>,
-    device: AtomicPtr<c_void>,
+    instance: AtomicU64,
+    device: AtomicU64,
 }
 
 impl Context {
     // 'new' is used to initialize the static variable
     pub const fn new() -> Self {
         Self {
-            instance: AtomicPtr::new(null_mut()),
-            device: AtomicPtr::new(null_mut()),
+            instance: AtomicU64::new(0),
+            device: AtomicU64::new(0),
         }
     }
     /// Setting instance allows dylink to load Vulkan functions.
-    #[inline(always)]
-    pub fn init_inst(&self, inst: *mut c_void) {
+    #[inline]
+    pub fn init_inst(&self, inst: u64) {
         self.instance.store(inst, Ordering::Relaxed);
     }
     /// Setting device to a non-null value lets Dylink call `vkGetDeviceProcAddr`.    
-    #[inline(always)]
-    pub fn set_device(&self, dev: *mut c_void) {
+    #[inline]
+    pub fn set_device(&self, dev: u64) {
         self.device.store(dev, Ordering::Relaxed);
     }
 }
@@ -71,8 +72,8 @@ impl Context {
 impl Clone for Context {
     fn clone(&self) -> Self {
         Self {
-            instance: AtomicPtr::new(self.instance.load(Ordering::Relaxed)),
-            device: AtomicPtr::new(self.device.load(Ordering::Relaxed)),
+            instance: AtomicU64::new(self.instance.load(Ordering::Relaxed)),
+            device: AtomicU64::new(self.device.load(Ordering::Relaxed)),
         }
     }
 }
@@ -87,14 +88,14 @@ pub fn vkloader(fn_name: &str, context: Context) -> *const c_void {
     #[allow(non_snake_case)]
     #[allow(non_upper_case_globals)]
     static vkGetInstanceProcAddr: Lazy<
-        extern "stdcall" fn(*const c_void, *const c_char) -> *const c_void,
+        extern "stdcall" fn(u64, *const c_char) -> *const c_void,
     > = Lazy::new(|| unsafe {
         std::mem::transmute(loader("vulkan-1.dll", "vkGetInstanceProcAddr"))
     });
     #[allow(non_snake_case)]
     #[allow(non_upper_case_globals)]
     static vkGetDeviceProcAddr: Lazy<
-        extern "stdcall" fn(*const c_void, *const c_char) -> *const c_void,
+        extern "stdcall" fn(u64, *const c_char) -> *const c_void,
     > = Lazy::new(|| unsafe {
         std::mem::transmute(vkGetInstanceProcAddr(
             CONTEXT.instance.load(Ordering::Relaxed),
@@ -104,15 +105,16 @@ pub fn vkloader(fn_name: &str, context: Context) -> *const c_void {
 
     let addr = {
         let c_fn_name = CString::new(fn_name).unwrap();
-        if context.device.load(Ordering::Relaxed) == std::ptr::null_mut() {
-            vkGetInstanceProcAddr(context.instance.load(Ordering::Relaxed), c_fn_name.as_ptr())
+        let device = context.device.into_inner();
+        if device == 0 {
+            vkGetInstanceProcAddr(context.instance.into_inner(), c_fn_name.as_ptr())
         } else {
             let addr =
-                vkGetDeviceProcAddr(context.device.load(Ordering::Relaxed), c_fn_name.as_ptr());
+                vkGetDeviceProcAddr(device, c_fn_name.as_ptr());
             if addr == std::ptr::null() {
                 #[cfg(debug_assertions)]
                 println!("Dylink Warning: `{}` not found using `vkGetDeviceProcAddr`. Deferring call to `vkGetInstanceProcAddr`.", fn_name);
-                vkGetInstanceProcAddr(context.instance.load(Ordering::Relaxed), c_fn_name.as_ptr())
+                vkGetInstanceProcAddr(context.instance.into_inner(), c_fn_name.as_ptr())
             } else {
                 addr
             }
