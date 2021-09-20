@@ -87,21 +87,19 @@ pub static CONTEXT: Context = Context::new();
 pub fn vkloader(fn_name: &str, context: Context) -> *const c_void {
     #[allow(non_snake_case)]
     #[allow(non_upper_case_globals)]
-    static vkGetInstanceProcAddr: Lazy<
-        extern "stdcall" fn(u64, *const c_char) -> *const c_void,
-    > = Lazy::new(|| unsafe {
-        std::mem::transmute(loader("vulkan-1.dll", "vkGetInstanceProcAddr"))
-    });
+    static vkGetInstanceProcAddr: Lazy<extern "stdcall" fn(u64, *const c_char) -> *const c_void> =
+        Lazy::new(|| unsafe {
+            std::mem::transmute(loader("vulkan-1.dll", "vkGetInstanceProcAddr"))
+        });
     #[allow(non_snake_case)]
     #[allow(non_upper_case_globals)]
-    static vkGetDeviceProcAddr: Lazy<
-        extern "stdcall" fn(u64, *const c_char) -> *const c_void,
-    > = Lazy::new(|| unsafe {
-        std::mem::transmute(vkGetInstanceProcAddr(
-            CONTEXT.instance.load(Ordering::Relaxed),
-            "vkGetDeviceProcAddr\0".as_ptr() as *const c_char,
-        ))
-    });
+    static vkGetDeviceProcAddr: Lazy<extern "stdcall" fn(u64, *const c_char) -> *const c_void> =
+        Lazy::new(|| unsafe {
+            std::mem::transmute(vkGetInstanceProcAddr(
+                CONTEXT.instance.load(Ordering::Relaxed),
+                "vkGetDeviceProcAddr\0".as_ptr() as *const c_char,
+            ))
+        });
 
     let addr = {
         let c_fn_name = CString::new(fn_name).unwrap();
@@ -109,8 +107,7 @@ pub fn vkloader(fn_name: &str, context: Context) -> *const c_void {
         if device == 0 {
             vkGetInstanceProcAddr(context.instance.into_inner(), c_fn_name.as_ptr())
         } else {
-            let addr =
-                vkGetDeviceProcAddr(device, c_fn_name.as_ptr());
+            let addr = vkGetDeviceProcAddr(device, c_fn_name.as_ptr());
             if addr == std::ptr::null() {
                 #[cfg(debug_assertions)]
                 println!("Dylink Warning: `{}` not found using `vkGetDeviceProcAddr`. Deferring call to `vkGetInstanceProcAddr`.", fn_name);
