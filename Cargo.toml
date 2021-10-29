@@ -2,7 +2,7 @@
 name = "dylink"
 version = "0.0.0"
 authors = ["Jonathan Thomason"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 once_cell = "*"
