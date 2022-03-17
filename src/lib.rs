@@ -43,7 +43,6 @@ static DLL_DATA: Lazy<DllHandle> = Lazy::new(|| Mutex::new(UnsafeCell::new(Vec::
 
 /// Context is used in place of `VkInstance` to invoke the vulkan specialization.
 // VkInstance and VkDevice are both dispatchable and therefore cannonically 64-bit integers
-#[repr(C)]
 pub struct Context {
     instance: AtomicU64,
     device: AtomicU64,
@@ -59,13 +58,21 @@ impl Context {
     }
     /// Setting instance allows dylink to load Vulkan functions.
     #[inline]
-    pub fn init_inst(&self, inst: u64) {
+    pub fn set_instance(&self, inst: u64) {
         self.instance.store(inst, Ordering::Relaxed);
     }
     /// Setting device to a non-null value lets Dylink call `vkGetDeviceProcAddr`.    
     #[inline]
     pub fn set_device(&self, dev: u64) {
         self.device.store(dev, Ordering::Relaxed);
+    }    
+    #[inline]
+    pub fn get_instance(&self) -> u64 {
+        self.instance.load(Ordering::Relaxed)
+    }    
+    #[inline]
+    pub fn get_device(&self) -> u64 {
+        self.device.load(Ordering::Relaxed)
     }
 }
 
