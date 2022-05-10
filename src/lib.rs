@@ -58,18 +58,18 @@ impl Context {
     }
     /// Setting instance allows dylink to load Vulkan functions.
     #[inline]
-    pub fn set_instance(&self, inst: u64) {
-        self.instance.store(inst, Ordering::Relaxed);
+    pub fn set_instance<T: Into<u64>>(&self, inst: T) {
+        self.instance.store(inst.into(), Ordering::Relaxed);
     }
     /// Setting device to a non-null value lets Dylink call `vkGetDeviceProcAddr`.    
     #[inline]
-    pub fn set_device(&self, dev: u64) {
-        self.device.store(dev, Ordering::Relaxed);
-    }    
+    pub fn set_device<T: Into<u64>>(&self, dev: T) {
+        self.device.store(dev.into(), Ordering::Relaxed);
+    }
     #[inline]
     pub fn get_instance(&self) -> u64 {
         self.instance.load(Ordering::Relaxed)
-    }    
+    }
     #[inline]
     pub fn get_device(&self) -> u64 {
         self.device.load(Ordering::Relaxed)
@@ -110,15 +110,15 @@ pub fn vkloader(fn_name: &str, context: Context) -> *const c_void {
 
     let addr = {
         let c_fn_name = CString::new(fn_name).unwrap();
-        let device = context.device.into_inner();
+        let device = context.get_device();
         if device == 0 {
-            vkGetInstanceProcAddr(context.instance.into_inner(), c_fn_name.as_ptr())
+            vkGetInstanceProcAddr(context.get_instance(), c_fn_name.as_ptr())
         } else {
             let addr = vkGetDeviceProcAddr(device, c_fn_name.as_ptr());
             if addr == std::ptr::null() {
                 #[cfg(debug_assertions)]
                 println!("Dylink Warning: `{}` not found using `vkGetDeviceProcAddr`. Deferring call to `vkGetInstanceProcAddr`.", fn_name);
-                vkGetInstanceProcAddr(context.instance.into_inner(), c_fn_name.as_ptr())
+                vkGetInstanceProcAddr(context.get_instance(), c_fn_name.as_ptr())
             } else {
                 addr
             }
