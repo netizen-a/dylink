@@ -44,8 +44,13 @@ static DLL_DATA: Lazy<DllHandle> = Lazy::new(|| Mutex::new(UnsafeCell::new(Vec::
 #[repr(transparent)]
 pub struct VkObjectHandle(u64);
 impl VkObjectHandle {
+    #[inline]
     pub const fn null() -> Self {
         Self(0)
+    }
+    #[inline]
+    pub const fn is_invalid(&self) -> bool {
+        self.0 == 0
     }
 }
 
