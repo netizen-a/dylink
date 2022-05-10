@@ -41,6 +41,14 @@ extern "stdcall" {
 type DllHandle = Mutex<UnsafeCell<Vec<(String, isize)>>>;
 static DLL_DATA: Lazy<DllHandle> = Lazy::new(|| Mutex::new(UnsafeCell::new(Vec::new())));
 
+#[repr(transparent)]
+pub struct VkObjectHandle(u64);
+impl VkObjectHandle {
+    pub const fn null() -> Self {
+        Self(0)
+    }
+}
+
 /// Context is used in place of `VkInstance` to invoke the vulkan specialization.
 // VkInstance and VkDevice are both dispatchable and therefore cannonically 64-bit integers
 pub struct Context {
@@ -58,21 +66,21 @@ impl Context {
     }
     /// Setting instance allows dylink to load Vulkan functions.
     #[inline]
-    pub fn set_instance<T: Into<u64>>(&self, inst: T) {
-        self.instance.store(inst.into(), Ordering::Relaxed);
+    pub fn set_instance<T: Into<VkObjectHandle>>(&self, inst: T) {
+        self.instance.store(inst.into().0, Ordering::Relaxed);
     }
     /// Setting device to a non-null value lets Dylink call `vkGetDeviceProcAddr`.    
     #[inline]
-    pub fn set_device<T: Into<u64>>(&self, dev: T) {
-        self.device.store(dev.into(), Ordering::Relaxed);
+    pub fn set_device<T: Into<VkObjectHandle>>(&self, dev: T) {
+        self.device.store(dev.into().0, Ordering::Relaxed);
     }
     #[inline]
-    pub fn get_instance(&self) -> u64 {
-        self.instance.load(Ordering::Relaxed)
+    pub fn get_instance(&self) -> VkObjectHandle {
+        VkObjectHandle(self.instance.load(Ordering::Relaxed))
     }
     #[inline]
-    pub fn get_device(&self) -> u64 {
-        self.device.load(Ordering::Relaxed)
+    pub fn get_device(&self) -> VkObjectHandle {
+        VkObjectHandle(self.device.load(Ordering::Relaxed))
     }
 }
 
@@ -110,15 +118,15 @@ pub fn vkloader(fn_name: &str, context: Context) -> *const c_void {
 
     let addr = {
         let c_fn_name = CString::new(fn_name).unwrap();
-        let device = context.get_device();
+        let device = context.get_device().0;
         if device == 0 {
-            vkGetInstanceProcAddr(context.get_instance(), c_fn_name.as_ptr())
+            vkGetInstanceProcAddr(context.get_instance().0, c_fn_name.as_ptr())
         } else {
             let addr = vkGetDeviceProcAddr(device, c_fn_name.as_ptr());
             if addr == std::ptr::null() {
                 #[cfg(debug_assertions)]
                 println!("Dylink Warning: `{}` not found using `vkGetDeviceProcAddr`. Deferring call to `vkGetInstanceProcAddr`.", fn_name);
-                vkGetInstanceProcAddr(context.get_instance(), c_fn_name.as_ptr())
+                vkGetInstanceProcAddr(context.get_instance().0, c_fn_name.as_ptr())
             } else {
                 addr
             }
