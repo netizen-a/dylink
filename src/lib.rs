@@ -42,6 +42,7 @@ extern "stdcall" {
 type DllHandle = Mutex<UnsafeCell<Vec<(String, isize)>>>;
 static DLL_DATA: Lazy<DllHandle> = Lazy::new(|| Mutex::new(UnsafeCell::new(Vec::new())));
 
+#[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct DispatchableHandle(*mut ffi::c_void);
 impl DispatchableHandle {
