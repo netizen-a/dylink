@@ -95,7 +95,7 @@ pub static CONTEXT: Context = Context::new();
 
 /// `vkloader` is a vulkan loader specialization.
 /// vulkan 1.2 or above is recommended.
-pub fn vkloader(fn_name: &str, context: Context) -> *const ffi::c_void {
+pub fn vkloader(fn_name: &str, context: Context) -> ptr::NonNull<ffi::c_void> {
     #[allow(non_snake_case)]
     #[allow(non_upper_case_globals)]
     static vkGetInstanceProcAddr: Lazy<extern "stdcall" fn(DispatchableHandle, *const c_char) -> *const ffi::c_void> =
@@ -128,22 +128,20 @@ pub fn vkloader(fn_name: &str, context: Context) -> *const ffi::c_void {
             }
         }
     };
-    assert!(!addr.is_null(), "Dylink Error: `{}` not found!", fn_name);
-    addr
+    ptr::NonNull::new(addr as *mut _).expect(&format!("Dylink Error: `{fn_name}` not found!"))
 }
 
 /// `glloader` is an opengl loader specialization.
 pub fn glloader(fn_name: &str) -> *const ffi::c_void {
     let addr = unsafe {
-        let fn_name = ffi::CString::new(fn_name).unwrap();
-        gl::wglGetProcAddress(core::PCSTR(fn_name.as_ptr() as *const _))
-    };
-    assert!(addr.is_some(), "Dylink Error: `{}` not found!", fn_name);
+        let c_fn_name = ffi::CString::new(fn_name).unwrap();
+        gl::wglGetProcAddress(core::PCSTR(c_fn_name.as_ptr() as *const _)).expect(&format!("Dylink Error: `{fn_name}` not found!"))
+    };    
     unsafe {mem::transmute(addr)}
 }
 
 /// `loader` is a generalization for all other dlls.
-pub fn loader(lib_name: &str, fn_name: &str) -> *const ffi::c_void {
+pub fn loader(lib_name: &str, fn_name: &str) -> ptr::NonNull<ffi::c_void> {
     let mut lib_handle = HINSTANCE::default();
     let mut lib_found = false;
     unsafe {
@@ -166,6 +164,5 @@ pub fn loader(lib_name: &str, fn_name: &str) -> *const ffi::c_void {
 
     let addr: *const ffi::c_void =
         unsafe { std::mem::transmute(GetProcAddress(lib_handle, core::PCSTR(fn_cstr.as_ptr() as *const _))) };
-    assert!(!addr.is_null(), "Dylink Error: `{}` not found!", fn_name);
-    addr
+    ptr::NonNull::new(addr as *mut _).expect(&format!("Dylink Error: `{fn_name}` not found!"))
 }
