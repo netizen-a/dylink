@@ -13,33 +13,22 @@ use std::ffi;
 use std::os::{
     raw::c_char,
     // FIXME: this type violates strict-provenance
-    windows::raw::HANDLE,
+    //windows::raw::HANDLE,
 };
 use std::ptr;
+use std::mem;
 use std::sync::{
     atomic::{AtomicPtr, Ordering},
     Mutex,
 };
-
-// These functions are statically linked for 2 reasons:
-// 1. Clarity: This code would get more obfuscated than it already is if it's dynamically linked.
-// 2. Performance: There is no startup overhead when statically linked.
-#[allow(non_snake_case)]
-#[link(name = "Kernel32")]
-extern "stdcall" {
-    fn LoadLibraryA(_: *const c_char) -> HANDLE;
-    fn GetProcAddress(_: HANDLE, lpProcName: *const c_char) -> *const ffi::c_void;
-}
-
-#[allow(non_snake_case)]
-#[link(name = "Opengl32")]
-extern "stdcall" {
-    fn wglGetProcAddress(_: *const c_char) -> *const ffi::c_void;
-}
+use windows::Win32::Graphics::OpenGL as gl;
+use windows::core;
+use windows::Win32::System::LibraryLoader::{LoadLibraryA, GetProcAddress};
+use windows::Win32::Foundation::HINSTANCE;
 
 // The loader functions can be called on different threads by the user,
 // therefore the following precautions, namely Mutex for thread safety are necessary.
-type DllHandle = Mutex<UnsafeCell<Vec<(String, isize)>>>;
+type DllHandle = Mutex<UnsafeCell<Vec<(String, HINSTANCE)>>>;
 static DLL_DATA: Lazy<DllHandle> = Lazy::new(|| Mutex::new(UnsafeCell::new(Vec::new())));
 
 #[derive(Clone, Copy)]
@@ -147,42 +136,36 @@ pub fn vkloader(fn_name: &str, context: Context) -> *const ffi::c_void {
 pub fn glloader(fn_name: &str) -> *const ffi::c_void {
     let addr = unsafe {
         let fn_name = ffi::CString::new(fn_name).unwrap();
-        wglGetProcAddress(fn_name.as_ptr())
+        gl::wglGetProcAddress(core::PCSTR(fn_name.as_ptr() as *const _))
     };
-    assert!(!addr.is_null(), "Dylink Error: `{}` not found!", fn_name);
-    addr
+    assert!(addr.is_some(), "Dylink Error: `{}` not found!", fn_name);
+    unsafe {mem::transmute(addr)}
 }
 
 /// `loader` is a generalization for all other dlls.
 pub fn loader(lib_name: &str, fn_name: &str) -> *const ffi::c_void {
-    let mut lib_handle: HANDLE = ptr::null_mut();
+    let mut lib_handle = HINSTANCE::default();
     let mut lib_found = false;
     unsafe {
         let dll_data = DLL_DATA.lock().unwrap().get();
         for lib_set in (*dll_data).iter_mut() {
             if lib_set.0 == lib_name {
                 lib_found = true;
-                lib_handle = lib_set.1 as HANDLE;
+                lib_handle = lib_set.1;
             }
         }
 
         if !lib_found {
             let lib_cstr = ffi::CString::new(lib_name).unwrap();
-            lib_handle = LoadLibraryA(lib_cstr.as_ptr());
-            (*dll_data).push((lib_name.to_string(), lib_handle as isize));
+            lib_handle = LoadLibraryA(core::PCSTR(lib_cstr.as_ptr() as *const _)).expect("Dylink Error: `{}` not found!");
+            (*dll_data).push((lib_name.to_string(), lib_handle));
         }
     }
-
-    assert!(
-        !lib_handle.is_null(),
-        "Dylink Error: `{}` not found!",
-        lib_name
-    );
 
     let fn_cstr = ffi::CString::new(fn_name).unwrap();
 
     let addr: *const ffi::c_void =
-        unsafe { std::mem::transmute(GetProcAddress(lib_handle, fn_cstr.as_ptr())) };
+        unsafe { std::mem::transmute(GetProcAddress(lib_handle, core::PCSTR(fn_cstr.as_ptr() as *const _))) };
     assert!(!addr.is_null(), "Dylink Error: `{}` not found!", fn_name);
     addr
 }
