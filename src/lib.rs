@@ -107,7 +107,7 @@ pub fn vkloader(fn_name: &str, context: Context) -> ptr::NonNull<ffi::c_void> {
     static vkGetDeviceProcAddr: Lazy<extern "stdcall" fn(DispatchableHandle, *const c_char) -> *const ffi::c_void> =
         Lazy::new(|| unsafe {
             std::mem::transmute(vkGetInstanceProcAddr(
-                DispatchableHandle(CONTEXT.instance.load(Ordering::Relaxed)),
+                CONTEXT.get_instance(),
                 "vkGetDeviceProcAddr\0".as_ptr() as *const c_char,
             ))
         });
@@ -133,11 +133,12 @@ pub fn vkloader(fn_name: &str, context: Context) -> ptr::NonNull<ffi::c_void> {
 
 /// `glloader` is an opengl loader specialization.
 pub fn glloader(fn_name: &str) -> *const ffi::c_void {
-    let addr = unsafe {
+    unsafe {
         let c_fn_name = ffi::CString::new(fn_name).unwrap();
-        gl::wglGetProcAddress(core::PCSTR(c_fn_name.as_ptr() as *const _)).expect(&format!("Dylink Error: `{fn_name}` not found!"))
-    };    
-    unsafe {mem::transmute(addr)}
+        let addr = gl::wglGetProcAddress(core::PCSTR(c_fn_name.as_ptr() as *const _))
+            .expect(&format!("Dylink Error: `{fn_name}` not found!"));
+        mem::transmute(addr)
+    }
 }
 
 /// `loader` is a generalization for all other dlls.
