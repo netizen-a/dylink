@@ -44,7 +44,7 @@ impl DispatchableHandle {
 
 /// Context is used in place of `VkInstance` to invoke the vulkan specialization.
 // VkInstance and VkDevice are both dispatchable and therefore cannonically 64-bit integers
-pub struct Context {
+struct Context {
 	instance: AtomicPtr<ffi::c_void>,
 	device:   AtomicPtr<ffi::c_void>,
 }
@@ -56,37 +56,39 @@ impl Context {
 			instance: AtomicPtr::new(ptr::null_mut()),
 			device:   AtomicPtr::new(ptr::null_mut()),
 		}
-	}
-
-	/// Setting instance allows dylink to load Vulkan functions.
-	#[inline]
-	pub fn set_instance<T: Into<DispatchableHandle>>(&self, inst: T) {
-		self.instance.store(inst.into().0, Ordering::Release);
-	}
-
-	/// Setting device to a non-null value lets Dylink call `vkGetDeviceProcAddr`.    
-	#[inline]
-	pub fn set_device<T: Into<DispatchableHandle>>(&self, dev: T) {
-		self.device.store(dev.into().0, Ordering::Release);
-	}
-
-	#[inline]
-	pub fn get_instance(&self) -> DispatchableHandle {
-		DispatchableHandle(self.instance.load(Ordering::Acquire))
-	}
-
-	#[inline]
-	pub fn get_device(&self) -> DispatchableHandle {
-		DispatchableHandle(self.device.load(Ordering::Acquire))
-	}
+	}	
 }
 
-pub static CONTEXT: Context = Context::new();
+/// Setting instance allows dylink to load Vulkan functions.
+#[inline]
+pub fn set_instance<T: Into<DispatchableHandle>>(inst: T) {
+	CONTEXT.instance.store(inst.into().0, Ordering::Release);
+}
+
+/// Setting device to a non-null value lets Dylink call `vkGetDeviceProcAddr`.    
+#[inline]
+pub fn set_device<T: Into<DispatchableHandle>>(dev: T) {
+	CONTEXT.device.store(dev.into().0, Ordering::Release);
+}
+
+#[inline]
+pub fn get_instance() -> DispatchableHandle {
+	DispatchableHandle(CONTEXT.instance.load(Ordering::Acquire))
+}
+
+#[inline]
+pub fn get_device() -> DispatchableHandle {
+	DispatchableHandle(CONTEXT.device.load(Ordering::Acquire))
+}
+
+static CONTEXT: Context = Context::new();
 
 /// `vkloader` is a vulkan loader specialization.
 /// vulkan 1.2 or above is recommended.
-pub fn vkloader<ContextType: std::borrow::Borrow<Context>>(fn_name: &str, context: ContextType) -> ptr::NonNull<ffi::c_void> {
-    let context = context.borrow();
+pub fn vkloader(
+	fn_name: &str,
+) -> ptr::NonNull<ffi::c_void> {
+	//let context = context.borrow();
 	#[allow(non_snake_case)]
 	#[allow(non_upper_case_globals)]
 	static vkGetInstanceProcAddr: Lazy<
@@ -98,16 +100,16 @@ pub fn vkloader<ContextType: std::borrow::Borrow<Context>>(fn_name: &str, contex
 		extern "stdcall" fn(DispatchableHandle, *const c_char) -> *const ffi::c_void,
 	> = Lazy::new(|| unsafe {
 		std::mem::transmute(vkGetInstanceProcAddr(
-			CONTEXT.get_instance(),
+			get_instance(),
 			"vkGetDeviceProcAddr\0".as_ptr() as *const c_char,
 		))
 	});
 
 	let addr = {
 		let c_fn_name = ffi::CString::new(fn_name).unwrap();
-		let device = context.get_device();
+		let device = get_device();
 		if device.is_null() {
-			vkGetInstanceProcAddr(context.get_instance(), c_fn_name.as_ptr())
+			vkGetInstanceProcAddr(get_instance(), c_fn_name.as_ptr())
 		} else {
 			let addr = vkGetDeviceProcAddr(device, c_fn_name.as_ptr());
 			if addr == std::ptr::null() {
@@ -117,7 +119,7 @@ pub fn vkloader<ContextType: std::borrow::Borrow<Context>>(fn_name: &str, contex
 					 to `vkGetInstanceProcAddr`.",
 					fn_name
 				);
-				vkGetInstanceProcAddr(context.get_instance(), c_fn_name.as_ptr())
+				vkGetInstanceProcAddr(get_instance(), c_fn_name.as_ptr())
 			} else {
 				addr
 			}
