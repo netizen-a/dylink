@@ -1,5 +1,4 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
-#![doc(html_no_source)]
 
 // re-export the dylink macro
 pub extern crate dylink_macro;
@@ -16,6 +15,7 @@ use std::{
 
 pub use dylink_macro::dylink;
 // perpetuate dependency for macro
+#[doc(hidden)]
 pub use once_cell::sync::Lazy;
 use windows::{
 	core,
@@ -84,10 +84,9 @@ pub fn get_device() -> DispatchableHandle {
 static CONTEXT: Context = Context::new();
 
 /// `vkloader` is a vulkan loader specialization.
-/// vulkan 1.2 or above is recommended.
 pub fn vkloader(
 	fn_name: &str,
-) -> ptr::NonNull<ffi::c_void> {
+) -> Option<fn()> {
 	//let context = context.borrow();
 	#[allow(non_snake_case)]
 	#[allow(non_upper_case_globals)]
@@ -105,27 +104,31 @@ pub fn vkloader(
 		))
 	});
 
-	let addr = {
-		let c_fn_name = ffi::CString::new(fn_name).unwrap();
-		let device = get_device();
-		if device.is_null() {
+	
+	let c_fn_name = ffi::CString::new(fn_name).unwrap();
+	let device = get_device();
+	let addr = if device.is_null() {
+		vkGetInstanceProcAddr(get_instance(), c_fn_name.as_ptr())
+	} else {
+		let addr = vkGetDeviceProcAddr(device, c_fn_name.as_ptr());
+		if addr.is_null() {
+			#[cfg(debug_assertions)]
+			println!(
+				"Dylink Warning: `{fn_name}` not found using `vkGetDeviceProcAddr`. Deferring call \
+				 to `vkGetInstanceProcAddr`."
+			);
 			vkGetInstanceProcAddr(get_instance(), c_fn_name.as_ptr())
 		} else {
-			let addr = vkGetDeviceProcAddr(device, c_fn_name.as_ptr());
-			if addr == std::ptr::null() {
-				#[cfg(debug_assertions)]
-				println!(
-					"Dylink Warning: `{}` not found using `vkGetDeviceProcAddr`. Deferring call \
-					 to `vkGetInstanceProcAddr`.",
-					fn_name
-				);
-				vkGetInstanceProcAddr(get_instance(), c_fn_name.as_ptr())
-			} else {
-				addr
-			}
+			addr
 		}
 	};
-	ptr::NonNull::new(addr as *mut _).expect(&format!("Dylink Error: `{fn_name}` not found!"))
+	if addr.is_null() {
+		None
+	} else {
+		unsafe {
+			Some(mem::transmute(addr))
+		}
+	}	
 }
 
 /// `glloader` is an opengl loader specialization.
