@@ -43,20 +43,9 @@ impl DispatchableHandle {
 }
 
 /// Context is used in place of `VkInstance` to invoke the vulkan specialization.
-// VkInstance and VkDevice are both dispatchable and therefore cannonically 64-bit integers
 struct Context {
 	instance: AtomicPtr<ffi::c_void>,
 	device:   AtomicPtr<ffi::c_void>,
-}
-
-impl Context {
-	// 'new' is used to initialize the static variable
-	pub const fn new() -> Self {
-		Self {
-			instance: AtomicPtr::new(ptr::null_mut()),
-			device:   AtomicPtr::new(ptr::null_mut()),
-		}
-	}
 }
 
 /// Setting instance allows dylink to load Vulkan functions.
@@ -81,7 +70,10 @@ pub fn get_device() -> DispatchableHandle {
 	DispatchableHandle(CONTEXT.device.load(Ordering::Acquire))
 }
 
-static CONTEXT: Context = Context::new();
+static CONTEXT: Context = Context {
+	instance: AtomicPtr::new(ptr::null_mut()),
+	device:   AtomicPtr::new(ptr::null_mut()),
+};
 
 /// `vkloader` is a vulkan loader specialization.
 pub fn vkloader(fn_name: &str) -> Option<fn()> {
