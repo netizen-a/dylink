@@ -31,7 +31,7 @@ use windows::{
 type DllHandle = Mutex<UnsafeCell<Vec<(String, HINSTANCE)>>>;
 static DLL_DATA: Lazy<DllHandle> = Lazy::new(|| Mutex::new(UnsafeCell::new(Vec::new())));
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct DispatchableHandle(*mut ffi::c_void);
 impl DispatchableHandle {
@@ -56,7 +56,7 @@ impl Context {
 			instance: AtomicPtr::new(ptr::null_mut()),
 			device:   AtomicPtr::new(ptr::null_mut()),
 		}
-	}	
+	}
 }
 
 /// Setting instance allows dylink to load Vulkan functions.
@@ -84,10 +84,8 @@ pub fn get_device() -> DispatchableHandle {
 static CONTEXT: Context = Context::new();
 
 /// `vkloader` is a vulkan loader specialization.
-pub fn vkloader(
-	fn_name: &str,
-) -> Option<fn()> {
-	//let context = context.borrow();
+pub fn vkloader(fn_name: &str) -> Option<fn()> {
+	// let context = context.borrow();
 	#[allow(non_snake_case)]
 	#[allow(non_upper_case_globals)]
 	static vkGetInstanceProcAddr: Lazy<
@@ -104,7 +102,6 @@ pub fn vkloader(
 		))
 	});
 
-	
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 	let device = get_device();
 	let addr = if device.is_null() {
@@ -114,8 +111,8 @@ pub fn vkloader(
 		if addr.is_null() {
 			#[cfg(debug_assertions)]
 			println!(
-				"Dylink Warning: `{fn_name}` not found using `vkGetDeviceProcAddr`. Deferring call \
-				 to `vkGetInstanceProcAddr`."
+				"Dylink Warning: `{fn_name}` not found using `vkGetDeviceProcAddr`. Deferring \
+				 call to `vkGetInstanceProcAddr`."
 			);
 			vkGetInstanceProcAddr(get_instance(), c_fn_name.as_ptr())
 		} else {
@@ -125,10 +122,8 @@ pub fn vkloader(
 	if addr.is_null() {
 		None
 	} else {
-		unsafe {
-			Some(mem::transmute(addr))
-		}
-	}	
+		unsafe { Some(mem::transmute(addr)) }
+	}
 }
 
 /// `glloader` is an opengl loader specialization.
