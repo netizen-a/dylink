@@ -31,16 +31,9 @@ use windows::{
 type DllHandle = Mutex<UnsafeCell<Vec<(String, HINSTANCE)>>>;
 static DLL_DATA: Lazy<DllHandle> = Lazy::new(|| Mutex::new(UnsafeCell::new(Vec::new())));
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct DispatchableHandle(*mut ffi::c_void);
-impl DispatchableHandle {
-	#[inline]
-	pub const fn null() -> Self { Self(ptr::null_mut()) }
-
-	#[inline]
-	pub fn is_null(&self) -> bool { self.0.is_null() }
-}
+pub struct DispatchableHandle(pub *const ffi::c_void);
 
 /// Context is used in place of `VkInstance` to invoke the vulkan specialization.
 struct Context {
@@ -50,14 +43,14 @@ struct Context {
 
 /// Setting instance allows dylink to load Vulkan functions.
 #[inline]
-pub fn set_instance<T: Into<DispatchableHandle>>(inst: T) {
-	CONTEXT.instance.store(inst.into().0, Ordering::Release);
+pub fn set_instance(inst: DispatchableHandle) {
+	CONTEXT.instance.store(inst.0 as *mut _, Ordering::Release);
 }
 
 /// Setting device to a non-null value lets Dylink call `vkGetDeviceProcAddr`.    
 #[inline]
-pub fn set_device<T: Into<DispatchableHandle>>(dev: T) {
-	CONTEXT.device.store(dev.into().0, Ordering::Release);
+pub fn set_device(dev: DispatchableHandle) {
+	CONTEXT.device.store(dev.0 as *mut _, Ordering::Release);
 }
 
 #[inline]
@@ -96,7 +89,7 @@ pub fn vkloader(fn_name: &str) -> Option<fn()> {
 
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 	let device = get_device();
-	let addr = if device.is_null() {
+	let addr = if device.0.is_null() {
 		vkGetInstanceProcAddr(get_instance(), c_fn_name.as_ptr())
 	} else {
 		let addr = vkGetDeviceProcAddr(device, c_fn_name.as_ptr());
