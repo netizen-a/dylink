@@ -1,4 +1,5 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
+#![feature(strict_provenance)]
 
 // re-export the dylink macro
 pub extern crate dylink_macro;
