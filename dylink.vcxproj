@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Compile" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Test|x64">
+      <Configuration>Test</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Test|Win32">
+      <Configuration>Test</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Check|x64">
+      <Configuration>Check</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Check|Win32">
+      <Configuration>Check</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Clippy|x64">
+      <Configuration>Clippy</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Clippy|Win32">
+      <Configuration>Clippy</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{7ea840fa-b70f-4421-a552-6b1dd46beb4f}</ProjectGuid>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.default.props" />
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Test|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Test|Win32'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Check|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Check|Win32'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Clippy|x64'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Clippy|Win32'">
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ConfigurationType>Application</ConfigurationType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>$(ProjectName)</TargetName>
+    <OutDir>target\x86_64-pc-windows-msvc\debug\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetName>$(ProjectName)</TargetName>
+    <OutDir>target\x86_64-pc-windows-msvc\release\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>target\i686-pc-windows-msvc\debug</OutDir>
+    <TargetName>$(ProjectName)</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <TargetName>$(ProjectName)</TargetName>
+    <OutDir>target\i686-pc-windows-msvc\release\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Link />
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Targets" />
+  <!--FILES-->
+  <ItemGroup>
+    <None Include="Cargo.toml" />
+    <None Include="src\lib.rs" />
+  </ItemGroup>
+  <Target Name="Build">
+    <!-- Debug|x64 -->
+    <Exec Command="cargo rustc --bin $(ProjectName) --target x86_64-pc-windows-msvc -- -o $(MSBuildProjectDirectory)\target\x86_64-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Debug|x64' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'Application'" />
+    <Exec Command="cargo build --target x86_64-pc-windows-msvc " Condition="'$(Configuration)|$(Platform)'=='Debug|x64' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'Application'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc -- --crate-type=lib" Condition="'$(Configuration)|$(Platform)'=='Debug|x64' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'Utility'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc -- --crate-type=staticlib" Condition="'$(Configuration)|$(Platform)'=='Debug|x64' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'StaticLibrary'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc -- --crate-type=dylib" Condition="'$(Configuration)|$(Platform)'=='Debug|x64' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'DynamicLibrary'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc -- --crate-type=lib -o $(MSBuildProjectDirectory)\target\x86_64-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Debug|x64' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'Utility'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc -- --crate-type=staticlib -o $(MSBuildProjectDirectory)\target\x86_64-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Debug|x64' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'StaticLibrary'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc -- --crate-type=dylib -o $(MSBuildProjectDirectory)\target\x86_64-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Debug|x64' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'DynamicLibrary'" />
+    <!-- Release|x64 -->
+    <Exec Command="cargo rustc --bin $(ProjectName) --target x86_64-pc-windows-msvc --release -- -o $(MSBuildProjectDirectory)\target\x86_64-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Release|x64' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'Application'" />
+    <Exec Command="cargo build --target x86_64-pc-windows-msvc --release" Condition="'$(Configuration)|$(Platform)'=='Release|x64' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'Application'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc --release -- --crate-type=lib" Condition="'$(Configuration)|$(Platform)'=='Release|x64' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'Utility'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc --release -- --crate-type=staticlib" Condition="'$(Configuration)|$(Platform)'=='Release|x64' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'StaticLibrary'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc --release -- --crate-type=dylib" Condition="'$(Configuration)|$(Platform)'=='Release|x64' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'DynamicLibrary'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc --release -- --crate-type=lib -o $(MSBuildProjectDirectory)\target\x86_64-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Release|x64' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'Utility'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc --release -- --crate-type=staticlib -o $(MSBuildProjectDirectory)\target\x86_64-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Release|x64' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'StaticLibrary'" />
+    <Exec Command="cargo rustc --lib --target x86_64-pc-windows-msvc --release -- --crate-type=dylib -o $(MSBuildProjectDirectory)\target\x86_64-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Release|x64' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'DynamicLibrary'" />
+    <!-- Debug|x86 -->
+    <Exec Command="cargo rustc --bin $(ProjectName) --target i686-pc-windows-msvc -- -o $(MSBuildProjectDirectory)\target\target i686-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'Application'" />
+    <Exec Command="cargo build --target i686-pc-windows-msvc" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'Application'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc -- --crate-type=lib" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'Utility'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc -- --crate-type=staticlib" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'StaticLibrary'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc -- --crate-type=dylib" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'DynamicLibrary'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc -- --crate-type=lib -o $(MSBuildProjectDirectory)\target\target i686-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'Utility'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc -- --crate-type=staticlib -o $(MSBuildProjectDirectory)\target\target i686-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'StaticLibrary'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc -- --crate-type=dylib -o $(MSBuildProjectDirectory)\target\target i686-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'DynamicLibrary'" />
+    <!-- Release|x86 -->
+    <Exec Command="cargo rustc --bin $(ProjectName) --target i686-pc-windows-msvc --release -- -o $(MSBuildProjectDirectory)\target\target i686-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Release|Win32' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'Application'" />
+    <Exec Command="cargo build --target i686-pc-windows-msvc --release" Condition="'$(Configuration)|$(Platform)'=='Release|Win32' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'Application'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc --release -- --crate-type=lib" Condition="'$(Configuration)|$(Platform)'=='Release|Win32' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'Utility'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc --release -- --crate-type=staticlib" Condition="'$(Configuration)|$(Platform)'=='Release|Win32' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'StaticLibrary'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc --release -- --crate-type=dylib" Condition="'$(Configuration)|$(Platform)'=='Release|Win32' And '$(TargetName)' == '$(ProjectName)' And '$(ConfigurationType)' == 'DynamicLibrary'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc --release -- --crate-type=lib -o $(MSBuildProjectDirectory)\target\target i686-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Release|Win32' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'Utility'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc --release -- --crate-type=staticlib -o $(MSBuildProjectDirectory)\target\target i686-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Release|Win32' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'StaticLibrary'" />
+    <Exec Command="cargo rustc --lib --target i686-pc-windows-msvc --release -- --crate-type=dylib -o $(MSBuildProjectDirectory)\target\target i686-pc-windows-msvc\debug\$(TargetName)" Condition="'$(Configuration)|$(Platform)'=='Release|Win32' And '$(TargetName)' != '$(ProjectName)' And '$(ConfigurationType)' == 'DynamicLibrary'" />
+    <!-- Test|x64 -->
+    <Exec Command="cargo test" Condition="'$(Configuration)'=='Test'" />
+    <!-- Test|x86 -->
+    <Exec Command="cargo test" Condition="'$(Configuration)'=='Test'" />
+    <!-- Check|x64 -->
+    <Exec Command="cargo check" Condition="'$(Configuration)'=='Check'" />
+    <!-- Check|x86 -->
+    <Exec Command="cargo check" Condition="'$(Configuration)'=='Check'" />
+    <!-- Clippy|x64 -->
+    <Exec Command="cargo clippy" Condition="'$(Configuration)'=='Clippy'" />
+    <!-- Clippy|x86 -->
+    <Exec Command="cargo clippy" Condition="'$(Configuration)'=='Clippy'" />
+  </Target>
+  <Target Name="Run">
+    <CallTarget Targets="Build" />
+    <Error Text="Cargo cannot run this configuration type!" Condition="'$(ConfigurationType)' != 'Application'" />
+    <Exec Command="cargo run" Condition="'$(Configuration)'=='Debug'" />
+    <Exec Command="cargo run --release" Condition="'$(Configuration)'=='Release'" />
+  </Target>
+  <Target Name="TestComplete">
+    <Exec Command="notepad.exe" />
+  </Target>
+</Project>
