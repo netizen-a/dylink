@@ -4,13 +4,12 @@
 // re-export the dylink macro
 pub extern crate dylink_macro;
 use std::{
-	cell::UnsafeCell,
 	ffi, mem,
 	os::raw::c_char,
 	ptr,
 	sync::{
 		atomic::{AtomicPtr, Ordering},
-		Mutex,
+		RwLock,
 	},
 };
 
@@ -102,13 +101,11 @@ macro_rules! vk_platform {
     };
 }
 
-// The loader functions can be called on different threads by the user,
-// therefore the following precautions, namely Mutex for thread safety are necessary.
-type DllHandle = Mutex<UnsafeCell<Vec<(String, HINSTANCE)>>>;
-static DLL_DATA: DllHandle = Mutex::new(UnsafeCell::new(Vec::new()));
-
 type DispatchableHandle = *const ffi::c_void;
-
+vk_platform! {
+	#[allow(non_camel_case_types)]
+	type PFN_vkGetProcAddr = extern VKAPI_CALL fn(DispatchableHandle, *const c_char) -> Option<fn()>;
+}
 pub struct VkContext {
 	pub instance: AtomicPtr<ffi::c_void>,
 	pub device:   AtomicPtr<ffi::c_void>,
@@ -121,21 +118,18 @@ pub static VK_CONTEXT: VkContext = VkContext {
 };
 
 /// `vkloader` is a vulkan loader specialization.
+/// # Panics
+/// This function might panic if `vulkan-1.dll` is not found or if the function is not found.
 #[track_caller]
 pub unsafe fn vkloader(fn_name: &str) -> fn() {
-	vk_platform! {
-		#[allow(non_camel_case_types)]
-		type PFN_vkGetProcAddr = extern VKAPI_CALL fn(DispatchableHandle, *const c_char) -> Option<fn()>;
-	}
 	let device = VK_CONTEXT.device.load(Ordering::Acquire);
 	let instance = VK_CONTEXT.instance.load(Ordering::Acquire);
 	#[allow(non_upper_case_globals)]
-	static vkGetInstanceProcAddr: Lazy<PFN_vkGetProcAddr> = Lazy::new(|| unsafe {
-		std::mem::transmute(loader("vulkan-1.dll", "vkGetInstanceProcAddr"))
-	});
+	static vkGetInstanceProcAddr: Lazy<PFN_vkGetProcAddr> =
+		Lazy::new(|| unsafe { mem::transmute(loader("vulkan-1.dll", "vkGetInstanceProcAddr")) });
 	#[allow(non_upper_case_globals)]
 	static vkGetDeviceProcAddr: Lazy<PFN_vkGetProcAddr> = Lazy::new(|| unsafe {
-		std::mem::transmute(vkGetInstanceProcAddr(
+		mem::transmute(vkGetInstanceProcAddr(
 			VK_CONTEXT.instance.load(Ordering::Acquire),
 			"vkGetDeviceProcAddr\0".as_ptr() as *const c_char,
 		))
@@ -152,6 +146,8 @@ pub unsafe fn vkloader(fn_name: &str) -> fn() {
 }
 
 /// `glloader` is an opengl loader specialization.
+/// # Panics
+/// This function might panic if the function is not found.
 #[track_caller]
 pub unsafe fn glloader(fn_name: &str) -> fn() {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
@@ -161,12 +157,14 @@ pub unsafe fn glloader(fn_name: &str) -> fn() {
 }
 
 /// `loader` is a generalization for all other dlls.
+/// # Panics
+/// This function might panic if the `lib_name` dll is not found or if the function is not found.
 #[track_caller]
 pub unsafe fn loader(lib_name: &str, fn_name: &str) -> fn() {
+	static DLL_DATA: RwLock<Vec<(String, HINSTANCE)>> = RwLock::new(Vec::new());
 	let mut lib_handle = HINSTANCE::default();
 	let mut lib_found = false;
-	let dll_data = DLL_DATA.lock().unwrap().get();
-	for lib_set in (*dll_data).iter_mut() {
+	for lib_set in DLL_DATA.read().unwrap().iter() {
 		if lib_set.0 == lib_name {
 			lib_found = true;
 			lib_handle = lib_set.1;
@@ -177,10 +175,13 @@ pub unsafe fn loader(lib_name: &str, fn_name: &str) -> fn() {
 		let lib_cstr = ffi::CString::new(lib_name).unwrap();
 		lib_handle = LoadLibraryA(lib_cstr.as_ptr() as *const _);
 		assert!(lib_handle != 0, "Dylink Error: `{lib_name}` not found!");
-		(*dll_data).push((lib_name.to_string(), lib_handle));
+		DLL_DATA
+			.write()
+			.unwrap()
+			.push((lib_name.to_string(), lib_handle));
 	}
 	let fn_cstr = ffi::CString::new(fn_name).unwrap();
 	let addr = GetProcAddress(lib_handle, fn_cstr.as_ptr() as *const _)
-		.expect("Dylink Error: `{fn_name}` not found!");	
+		.expect("Dylink Error: `{fn_name}` not found!");
 	mem::transmute(addr)
 }
