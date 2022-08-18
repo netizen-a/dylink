@@ -161,27 +161,26 @@ pub unsafe fn glloader(fn_name: &str) -> fn() {
 /// This function might panic if the `lib_name` dll is not found or if the function is not found.
 #[track_caller]
 pub unsafe fn loader(lib_name: &str, fn_name: &str) -> fn() {
-	static DLL_DATA: RwLock<Vec<(String, HINSTANCE)>> = RwLock::new(Vec::new());
-	let mut lib_handle = HINSTANCE::default();
-	let mut lib_found = false;
-	for lib_set in DLL_DATA.read().unwrap().iter() {
-		if lib_set.0 == lib_name {
-			lib_found = true;
-			lib_handle = lib_set.1;
-			break;
+	use std::collections::HashMap;
+	static DLL_DATA: Lazy<RwLock<HashMap<String, HINSTANCE>>> =
+		Lazy::new(|| RwLock::new(HashMap::new()));
+	let read_lock = DLL_DATA.read().unwrap();
+	let handle: HINSTANCE = match read_lock.get(lib_name) {
+		Some(lib_handle) => *lib_handle,
+		None => {
+			mem::drop(read_lock);
+			let lib_cstr = ffi::CString::new(lib_name).unwrap();
+			let lib_handle = LoadLibraryA(lib_cstr.as_ptr() as *const _);
+			assert!(lib_handle != 0, "Dylink Error: `{lib_name}` not found!");
+			DLL_DATA
+				.write()
+				.unwrap()
+				.insert(lib_name.to_string(), lib_handle);
+			lib_handle
 		}
-	}
-	if !lib_found {
-		let lib_cstr = ffi::CString::new(lib_name).unwrap();
-		lib_handle = LoadLibraryA(lib_cstr.as_ptr() as *const _);
-		assert!(lib_handle != 0, "Dylink Error: `{lib_name}` not found!");
-		DLL_DATA
-			.write()
-			.unwrap()
-			.push((lib_name.to_string(), lib_handle));
-	}
+	};
 	let fn_cstr = ffi::CString::new(fn_name).unwrap();
-	let addr = GetProcAddress(lib_handle, fn_cstr.as_ptr() as *const _)
+	let addr = GetProcAddress(handle, fn_cstr.as_ptr() as *const _)
 		.expect("Dylink Error: `{fn_name}` not found!");
 	mem::transmute(addr)
 }
