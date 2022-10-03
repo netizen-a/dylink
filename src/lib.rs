@@ -18,7 +18,7 @@ pub use dylink_macro::dylink;
 #[doc(hidden)]
 pub use once_cell::sync::Lazy;
 use windows_sys::Win32::{
-	Foundation::HINSTANCE,
+	Foundation::{HINSTANCE, PROC},
 	Graphics::OpenGL as gl,
 	System::LibraryLoader::{GetProcAddress, LoadLibraryA},
 };
@@ -106,6 +106,21 @@ vk_platform! {
 	#[allow(non_camel_case_types)]
 	type PFN_vkGetProcAddr = extern VKAPI_CALL fn(DispatchableHandle, *const c_char) -> Option<fn()>;
 }
+
+// This is pretty much impossible to use safely without the dylink macro
+pub struct LazyFn<F>(pub std::cell::UnsafeCell<F>);
+unsafe impl<F> Sync for LazyFn<F> {}
+impl<F> LazyFn<F> {
+	#[allow(dead_code)]
+	#[inline]
+	pub const fn new(thunk: F) -> Self { Self(std::cell::UnsafeCell::new(thunk)) }
+}
+impl<F: Sized> std::ops::Deref for LazyFn<F> {
+	type Target = F;
+	#[inline]
+	fn deref(&self) -> &Self::Target { unsafe { mem::transmute(self.0.get()) } }
+}
+
 pub struct VkContext {
 	pub instance: AtomicPtr<ffi::c_void>,
 	pub device:   AtomicPtr<ffi::c_void>,
@@ -121,7 +136,7 @@ pub static VK_CONTEXT: VkContext = VkContext {
 /// # Panics
 /// This function might panic if `vulkan-1.dll` is not found or if the function is not found.
 #[track_caller]
-pub unsafe fn vkloader(fn_name: &str) -> fn() {
+pub unsafe fn vkloader(fn_name: &str) -> Option<fn()> {
 	let device = VK_CONTEXT.device.load(Ordering::Acquire);
 	let instance = VK_CONTEXT.instance.load(Ordering::Acquire);
 	#[allow(non_upper_case_globals)]
@@ -136,31 +151,34 @@ pub unsafe fn vkloader(fn_name: &str) -> fn() {
 	});
 
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	if device.is_null() {
+	let addr = if device.is_null() {
 		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
 	} else {
 		vkGetDeviceProcAddr(device, c_fn_name.as_ptr())
 			.or_else(|| vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()))
-	}
-	.expect(&format!("Dylink Error: `{fn_name}` not found!"))
+	};
+	#[cfg(feature = "panic_always")]
+	assert!(addr.is_some(), "Dylink Error: `{fn_name}` not found!");
+	addr
 }
 
 /// `glloader` is an opengl loader specialization.
 /// # Panics
 /// This function might panic if the function is not found.
 #[track_caller]
-pub unsafe fn glloader(fn_name: &str) -> fn() {
+pub unsafe fn glloader(fn_name: &str) -> PROC {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	let addr = gl::wglGetProcAddress(c_fn_name.as_ptr() as *const _)
-		.expect(&format!("Dylink Error: `{fn_name}` not found!"));
-	mem::transmute(addr)
+	let addr = gl::wglGetProcAddress(c_fn_name.as_ptr() as *const _);
+	#[cfg(feature = "panic_always")]
+	assert!(addr.is_some(), "Dylink Error: `{fn_name}` not found!");
+	addr
 }
 
 /// `loader` is a generalization for all other dlls.
 /// # Panics
 /// This function might panic if the `lib_name` dll is not found or if the function is not found.
 #[track_caller]
-pub unsafe fn loader(lib_name: &str, fn_name: &str) -> fn() {
+pub unsafe fn loader(lib_name: &str, fn_name: &str) -> Option<fn()> {
 	use std::collections::HashMap;
 	static DLL_DATA: Lazy<RwLock<HashMap<String, HINSTANCE>>> =
 		Lazy::new(|| RwLock::new(HashMap::new()));
@@ -180,7 +198,29 @@ pub unsafe fn loader(lib_name: &str, fn_name: &str) -> fn() {
 		}
 	};
 	let fn_cstr = ffi::CString::new(fn_name).unwrap();
-	let addr = GetProcAddress(handle, fn_cstr.as_ptr() as *const _)
-		.expect("Dylink Error: `{fn_name}` not found!");
+	let addr = GetProcAddress(handle, fn_cstr.as_ptr() as *const _);
+	#[cfg(feature = "panic_always")]
+	assert!(addr.is_some(), "Dylink Error: `{fn_name}` not found!");
 	mem::transmute(addr)
 }
+
+//#![feature(sync_unsafe_cell)]
+// use std::cell::SyncUnsafeCell;
+// use std::sync::Once;
+//
+// fn foo(x:usize) -> usize {
+//    x * 2
+//}
+// static DLL_FN: SyncUnsafeCell<fn(usize) -> usize> = SyncUnsafeCell::new(|x| {
+//    static START: Once = Once::new();
+//    unsafe {
+//        START.call_once(||{
+//            *SyncUnsafeCell::raw_get(&DLL_FN) = foo;
+//        });
+//        (*DLL_FN.get())(x)
+//    }
+//});
+// fn main() {
+//    let t = unsafe {(*DLL_FN.get())(5)};
+//    println!("{}", t);
+//}

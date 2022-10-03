@@ -16,3 +16,7 @@ features = [
 	"Win32_Graphics_OpenGL",
 	"Win32_System_LibraryLoader",	
 ]
+[features]
+# if dll or function is not found, panic will always be called.
+# if this is disabled loader functions will defer to Option result
+panic_always = []
