@@ -15,9 +15,7 @@ use std::{
 };
 
 pub use dylink_macro::dylink;
-// perpetuate dependency for macro
-#[doc(hidden)]
-pub use once_cell::sync::Lazy;
+use once_cell::sync::Lazy;
 use windows_sys::Win32::{
 	Foundation::{HINSTANCE, PROC},
 	Graphics::OpenGL as gl,
@@ -169,8 +167,6 @@ pub unsafe fn vkloader(fn_name: &str) -> Option<fn()> {
 		vkGetDeviceProcAddr(device, c_fn_name.as_ptr())
 			.or_else(|| vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()))
 	};
-	#[cfg(feature = "panic_always")]
-	assert!(addr.is_some(), "Dylink Error: `{fn_name}` not found!");
 	addr
 }
 
@@ -181,8 +177,6 @@ pub unsafe fn vkloader(fn_name: &str) -> Option<fn()> {
 pub unsafe fn glloader(fn_name: &str) -> PROC {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 	let addr = gl::wglGetProcAddress(c_fn_name.as_ptr() as *const _);
-	#[cfg(feature = "panic_always")]
-	assert!(addr.is_some(), "Dylink Error: `{fn_name}` not found!");
 	addr
 }
 
@@ -211,8 +205,6 @@ pub unsafe fn loader(lib_name: &str, fn_name: &str) -> Option<fn()> {
 	};
 	let fn_cstr = ffi::CString::new(fn_name).unwrap();
 	let addr = GetProcAddress(handle, fn_cstr.as_ptr() as *const _);
-	#[cfg(feature = "panic_always")]
-	assert!(addr.is_some(), "Dylink Error: `{fn_name}` not found!");
 	mem::transmute(addr)
 }
 
