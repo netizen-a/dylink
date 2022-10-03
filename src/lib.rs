@@ -4,10 +4,11 @@
 // re-export the dylink macro
 pub extern crate dylink_macro;
 use std::{
-	ffi, mem,
+	cell, ffi, mem,
 	os::raw::c_char,
 	ptr,
 	sync::{
+		self,
 		atomic::{AtomicPtr, Ordering},
 		RwLock,
 	},
@@ -108,15 +109,26 @@ vk_platform! {
 }
 
 // This is pretty much impossible to use safely without the dylink macro
-pub struct LazyFn<F>(pub std::cell::UnsafeCell<F>);
+#[repr(transparent)]
+pub struct LazyFn<F>(cell::UnsafeCell<F>);
 unsafe impl<F> Sync for LazyFn<F> {}
 impl<F> LazyFn<F> {
-	#[allow(dead_code)]
 	#[inline]
-	pub const fn new(thunk: F) -> Self { Self(std::cell::UnsafeCell::new(thunk)) }
+	pub const fn new(thunk: F) -> Self { Self(cell::UnsafeCell::new(thunk)) }
+
+	/// `Once` value must be unique to each `LazyFn` instance
+	pub fn update<I>(&self, once_val: &'static sync::Once, thunk: I)
+	where
+		I: Fn() -> F,
+	{
+		once_val.call_once(|| unsafe {
+			*cell::UnsafeCell::raw_get(&self.0) = thunk();
+		});
+	}
 }
 impl<F: Sized> std::ops::Deref for LazyFn<F> {
 	type Target = F;
+
 	#[inline]
 	fn deref(&self) -> &Self::Target { unsafe { mem::transmute(self.0.get()) } }
 }
