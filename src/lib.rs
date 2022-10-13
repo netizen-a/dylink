@@ -20,8 +20,10 @@ use once_cell::sync::Lazy;
 
 type DispatchableHandle = *const ffi::c_void;
 
+use windows_sys::Win32::Foundation::PROC;
+
 #[allow(non_camel_case_types)]
-type PFN_vkGetProcAddr = extern "system" fn(DispatchableHandle, *const c_char) -> Option<fn()>;
+type PFN_vkGetProcAddr = extern "system" fn(DispatchableHandle, *const c_char) -> PROC;
 
 
 // This is pretty much impossible to use safely without the dylink macro
@@ -32,7 +34,7 @@ impl<F> LazyFn<F> {
 	#[inline]
 	pub const fn new(thunk: F) -> Self { Self(cell::UnsafeCell::new(thunk)) }
 
-	/// `Once` value must be unique to each `LazyFn` instance
+	/// `Once` value must be unique to each `LazyFn` instance	
 	pub fn update<I>(&self, once_val: &'static sync::Once, thunk: I)
 	where
 		I: Fn() -> F,
@@ -64,7 +66,7 @@ pub static VK_CONTEXT: VkContext = VkContext {
 /// # Panics
 /// This function might panic if `vulkan-1.dll` is not found or if the function is not found.
 #[track_caller]
-pub unsafe fn vkloader(fn_name: &str) -> Option<unsafe extern "system" fn()> {
+pub unsafe fn vkloader(fn_name: &str) -> PROC {
 	let device = VK_CONTEXT.device.load(Ordering::Acquire);
 	let instance = VK_CONTEXT.instance.load(Ordering::Acquire);
 	#[allow(non_upper_case_globals)]
@@ -79,20 +81,19 @@ pub unsafe fn vkloader(fn_name: &str) -> Option<unsafe extern "system" fn()> {
 	});
 
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	let addr = if device.is_null() {
+	if device.is_null() {
 		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
 	} else {
 		vkGetDeviceProcAddr(device, c_fn_name.as_ptr())
 			.or_else(|| vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()))
-	};
-	mem::transmute(addr)
+	}
 }
 
 /// `glloader` is an opengl loader specialization.
 /// # Panics
 /// This function might panic if the function is not found.
 #[track_caller]
-pub unsafe fn glloader(fn_name: &str) -> Option<unsafe extern "system" fn()> {
+pub unsafe fn glloader(fn_name: &str) -> PROC {
 	use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 	let addr = wglGetProcAddress(c_fn_name.as_ptr() as *const _);
@@ -103,11 +104,12 @@ pub unsafe fn glloader(fn_name: &str) -> Option<unsafe extern "system" fn()> {
 /// # Panics
 /// This function might panic if the `lib_name` dll is not found or if the function is not found.
 #[track_caller]
-pub unsafe fn loader(lib_name: &str, fn_name: &str) -> Option<unsafe fn()> {
+pub unsafe fn loader(lib_name: &str, fn_name: &str) -> PROC {
 	use windows_sys::Win32::{
 		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
 		Foundation::HINSTANCE,
 	};	
+	
 	use std::collections::HashMap;
 
 	static DLL_DATA: Lazy<RwLock<HashMap<String, HINSTANCE>>> =
@@ -129,27 +131,5 @@ pub unsafe fn loader(lib_name: &str, fn_name: &str) -> Option<unsafe fn()> {
 		}
 	};
 	let fn_cstr = ffi::CString::new(fn_name).unwrap();
-	let addr = GetProcAddress(handle, fn_cstr.as_ptr() as *const _);
-	mem::transmute(addr)
+	GetProcAddress(handle, fn_cstr.as_ptr() as *const _)
 }
-
-//#![feature(sync_unsafe_cell)]
-// use std::cell::SyncUnsafeCell;
-// use std::sync::Once;
-//
-// fn foo(x:usize) -> usize {
-//    x * 2
-//}
-// static DLL_FN: SyncUnsafeCell<fn(usize) -> usize> = SyncUnsafeCell::new(|x| {
-//    static START: Once = Once::new();
-//    unsafe {
-//        START.call_once(||{
-//            *SyncUnsafeCell::raw_get(&DLL_FN) = foo;
-//        });
-//        (*DLL_FN.get())(x)
-//    }
-//});
-// fn main() {
-//    let t = unsafe {(*DLL_FN.get())(5)};
-//    println!("{}", t);
-//}
