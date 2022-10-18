@@ -2,8 +2,6 @@
 #![feature(strict_provenance)]
 #![warn(fuzzy_provenance_casts)]
 
-// re-export the dylink macro
-pub extern crate dylink_macro;
 use std::{
 	cell, ffi, mem,
 	os::raw::c_char,
@@ -14,7 +12,7 @@ use std::{
 		RwLock,
 	},
 };
-
+// re-export the dylink macro
 pub use dylink_macro::dylink;
 use once_cell::sync::Lazy;
 
@@ -25,21 +23,20 @@ use windows_sys::Win32::Foundation::PROC;
 #[allow(non_camel_case_types)]
 type PFN_vkGetProcAddr = extern "system" fn(DispatchableHandle, *const c_char) -> PROC;
 
-
 // This is pretty much impossible to use safely without the dylink macro
-#[repr(transparent)]
-pub struct LazyFn<F>(cell::UnsafeCell<F>);
+
+pub struct LazyFn<F>(cell::UnsafeCell<F>, sync::Once);
 unsafe impl<F> Sync for LazyFn<F> {}
 impl<F> LazyFn<F> {
 	#[inline]
-	pub const fn new(thunk: F) -> Self { Self(cell::UnsafeCell::new(thunk)) }
+	pub const fn new(thunk: F) -> Self { Self(cell::UnsafeCell::new(thunk), sync::Once::new()) }
 
-	/// `Once` value must be unique to each `LazyFn` instance	
-	pub fn update<I>(&self, once_val: &'static sync::Once, thunk: I)
+	/// `Once` value must be unique to each `LazyFn` instance
+	pub fn update<I>(&self, thunk: I)
 	where
 		I: Fn() -> F,
 	{
-		once_val.call_once(|| unsafe {
+		self.1.call_once(|| unsafe {
 			*cell::UnsafeCell::raw_get(&self.0) = thunk();
 		});
 	}
@@ -76,7 +73,7 @@ pub unsafe fn vkloader(fn_name: &str) -> PROC {
 	static vkGetDeviceProcAddr: Lazy<PFN_vkGetProcAddr> = Lazy::new(|| unsafe {
 		mem::transmute(vkGetInstanceProcAddr(
 			VK_CONTEXT.instance.load(Ordering::Acquire),
-			"vkGetDeviceProcAddr\0".as_ptr() as *const c_char,
+			windows_sys::s!("vkGetDeviceProcAddr") as *const _,
 		))
 	});
 
@@ -105,12 +102,12 @@ pub unsafe fn glloader(fn_name: &str) -> PROC {
 /// This function might panic if the `lib_name` dll is not found or if the function is not found.
 #[track_caller]
 pub unsafe fn loader(lib_name: &str, fn_name: &str) -> PROC {
-	use windows_sys::Win32::{
-		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
-		Foundation::HINSTANCE,
-	};	
-	
 	use std::collections::HashMap;
+
+	use windows_sys::Win32::{
+		Foundation::HINSTANCE,
+		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
+	};
 
 	static DLL_DATA: Lazy<RwLock<HashMap<String, HINSTANCE>>> =
 		Lazy::new(|| RwLock::new(HashMap::new()));
@@ -121,7 +118,11 @@ pub unsafe fn loader(lib_name: &str, fn_name: &str) -> PROC {
 		None => {
 			mem::drop(read_lock);
 			let lib_cstr = ffi::CString::new(lib_name).unwrap();
-			let lib_handle = LoadLibraryExA(lib_cstr.as_ptr() as *const _, 0, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+			let lib_handle = LoadLibraryExA(
+				lib_cstr.as_ptr() as *const _,
+				0,
+				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
+			);
 			assert!(lib_handle != 0, "Dylink Error: `{lib_name}` not found!");
 			DLL_DATA
 				.write()
