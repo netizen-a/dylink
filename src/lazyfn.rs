@@ -10,6 +10,7 @@ pub enum LinkType {
 	General { library: &'static str },
 }
 
+// This can be used safely without macro, but macro makes it so much easier to read.
 pub struct LazyFn<F> {
 	addr: cell::UnsafeCell<F>,
 	once: sync::Once,
@@ -69,14 +70,18 @@ extern "system" fn get_device_proc_addr_init(
 	name: *const c_char,
 ) -> PROC {
 	vkGetDeviceProcAddr.once.call_once(|| unsafe {
+		let instance = crate::VK_CONTEXT
+			.instance
+			.load(sync::atomic::Ordering::Acquire);
+		let self_name = vkGetDeviceProcAddr.name.as_ptr();
+		debug_assert!(
+			!instance.is_null() && !device.is_null() && !self_name.is_null() && !name.is_null(),
+			"undefined behavior!"
+		);
+
 		*cell::UnsafeCell::raw_get(&vkGetDeviceProcAddr.addr) = mem::transmute(
-			crate::example::vkGetInstanceProcAddr(
-				crate::VK_CONTEXT
-					.instance
-					.load(sync::atomic::Ordering::Acquire) as *const _,
-				vkGetDeviceProcAddr.name.as_ptr() as *const _,
-			)
-			.unwrap(),
+			crate::example::vkGetInstanceProcAddr(instance as *const _, self_name as *const _)
+				.unwrap(),
 		);
 	});
 	vkGetDeviceProcAddr(device, name)
