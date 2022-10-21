@@ -1,4 +1,9 @@
-use std::{cell, ffi, mem, os::raw::c_char, sync};
+use std::{
+	cell, ffi,
+	mem::{self, size_of},
+	os::raw::c_char,
+	ptr, sync,
+};
 
 use windows_sys::Win32::Foundation::PROC;
 
@@ -10,7 +15,13 @@ pub enum LinkType {
 	General { library: &'static str },
 }
 
-// This can be used safely without macro, but macro makes it so much easier to read.
+pub trait SizeTest<T, U> {
+	const SIZE_TEST: () = assert!(size_of::<T>() == size_of::<U>());
+}
+impl<F> SizeTest<fn(), F> for LazyFn<F> {}
+
+// This can be used safely without the dylink macro.
+// `F` can be anything as long as it's the size of a function pointer
 pub struct LazyFn<F> {
 	addr: cell::UnsafeCell<F>,
 	once: sync::Once,
@@ -31,24 +42,25 @@ impl<F> LazyFn<F> {
 		}
 	}
 
-	// This function can be used to load proactively
-	pub fn link_addr(&self, info: LinkType) -> Result<(), String> {
-		let mut result = Err(format!(
-			"Dylink Error: function `{}` already linked",
-			self.name
-		));
+	/// Can be used to preload functions before called.
+	/// If successful, stores address and returns it.
+	pub fn link_addr(&self, info: LinkType) -> Result<F, String> {
+		let name = self.name;
+		let mut result = Err(format!("Dylink Error: function `{name}` already linked"));
 		self.once.call_once(|| unsafe {
-			let loader = match info {
-				LinkType::Vulkan => vkloader(self.name),
-				LinkType::OpenGL => glloader(self.name),
-				LinkType::General { library } => loader(library, self.name),
+			let loaded_addr = match info {
+				LinkType::Vulkan => vkloader(name),
+				LinkType::OpenGL => glloader(name),
+				LinkType::General { library } => loader(library, name),
 			};
-			match loader {
-				Some(loader) => {
-					*cell::UnsafeCell::raw_get(&self.addr) = mem::transmute_copy(&loader);
-					result = Ok(());
+			match loaded_addr {
+				Some(addr) => {
+					// `SizeTest` asserts `F` to be same size an `fn` pointer, so transmute_copy is safe.
+					let _ = Self::SIZE_TEST;
+					*cell::UnsafeCell::raw_get(&self.addr) = mem::transmute_copy(&addr);
+					result = Ok(mem::transmute_copy(&addr));
 				}
-				None => result = Err(format!("Dylink Error: function `{}` not found", self.name)),
+				None => result = Err(format!("Dylink Error: function `{name}` not found")),
 			}
 		});
 		result
@@ -57,7 +69,7 @@ impl<F> LazyFn<F> {
 impl<F> std::ops::Deref for LazyFn<F> {
 	type Target = F;
 
-	#[inline]
+	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
 	fn deref(&self) -> &Self::Target { unsafe { self.addr.get().as_ref().unwrap_unchecked() } }
 }
 
@@ -65,8 +77,15 @@ impl<F> std::ops::Deref for LazyFn<F> {
 // SPECIALIZATION: vkGetDeviceProcAddr //
 /////////////////////////////////////////
 
+#[allow(non_upper_case_globals)]
+pub(crate) static vkGetDeviceProcAddr: LazyFn<
+	extern "system" fn(ptr::NonNull<ffi::c_void>, *const c_char) -> PROC,
+> = LazyFn::new("vkGetDeviceProcAddr\0", get_device_proc_addr_init);
+
+// Rust closures can't infer foreign calling conventions, so they must be defined
+// seperate from initialization.
 extern "system" fn get_device_proc_addr_init(
-	device: *const ffi::c_void,
+	device: ptr::NonNull<ffi::c_void>,
 	name: *const c_char,
 ) -> PROC {
 	vkGetDeviceProcAddr.once.call_once(|| unsafe {
@@ -75,8 +94,8 @@ extern "system" fn get_device_proc_addr_init(
 			.load(sync::atomic::Ordering::Acquire);
 		let self_name = vkGetDeviceProcAddr.name.as_ptr();
 		debug_assert!(
-			!instance.is_null() && !device.is_null() && !self_name.is_null() && !name.is_null(),
-			"undefined behavior!"
+			!instance.is_null() && !name.is_null(),
+			"Dylink Error: undefined behavior!"
 		);
 
 		*cell::UnsafeCell::raw_get(&vkGetDeviceProcAddr.addr) = mem::transmute(
@@ -86,8 +105,3 @@ extern "system" fn get_device_proc_addr_init(
 	});
 	vkGetDeviceProcAddr(device, name)
 }
-
-#[allow(non_upper_case_globals)]
-pub(crate) static vkGetDeviceProcAddr: LazyFn<
-	extern "system" fn(*const ffi::c_void, *const c_char) -> PROC,
-> = LazyFn::new("vkGetDeviceProcAddr\0", get_device_proc_addr_init);

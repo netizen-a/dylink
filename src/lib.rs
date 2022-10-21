@@ -1,5 +1,6 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
 #![feature(strict_provenance)]
+#![feature(core_intrinsics)]
 #![warn(fuzzy_provenance_casts)]
 
 use std::{ffi, ptr, sync::atomic::AtomicPtr};

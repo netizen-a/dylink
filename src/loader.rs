@@ -16,11 +16,11 @@ pub unsafe fn vkloader(fn_name: &str) -> PROC {
 	let device = VK_CONTEXT.device.load(Ordering::Acquire);
 	let instance = VK_CONTEXT.instance.load(Ordering::Acquire);
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	if device.is_null() {
-		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
-	} else {
+	if let Some(device) = std::ptr::NonNull::new(device) {
 		vkGetDeviceProcAddr(device, c_fn_name.as_ptr())
 			.or_else(|| vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()))
+	} else {
+		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
 	}
 }
 
