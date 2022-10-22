@@ -8,6 +8,8 @@ use windows_sys::Win32::Foundation::PROC;
 
 use crate::{example::*, lazyfn::*, VK_CONTEXT};
 
+//TODO: change PROC to Result<extern "system" fn(), DylinkError>
+
 /// `vkloader` is a vulkan loader specialization.
 /// # Panics
 /// This function might panic if `vulkan-1.dll` is not found or if the function is not found.

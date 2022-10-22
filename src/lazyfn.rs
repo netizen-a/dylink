@@ -1,6 +1,6 @@
 use std::{
 	cell, ffi,
-	mem::{self, size_of},
+	mem,
 	os::raw::c_char,
 	ptr, sync,
 };
@@ -8,6 +8,7 @@ use std::{
 use windows_sys::Win32::Foundation::PROC;
 
 use crate::loader::*;
+use crate::error::*;
 
 pub enum LinkType {
 	OpenGL,
@@ -16,7 +17,7 @@ pub enum LinkType {
 }
 
 pub trait SizeTest<T, U> {
-	const SIZE_TEST: () = assert!(size_of::<T>() == size_of::<U>());
+	const SIZE_TEST: () = assert!(mem::size_of::<T>() == mem::size_of::<U>());
 }
 impl<F> SizeTest<fn(), F> for LazyFn<F> {}
 
@@ -44,9 +45,9 @@ impl<F> LazyFn<F> {
 
 	/// Can be used to preload functions before called.
 	/// If successful, stores address and returns it.
-	pub fn link_addr(&self, info: LinkType) -> Result<F, String> {
+	pub fn link_addr(&self, info: LinkType) -> Result<F, DylinkError> {
 		let name = self.name;
-		let mut result = Err(format!("Dylink Error: function `{name}` already linked"));
+		let mut result = Err(DylinkError::new(name, ErrCause::AlreadyLinked));
 		self.once.call_once(|| unsafe {
 			let loaded_addr = match info {
 				LinkType::Vulkan => vkloader(name),
@@ -60,7 +61,7 @@ impl<F> LazyFn<F> {
 					*cell::UnsafeCell::raw_get(&self.addr) = mem::transmute_copy(&addr);
 					result = Ok(mem::transmute_copy(&addr));
 				}
-				None => result = Err(format!("Dylink Error: function `{name}` not found")),
+				None => result = Err(DylinkError::new(name, ErrCause::FnNotFound)),
 			}
 		});
 		result

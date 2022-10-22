@@ -8,6 +8,7 @@ use std::{ffi, ptr, sync::atomic::AtomicPtr};
 pub mod example;
 pub mod lazyfn;
 pub mod loader;
+pub mod error;
 
 // Re-export
 pub use dylink_macro::dylink;
