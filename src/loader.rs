@@ -4,25 +4,28 @@ use std::{
 };
 
 use once_cell::sync::Lazy;
-use windows_sys::Win32::Foundation::PROC;
 
-use crate::{example::*, lazyfn::*, VK_CONTEXT};
+use crate::{example::*, lazyfn::*, VK_CONTEXT, error::*};
 
-//TODO: change PROC to Result<extern "system" fn(), DylinkError>
+
 
 /// `vkloader` is a vulkan loader specialization.
 /// # Panics
 /// This function might panic if `vulkan-1.dll` is not found or if the function is not found.
 #[track_caller]
-pub unsafe fn vkloader(fn_name: &str) -> PROC {
+pub unsafe fn vkloader(fn_name: &str) -> Result<fn()> {
 	let device = VK_CONTEXT.device.load(Ordering::Acquire);
 	let instance = VK_CONTEXT.instance.load(Ordering::Acquire);
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	if let Some(device) = std::ptr::NonNull::new(device) {
+	let maybe_fn = if let Some(device) = std::ptr::NonNull::new(device) {
 		vkGetDeviceProcAddr(device, c_fn_name.as_ptr())
 			.or_else(|| vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()))
 	} else {
 		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
+	};
+	match maybe_fn {
+		Some(addr) => Ok(mem::transmute(addr)),
+		None => Err(DylinkError::new(fn_name.to_owned(), ErrorKind::FnNotFound)),
 	}
 }
 
@@ -30,18 +33,21 @@ pub unsafe fn vkloader(fn_name: &str) -> PROC {
 /// # Panics
 /// This function might panic if the function is not found.
 #[track_caller]
-pub unsafe fn glloader(fn_name: &str) -> PROC {
+pub unsafe fn glloader(fn_name: &str) -> Result<fn()> {
 	use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	let addr = wglGetProcAddress(c_fn_name.as_ptr() as *const _);
-	mem::transmute(addr)
+	let maybe_fn = wglGetProcAddress(c_fn_name.as_ptr() as *const _);
+	match maybe_fn {
+		Some(addr) => Ok(mem::transmute(addr)),
+		None => Err(DylinkError::new(fn_name.to_owned(), ErrorKind::FnNotFound)),
+	}	
 }
 
 /// `loader` is a generalization for all other dlls.
 /// # Panics
 /// This function might panic if the `lib_name` dll is not found or if the function is not found.
 #[track_caller]
-pub unsafe fn loader(lib_name: &str, fn_name: &str) -> PROC {
+pub unsafe fn loader(lib_name: &str, fn_name: &str) -> Result<fn()> {
 	use std::collections::HashMap;
 
 	use windows_sys::Win32::{
@@ -62,8 +68,10 @@ pub unsafe fn loader(lib_name: &str, fn_name: &str) -> PROC {
 				lib_cstr.as_ptr() as *const _,
 				0,
 				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
-			);
-			assert!(lib_handle != 0, "Dylink Error: `{lib_name}` not found!");
+			);			
+			if lib_handle == 0 {
+				return Err(DylinkError::new(lib_name.to_owned(), ErrorKind::LibNotFound))
+			}
 			DLL_DATA
 				.write()
 				.unwrap()
@@ -72,5 +80,9 @@ pub unsafe fn loader(lib_name: &str, fn_name: &str) -> PROC {
 		}
 	};
 	let fn_cstr = ffi::CString::new(fn_name).unwrap();
-	GetProcAddress(handle, fn_cstr.as_ptr() as *const _)
+	let maybe_fn = GetProcAddress(handle, fn_cstr.as_ptr() as *const _);
+	match maybe_fn {
+		Some(addr) => Ok(mem::transmute(addr)),
+		None => Err(DylinkError::new(fn_name.to_owned(), ErrorKind::FnNotFound)),
+	}
 }

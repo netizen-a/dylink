@@ -4,7 +4,6 @@ use std::{
 	os::raw::c_char,
 	ptr, sync,
 };
-
 use windows_sys::Win32::Foundation::PROC;
 
 use crate::loader::*;
@@ -45,23 +44,23 @@ impl<F> LazyFn<F> {
 
 	/// Can be used to preload functions before called.
 	/// If successful, stores address and returns it.
-	pub fn link_addr(&self, info: LinkType) -> Result<F, DylinkError> {
+	pub fn link_addr(&self, info: LinkType) -> Result<F> {
 		let name = self.name;
-		let mut result = Err(DylinkError::new(name, ErrCause::AlreadyLinked));
+		let mut result = Err(DylinkError::new(name.to_owned(), ErrorKind::AlreadyLinked));
 		self.once.call_once(|| unsafe {
-			let loaded_addr = match info {
+			let maybe = match info {
 				LinkType::Vulkan => vkloader(name),
 				LinkType::OpenGL => glloader(name),
 				LinkType::General { library } => loader(library, name),
 			};
-			match loaded_addr {
-				Some(addr) => {
+			match maybe {
+				Ok(addr) => {
 					// `SizeTest` asserts `F` to be same size an `fn` pointer, so transmute_copy is safe.
 					let _ = Self::SIZE_TEST;
 					*cell::UnsafeCell::raw_get(&self.addr) = mem::transmute_copy(&addr);
 					result = Ok(mem::transmute_copy(&addr));
 				}
-				None => result = Err(DylinkError::new(name, ErrCause::FnNotFound)),
+				Err(err) => result = Err(err),
 			}
 		});
 		result
