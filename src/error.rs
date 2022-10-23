@@ -30,4 +30,4 @@ impl fmt::Display for DylinkError {
 	}
 }
 
-pub type Result<T> = std::result::Result<T, DylinkError>;
+

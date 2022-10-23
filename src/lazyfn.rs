@@ -1,8 +1,7 @@
-use std::{cell, ffi, mem, os::raw::c_char, ptr, sync};
+use std::{cell, ffi, mem, os::raw::c_char, sync};
 
-//use windows_sys::Win32::Foundation::PROC;
-
-use crate::{error::*, loader::*, FnPtr};
+// use windows_sys::Win32::Foundation::PROC;
+use crate::{error::*, loader::*, FnPtr, Result};
 
 pub enum LinkType {
 	OpenGL,
@@ -72,16 +71,16 @@ impl<F: Sync> std::ops::Deref for LazyFn<F> {
 
 #[allow(non_upper_case_globals)]
 pub(crate) static vkGetDeviceProcAddr: LazyFn<
-	extern "system" fn(ptr::NonNull<ffi::c_void>, *const c_char) -> FnPtr,
+	unsafe extern "system" fn(*const ffi::c_void, *const c_char) -> FnPtr,
 > = LazyFn::new("vkGetDeviceProcAddr\0", get_device_proc_addr_init);
 
 // Rust closures can't infer foreign calling conventions, so they must be defined
 // seperate from initialization.
-extern "system" fn get_device_proc_addr_init(
-	device: ptr::NonNull<ffi::c_void>,
+unsafe extern "system" fn get_device_proc_addr_init(
+	device: *const ffi::c_void,
 	name: *const c_char,
 ) -> FnPtr {
-	vkGetDeviceProcAddr.once.call_once(|| unsafe {
+	vkGetDeviceProcAddr.once.call_once(|| {
 		let instance = crate::VK_CONTEXT
 			.instance
 			.load(sync::atomic::Ordering::Acquire);

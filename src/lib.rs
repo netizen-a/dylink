@@ -1,6 +1,5 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
 #![feature(strict_provenance)]
-#![feature(core_intrinsics)]
 #![warn(fuzzy_provenance_casts)]
 
 use std::{ffi, ptr, sync::atomic::AtomicPtr};
@@ -24,5 +23,7 @@ pub static VK_CONTEXT: VkContext = VkContext {
 	device:   AtomicPtr::new(ptr::null_mut()),
 };
 
-// Used as a placeholder function pointer
+/// Used as a placeholder function pointer
 pub type FnPtr = Option<unsafe extern "system" fn() -> isize>;
+/// The result of a Dylink function
+pub type Result<T> = std::result::Result<T, crate::error::DylinkError>;

@@ -5,7 +5,7 @@ use std::{
 
 use once_cell::sync::Lazy;
 
-use crate::{error::*, example::*, lazyfn::*, VK_CONTEXT, FnPtr};
+use crate::{FnPtr, Result, example::*, lazyfn::*, VK_CONTEXT, error::*};
 
 /// `vkloader` is a vulkan loader specialization.
 /// # Panics
@@ -15,11 +15,11 @@ pub unsafe fn vkloader(fn_name: &str) -> Result<FnPtr> {
 	let device = VK_CONTEXT.device.load(Ordering::Acquire);
 	let instance = VK_CONTEXT.instance.load(Ordering::Acquire);
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	let maybe_fn = if let Some(device) = std::ptr::NonNull::new(device) {
+	let maybe_fn = if device.is_null() {
+		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
+	} else {
 		vkGetDeviceProcAddr(device, c_fn_name.as_ptr())
 			.or_else(|| vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()))
-	} else {
-		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
 	};
 	match maybe_fn {
 		Some(addr) => Ok(mem::transmute(addr)),
