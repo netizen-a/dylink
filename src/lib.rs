@@ -5,10 +5,10 @@
 
 use std::{ffi, ptr, sync::atomic::AtomicPtr};
 
+pub mod error;
 pub mod example;
 pub mod lazyfn;
 pub mod loader;
-pub mod error;
 
 // Re-export
 pub use dylink_macro::dylink;
@@ -23,3 +23,6 @@ pub static VK_CONTEXT: VkContext = VkContext {
 	instance: AtomicPtr::new(ptr::null_mut()),
 	device:   AtomicPtr::new(ptr::null_mut()),
 };
+
+// Used as a placeholder function pointer
+pub type FnPtr = Option<unsafe extern "system" fn() -> isize>;

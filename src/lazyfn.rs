@@ -1,13 +1,8 @@
-use std::{
-	cell, ffi,
-	mem,
-	os::raw::c_char,
-	ptr, sync,
-};
-use windows_sys::Win32::Foundation::PROC;
+use std::{cell, ffi, mem, os::raw::c_char, ptr, sync};
 
-use crate::loader::*;
-use crate::error::*;
+//use windows_sys::Win32::Foundation::PROC;
+
+use crate::{error::*, loader::*, FnPtr};
 
 pub enum LinkType {
 	OpenGL,
@@ -18,21 +13,19 @@ pub enum LinkType {
 pub trait SizeTest<T, U> {
 	const SIZE_TEST: () = assert!(mem::size_of::<T>() == mem::size_of::<U>());
 }
-impl<F> SizeTest<fn(), F> for LazyFn<F> {}
+impl<F: Sync> SizeTest<FnPtr, F> for LazyFn<F> {}
 
 // This can be used safely without the dylink macro.
 // `F` can be anything as long as it's the size of a function pointer
-pub struct LazyFn<F> {
+pub struct LazyFn<F: Sync> {
 	addr: cell::UnsafeCell<F>,
 	once: sync::Once,
 	name: &'static str,
 }
 
-// both traits are enforced by the use of `Once`, so it should be safe to add.
-unsafe impl<F> Sync for LazyFn<F> {}
-unsafe impl<F> Send for LazyFn<F> {}
+unsafe impl<F: Sync> Sync for LazyFn<F> {}
 
-impl<F> LazyFn<F> {
+impl<F: Sync> LazyFn<F> {
 	#[inline]
 	pub const fn new(name: &'static str, thunk: F) -> Self {
 		Self {
@@ -66,7 +59,7 @@ impl<F> LazyFn<F> {
 		result
 	}
 }
-impl<F> std::ops::Deref for LazyFn<F> {
+impl<F: Sync> std::ops::Deref for LazyFn<F> {
 	type Target = F;
 
 	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
@@ -79,7 +72,7 @@ impl<F> std::ops::Deref for LazyFn<F> {
 
 #[allow(non_upper_case_globals)]
 pub(crate) static vkGetDeviceProcAddr: LazyFn<
-	extern "system" fn(ptr::NonNull<ffi::c_void>, *const c_char) -> PROC,
+	extern "system" fn(ptr::NonNull<ffi::c_void>, *const c_char) -> FnPtr,
 > = LazyFn::new("vkGetDeviceProcAddr\0", get_device_proc_addr_init);
 
 // Rust closures can't infer foreign calling conventions, so they must be defined
@@ -87,7 +80,7 @@ pub(crate) static vkGetDeviceProcAddr: LazyFn<
 extern "system" fn get_device_proc_addr_init(
 	device: ptr::NonNull<ffi::c_void>,
 	name: *const c_char,
-) -> PROC {
+) -> FnPtr {
 	vkGetDeviceProcAddr.once.call_once(|| unsafe {
 		let instance = crate::VK_CONTEXT
 			.instance
