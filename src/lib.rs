@@ -9,13 +9,12 @@ pub mod example;
 pub mod lazyfn;
 pub mod loader;
 
-// Re-export
-pub use dylink_macro::dylink;
-
 pub struct VkContext {
 	pub instance: AtomicPtr<ffi::c_void>,
 	pub device:   AtomicPtr<ffi::c_void>,
 }
+
+// TODO: hide VK_CONTEXT behind a trait
 
 /// `VK_CONTEXT` is loaded every time `vkloader` is called.
 pub static VK_CONTEXT: VkContext = VkContext {
@@ -24,6 +23,6 @@ pub static VK_CONTEXT: VkContext = VkContext {
 };
 
 /// Used as a placeholder function pointer
-pub type FnPtr = Option<unsafe extern "system" fn() -> isize>;
+pub type FnPtr = unsafe extern "system" fn() -> isize;
 /// The result of a Dylink function
 pub type Result<T> = std::result::Result<T, crate::error::DylinkError>;
