@@ -3,18 +3,18 @@ use std::{ffi, mem, sync::RwLock};
 use crate::{error::*, example::*, lazyfn::*, FnPtr, Result};
 
 /// `vkloader` is a vulkan loader specialization.
+/// If `instance` is null, then `device` is ignored.
 pub unsafe fn vkloader(
 	fn_name: &str,
 	instance: *const ffi::c_void,
 	device: *const ffi::c_void,
 ) -> Result<FnPtr> {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-
-	let maybe_fn = if instance.is_null() || device.is_null() {
-		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
-	} else {
+	let maybe_fn = if !instance.is_null() && !device.is_null() {
 		vkGetDeviceProcAddr(device, c_fn_name.as_ptr())
 			.or_else(|| vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()))
+	} else {
+		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
 	};
 	match maybe_fn {
 		Some(addr) => Ok(mem::transmute(addr)),
