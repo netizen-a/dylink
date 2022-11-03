@@ -14,5 +14,4 @@ Cargo.lock
 *.pdb
 *.vcxproj
 *.user
-.vs/VSWorkspaceState.json
-.vs/dylink/v17/.suo
+.vs/*
