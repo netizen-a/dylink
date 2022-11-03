@@ -1,5 +1,5 @@
 use std::{
-	cell, ffi, mem,
+	cell, mem,
 	os::raw::c_char,
 	ptr,
 	sync::{self, atomic},
@@ -17,20 +17,20 @@ pub enum LinkType {
 pub trait AssertSize<T, U> {
 	const ASSERT_SIZE: () = assert!(mem::size_of::<T>() == mem::size_of::<U>());
 }
-impl<F: Sync + Copy> AssertSize<FnPtr, F> for LazyFn<F> {}
+impl<F> AssertSize<FnPtr, F> for LazyFn<F> {}
 
 // This can be used safely without the dylink macro.
 // `F` can be anything as long as it's the size of a function pointer
-pub struct LazyFn<F: Sync + Copy> {
+pub struct LazyFn<F> {
 	name:   &'static str,
 	addr:   cell::UnsafeCell<F>,
 	once:   sync::Once,
 	status: cell::UnsafeCell<Option<ErrorKind>>,
 }
 
-unsafe impl<F: Sync + Copy> Sync for LazyFn<F> {}
+unsafe impl<F> Sync for LazyFn<F> {}
 
-impl<F: Sync + Copy> LazyFn<F> {
+impl<F> LazyFn<F> {
 	#[inline]
 	pub const fn new(name: &'static str, thunk: F) -> Self {
 		Self {
@@ -44,7 +44,7 @@ impl<F: Sync + Copy> LazyFn<F> {
 	// Can be used to preload functions, but the overhead is too insignificant to matter.
 
 	/// If successful, stores address and returns it.
-	pub fn link_lib(&self, info: LinkType) -> Result<F> {
+	pub fn link_lib(&self, info: LinkType) -> Result<&F> {
 		let fn_name = self.name;
 		self.once.call_once(|| unsafe {
 			let maybe = match info {
@@ -70,16 +70,20 @@ impl<F: Sync + Copy> LazyFn<F> {
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
 		match unsafe { *self.status.get() } {
-			None => Ok(**self),
+			None => Ok(self.as_ref()),
 			Some(kind) => Err(DylinkError::new(fn_name.to_owned(), kind)),
 		}
 	}
 }
-impl<F: Sync + Copy> std::ops::Deref for LazyFn<F> {
+impl<F> std::ops::Deref for LazyFn<F> {
 	type Target = F;
 
+	fn deref(&self) -> &Self::Target { self.as_ref() }
+}
+
+impl<F> std::convert::AsRef<F> for LazyFn<F> {
 	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
-	fn deref(&self) -> &Self::Target { unsafe { self.addr.get().as_ref().unwrap_unchecked() } }
+	fn as_ref(&self) -> &F { unsafe { self.addr.get().as_ref().unwrap_unchecked() } }
 }
 
 /////////////////////////////////////////
@@ -88,12 +92,12 @@ impl<F: Sync + Copy> std::ops::Deref for LazyFn<F> {
 
 #[allow(non_upper_case_globals)]
 pub(crate) static vkGetDeviceProcAddr: LazyFn<
-	unsafe extern "system" fn(*const ffi::c_void, *const c_char) -> Option<FnPtr>,
+	unsafe extern "system" fn(*const (), *const c_char) -> Option<FnPtr>,
 > = LazyFn::new("vkGetDeviceProcAddr", get_device_proc_addr_init);
 
 #[inline(never)]
 unsafe extern "system" fn get_device_proc_addr_init(
-	device: *const ffi::c_void,
+	device: *const (),
 	name: *const c_char,
 ) -> Option<FnPtr> {
 	vkGetDeviceProcAddr.once.call_once(|| {

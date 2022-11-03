@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 once_cell = "1.10"
-dylink_macro = {path = "../dylink_macro"}
+dylink_macro = { path = "../dylink_macro", default-features = false }
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.42"
@@ -16,3 +16,12 @@ features = [
 	"Win32_Graphics_OpenGL",
 	"Win32_System_LibraryLoader",
 ]
+
+[profile.release]
+codegen-units = 1
+debug = false
+strip = true
+lto = true
+overflow-checks = false
+incremental = false
+opt-level = "z"
