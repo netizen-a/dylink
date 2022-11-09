@@ -8,7 +8,7 @@ pub enum ErrorKind {
 
 #[derive(Debug)]
 pub struct DylinkError {
-	subject:         String,
+	subject:         &'static str,
 	pub(crate) kind: ErrorKind,
 }
 
@@ -16,12 +16,12 @@ impl Error for DylinkError {}
 
 impl DylinkError {
 	#[inline]
-	pub fn new(subject: String, kind: ErrorKind) -> Self { Self { subject, kind } }
+	pub fn new(subject: &'static str, kind: ErrorKind) -> Self { Self { subject, kind } }
 }
 
 impl fmt::Display for DylinkError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		let subject = &self.subject;
+		let subject = self.subject;
 		let err = match self.kind {
 			ErrorKind::FnNotFound => format!("function `{subject}` not found"),
 			ErrorKind::LibNotFound => format!("library `{subject}` not found"),

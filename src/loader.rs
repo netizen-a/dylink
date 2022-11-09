@@ -1,10 +1,16 @@
 use std::{ffi, mem, sync::RwLock};
 
+use once_cell::sync::Lazy;
+
 use crate::{error::*, example::*, lazyfn::*, FnPtr, Result};
 
 /// `vkloader` is a vulkan loader specialization.
 /// If `instance` is null, then `device` is ignored.
-pub unsafe fn vkloader(fn_name: &str, instance: *const (), device: *const ()) -> Result<FnPtr> {
+pub unsafe fn vkloader(
+	fn_name: &'static str,
+	instance: *const (),
+	device: *const (),
+) -> Result<FnPtr> {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 	let maybe_fn = if !instance.is_null() && !device.is_null() {
 		vkGetDeviceProcAddr(device, c_fn_name.as_ptr())
@@ -14,26 +20,25 @@ pub unsafe fn vkloader(fn_name: &str, instance: *const (), device: *const ()) ->
 	};
 	match maybe_fn {
 		Some(addr) => Ok(mem::transmute(addr)),
-		None => Err(DylinkError::new(fn_name.to_owned(), ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
 	}
 }
 
 /// `glloader` is an opengl loader specialization.
-pub unsafe fn glloader(fn_name: &str) -> Result<FnPtr> {
+pub unsafe fn glloader(fn_name: &'static str) -> Result<FnPtr> {
 	use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 	let maybe_fn = wglGetProcAddress(c_fn_name.as_ptr() as *const _);
 	match maybe_fn {
 		Some(addr) => Ok(mem::transmute(addr)),
-		None => Err(DylinkError::new(fn_name.to_owned(), ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
 	}
 }
 
 /// `loader` is a generalization for all other dlls.
-pub unsafe fn loader(lib_name: &str, fn_name: &str) -> Result<FnPtr> {
+pub unsafe fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
-	use once_cell::sync::Lazy;
 	use windows_sys::Win32::{
 		Foundation::HINSTANCE,
 		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
@@ -57,10 +62,7 @@ pub unsafe fn loader(lib_name: &str, fn_name: &str) -> Result<FnPtr> {
 			LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 		);
 		if lib_handle == 0 {
-			return Err(DylinkError::new(
-				lib_name.to_owned(),
-				ErrorKind::LibNotFound,
-			));
+			return Err(DylinkError::new(lib_name, ErrorKind::LibNotFound));
 		} else {
 			DLL_DATA
 				.write()
@@ -73,6 +75,6 @@ pub unsafe fn loader(lib_name: &str, fn_name: &str) -> Result<FnPtr> {
 	let maybe_fn = GetProcAddress(handle, c_fn_name.as_ptr() as *const _);
 	match maybe_fn {
 		Some(addr) => Ok(mem::transmute(addr)),
-		None => Err(DylinkError::new(fn_name.to_owned(), ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
 	}
 }

@@ -1,7 +1,5 @@
 use std::{
-	cell, mem,
-	os::raw::c_char,
-	ptr,
+	cell, ffi, mem, ptr,
 	sync::{self, atomic},
 };
 
@@ -17,20 +15,20 @@ pub enum LinkType {
 pub trait AssertSize<T, U> {
 	const ASSERT_SIZE: () = assert!(mem::size_of::<T>() == mem::size_of::<U>());
 }
-impl<F> AssertSize<FnPtr, F> for LazyFn<F> {}
+impl<F: 'static> AssertSize<FnPtr, F> for LazyFn<F> {}
 
 // This can be used safely without the dylink macro.
 // `F` can be anything as long as it's the size of a function pointer
-pub struct LazyFn<F> {
+pub struct LazyFn<F: 'static> {
 	name:   &'static str,
 	addr:   cell::UnsafeCell<F>,
 	once:   sync::Once,
 	status: cell::UnsafeCell<Option<ErrorKind>>,
 }
 
-unsafe impl<F> Sync for LazyFn<F> {}
+unsafe impl<F: 'static> Sync for LazyFn<F> {}
 
-impl<F> LazyFn<F> {
+impl<F: 'static> LazyFn<F> {
 	#[inline]
 	pub const fn new(name: &'static str, thunk: F) -> Self {
 		Self {
@@ -71,17 +69,17 @@ impl<F> LazyFn<F> {
 		// by this point. Race conditions shouldn't occur.
 		match unsafe { *self.status.get() } {
 			None => Ok(self.as_ref()),
-			Some(kind) => Err(DylinkError::new(fn_name.to_owned(), kind)),
+			Some(kind) => Err(DylinkError::new(fn_name, kind)),
 		}
 	}
 }
-impl<F> std::ops::Deref for LazyFn<F> {
+impl<F: 'static> std::ops::Deref for LazyFn<F> {
 	type Target = F;
 
 	fn deref(&self) -> &Self::Target { self.as_ref() }
 }
 
-impl<F> std::convert::AsRef<F> for LazyFn<F> {
+impl<F: 'static> std::convert::AsRef<F> for LazyFn<F> {
 	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
 	fn as_ref(&self) -> &F { unsafe { self.addr.get().as_ref().unwrap_unchecked() } }
 }
@@ -92,13 +90,13 @@ impl<F> std::convert::AsRef<F> for LazyFn<F> {
 
 #[allow(non_upper_case_globals)]
 pub(crate) static vkGetDeviceProcAddr: LazyFn<
-	unsafe extern "system" fn(*const (), *const c_char) -> Option<FnPtr>,
+	unsafe extern "system" fn(*const (), *const ffi::c_char) -> Option<FnPtr>,
 > = LazyFn::new("vkGetDeviceProcAddr", get_device_proc_addr_init);
 
 #[inline(never)]
 unsafe extern "system" fn get_device_proc_addr_init(
 	device: *const (),
-	name: *const c_char,
+	name: *const ffi::c_char,
 ) -> Option<FnPtr> {
 	vkGetDeviceProcAddr.once.call_once(|| {
 		let fn_ptr = crate::loader::vkloader(

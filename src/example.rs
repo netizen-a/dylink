@@ -1,7 +1,7 @@
 //#![allow(unused_doc_comments)]
 
 extern crate self as dylink;
-use std::os::raw::c_char;
+use core::ffi::c_char;
 
 use crate::FnPtr;
 

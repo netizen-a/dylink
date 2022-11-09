@@ -1,8 +1,5 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
-#![feature(strict_provenance)]
-#![warn(fuzzy_provenance_casts)]
-
-use std::{ptr, sync::atomic::AtomicPtr};
+use core::{ptr, sync::atomic::AtomicPtr};
 
 pub mod error;
 pub mod example;
@@ -28,4 +25,4 @@ pub static VK_CONTEXT: VkContext = VkContext {
 /// and promptly cast into the correct function pointer type.
 pub type FnPtr = unsafe extern "system" fn() -> isize;
 /// The result of a Dylink function
-pub type Result<T> = std::result::Result<T, crate::error::DylinkError>;
+pub type Result<T> = core::result::Result<T, crate::error::DylinkError>;
