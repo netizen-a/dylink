@@ -19,12 +19,3 @@ features = [
 	"Win32_Graphics_OpenGL",
 	"Win32_System_LibraryLoader",
 ]
-
-[profile.release]
-codegen-units = 1
-debug = false
-strip = true
-lto = true
-overflow-checks = false
-incremental = false
-opt-level = "z"

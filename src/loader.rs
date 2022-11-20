@@ -1,7 +1,5 @@
 use std::{ffi, mem, sync::RwLock};
 
-use once_cell::sync::Lazy;
-
 use crate::{error::*, example::*, lazyfn::*, FnPtr, Result};
 
 /// `vkloader` is a vulkan loader specialization.
@@ -19,7 +17,7 @@ pub unsafe fn vkloader(
 		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
 	};
 	match maybe_fn {
-		Some(addr) => Ok(mem::transmute(addr)),
+		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
 	}
 }
@@ -30,7 +28,7 @@ pub unsafe fn glloader(fn_name: &'static str) -> Result<FnPtr> {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 	let maybe_fn = wglGetProcAddress(c_fn_name.as_ptr() as *const _);
 	match maybe_fn {
-		Some(addr) => Ok(mem::transmute(addr)),
+		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
 	}
 }
@@ -39,6 +37,7 @@ pub unsafe fn glloader(fn_name: &'static str) -> Result<FnPtr> {
 pub unsafe fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
+	use once_cell::sync::Lazy;
 	use windows_sys::Win32::{
 		Foundation::HINSTANCE,
 		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
@@ -74,7 +73,7 @@ pub unsafe fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<Fn
 
 	let maybe_fn = GetProcAddress(handle, c_fn_name.as_ptr() as *const _);
 	match maybe_fn {
-		Some(addr) => Ok(mem::transmute(addr)),
+		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
 	}
 }

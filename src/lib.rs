@@ -1,4 +1,5 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
+#![allow(clippy::missing_safety_doc)]
 use core::{ptr, sync::atomic::AtomicPtr};
 
 pub mod error;
