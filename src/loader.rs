@@ -43,15 +43,17 @@ pub unsafe fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<Fn
 		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
 	};
 
-	static DLL_DATA: Lazy<RwLock<HashMap<String, HINSTANCE>>> =
-		Lazy::new(|| RwLock::new(HashMap::new()));
+	// A HashMap would be better, but `HashMap::new` isn't `const` at the time of writing this.
+	static DLL_DATA: RwLock<Lazy<HashMap<String, HINSTANCE>>> =
+		RwLock::new(Lazy::new(HashMap::default));
 
 	let c_lib_name = ffi::CString::new(lib_name).unwrap();
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 
 	let read_lock = DLL_DATA.read().unwrap();
-	let handle: HINSTANCE = if let Some(lib_handle) = read_lock.get(lib_name) {
-		*lib_handle
+
+	let handle: HINSTANCE = if let Some(handle) = read_lock.get(lib_name) {
+		*handle
 	} else {
 		mem::drop(read_lock);
 

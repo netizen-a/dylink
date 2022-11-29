@@ -17,6 +17,8 @@ impl Error for DylinkError {}
 impl DylinkError {
 	#[inline]
 	pub fn new(subject: &'static str, kind: ErrorKind) -> Self { Self { subject, kind } }
+
+	pub fn kind(&self) -> ErrorKind { self.kind }
 }
 
 impl fmt::Display for DylinkError {
