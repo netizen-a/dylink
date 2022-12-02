@@ -7,5 +7,5 @@ use crate::FnPtr;
 
 #[dylink_macro::dylink(name = "vulkan-1")]
 extern "system" {
-	pub fn vkGetInstanceProcAddr(instance: *const (), pName: *const c_char) -> Option<FnPtr>;
+	pub fn vkGetInstanceProcAddr(instance: *const std::ffi::c_void, pName: *const c_char) -> Option<FnPtr>;
 }

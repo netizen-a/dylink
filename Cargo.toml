@@ -5,6 +5,7 @@ authors = ["Jonathan Thomason"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 keywords = ["ffi"]
+publish = false
 
 [dependencies]
 once_cell = "1.16"

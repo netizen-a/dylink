@@ -6,8 +6,8 @@ use crate::{error::*, example::*, lazyfn::*, FnPtr, Result};
 /// If `instance` is null, then `device` is ignored.
 pub unsafe fn vkloader(
 	fn_name: &'static str,
-	instance: *const (),
-	device: *const (),
+	instance: *const std::ffi::c_void,
+	device: *const std::ffi::c_void,
 ) -> Result<FnPtr> {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 	let maybe_fn = if !instance.is_null() && !device.is_null() {
@@ -34,7 +34,7 @@ pub unsafe fn glloader(fn_name: &'static str) -> Result<FnPtr> {
 }
 
 /// `loader` is a generalization for all other dlls.
-pub unsafe fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
+pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -43,7 +43,6 @@ pub unsafe fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<Fn
 		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
 	};
 
-	// A HashMap would be better, but `HashMap::new` isn't `const` at the time of writing this.
 	static DLL_DATA: RwLock<Lazy<HashMap<String, HINSTANCE>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
@@ -57,11 +56,13 @@ pub unsafe fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<Fn
 	} else {
 		mem::drop(read_lock);
 
-		let lib_handle = LoadLibraryExA(
-			c_lib_name.as_ptr() as *const _,
-			0,
-			LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
-		);
+		let lib_handle = unsafe {
+			LoadLibraryExA(
+				c_lib_name.as_ptr() as *const _,
+				0,
+				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
+			)
+		};
 		if lib_handle == 0 {
 			return Err(DylinkError::new(lib_name, ErrorKind::LibNotFound));
 		} else {
@@ -73,7 +74,7 @@ pub unsafe fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<Fn
 		lib_handle
 	};
 
-	let maybe_fn = GetProcAddress(handle, c_fn_name.as_ptr() as *const _);
+	let maybe_fn = unsafe { GetProcAddress(handle, c_fn_name.as_ptr() as *const _) };
 	match maybe_fn {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),

@@ -1,6 +1,6 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
 #![allow(clippy::missing_safety_doc)]
-use core::{ptr, sync::atomic::AtomicPtr};
+use std::{ptr, sync::atomic::AtomicPtr};
 
 pub mod error;
 pub mod example;
@@ -11,8 +11,8 @@ pub mod lazyfn;
 pub mod loader;
 
 pub struct VkContext {
-	pub instance: AtomicPtr<()>,
-	pub device:   AtomicPtr<()>,
+	pub instance: AtomicPtr<std::ffi::c_void>,
+	pub device:   AtomicPtr<std::ffi::c_void>,
 }
 
 /// This global is read every time a vulkan function is called for the first time,
@@ -25,5 +25,5 @@ pub static VK_CONTEXT: VkContext = VkContext {
 /// Used as a placeholder function pointer. This should **NEVER** be called directly,
 /// and promptly cast into the correct function pointer type.
 pub type FnPtr = unsafe extern "system" fn() -> isize;
-/// The result of a Dylink function
-pub type Result<T> = core::result::Result<T, crate::error::DylinkError>;
+/// The result of a dylink function
+pub type Result<T> = std::result::Result<T, error::DylinkError>;

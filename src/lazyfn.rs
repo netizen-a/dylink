@@ -91,12 +91,12 @@ impl<F: 'static> std::convert::AsRef<F> for LazyFn<F> {
 
 #[allow(non_upper_case_globals)]
 pub(crate) static vkGetDeviceProcAddr: LazyFn<
-	unsafe extern "system" fn(*const (), *const ffi::c_char) -> Option<FnPtr>,
+	unsafe extern "system" fn(*const std::ffi::c_void, *const ffi::c_char) -> Option<FnPtr>,
 > = LazyFn::new("vkGetDeviceProcAddr", get_device_proc_addr_init);
 
 #[inline(never)]
 unsafe extern "system" fn get_device_proc_addr_init(
-	device: *const (),
+	device: *const std::ffi::c_void,
 	name: *const ffi::c_char,
 ) -> Option<FnPtr> {
 	vkGetDeviceProcAddr.once.call_once(|| {
