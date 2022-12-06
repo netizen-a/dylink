@@ -13,10 +13,7 @@ extern "system" {
 
 /// `vkloader` is a vulkan loader specialization.
 /// If `instance` is null, then `device` is ignored.
-pub unsafe fn vkloader(
-	fn_name: &'static str,
-	instance: *const std::ffi::c_void,
-) -> Result<FnPtr> {
+pub unsafe fn vkloader(fn_name: &'static str, instance: *const std::ffi::c_void) -> Result<FnPtr> {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
 	match vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()) {
 		Some(addr) => Ok(addr),

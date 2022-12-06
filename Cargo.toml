@@ -21,3 +21,6 @@ features = [
 	"Win32_Graphics_OpenGL",
 	"Win32_System_LibraryLoader",
 ]
+
+[features]
+opaque_types = []
