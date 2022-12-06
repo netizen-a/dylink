@@ -1,22 +1,24 @@
 use std::{ffi, mem, sync::RwLock};
 
-use crate::{error::*, example::*, lazyfn::*, FnPtr, Result};
+use crate::{error::*, FnPtr, Result};
+extern crate self as dylink;
+
+#[dylink_macro::dylink(name = "vulkan-1")]
+extern "system" {
+	fn vkGetInstanceProcAddr(
+		instance: *const ffi::c_void,
+		pName: *const ffi::c_char,
+	) -> Option<FnPtr>;
+}
 
 /// `vkloader` is a vulkan loader specialization.
 /// If `instance` is null, then `device` is ignored.
 pub unsafe fn vkloader(
 	fn_name: &'static str,
 	instance: *const std::ffi::c_void,
-	device: *const std::ffi::c_void,
 ) -> Result<FnPtr> {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	let maybe_fn = if !instance.is_null() && !device.is_null() {
-		vkGetDeviceProcAddr(device, c_fn_name.as_ptr())
-			.or_else(|| vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()))
-	} else {
-		vkGetInstanceProcAddr(instance, c_fn_name.as_ptr())
-	};
-	match maybe_fn {
+	match vkGetInstanceProcAddr(instance, c_fn_name.as_ptr()) {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
 	}

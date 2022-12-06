@@ -1,9 +1,10 @@
 use std::{
-	cell, ffi, mem, ptr,
+	cell, mem,
 	sync::{self, atomic},
 };
 
 use crate::{error::*, loader::*, FnPtr, Result, VK_CONTEXT};
+
 
 #[derive(Clone, Copy)]
 pub enum LinkType {
@@ -22,6 +23,7 @@ impl<F: 'static> AssertSize<FnPtr, F> for LazyFn<F> {}
 pub struct LazyFn<F: 'static> {
 	name:   &'static str,
 	addr:   cell::UnsafeCell<F>,
+	link_ty: LinkType,
 	once:   sync::Once,
 	status: cell::UnsafeCell<Option<ErrorKind>>,
 }
@@ -30,26 +32,24 @@ unsafe impl<F: 'static> Sync for LazyFn<F> {}
 
 impl<F: 'static> LazyFn<F> {
 	#[inline]
-	pub const fn new(name: &'static str, thunk: F) -> Self {
+	pub const fn new(name: &'static str, thunk: F, link_ty: LinkType) -> Self {
 		Self {
 			name,
 			addr: cell::UnsafeCell::new(thunk),
+			link_ty,
 			once: sync::Once::new(),
 			status: cell::UnsafeCell::new(None),
 		}
 	}
 
-	// Can be used to preload functions, but the overhead is too insignificant to matter.
-
 	/// If successful, stores address and returns it.
-	pub fn link_lib(&self, info: LinkType) -> Result<&F> {
+	pub fn link(&self) -> Result<&F> {
 		let fn_name = self.name;
 		self.once.call_once(|| unsafe {
-			let maybe = match info {
+			let maybe = match self.link_ty {
 				LinkType::Vulkan => vkloader(
 					fn_name,
 					VK_CONTEXT.instance.load(atomic::Ordering::Acquire),
-					VK_CONTEXT.device.load(atomic::Ordering::Acquire),
 				),
 				LinkType::OpenGL => glloader(fn_name),
 				LinkType::Normal(library) => loader(library, fn_name),
@@ -85,28 +85,30 @@ impl<F: 'static> std::convert::AsRef<F> for LazyFn<F> {
 	fn as_ref(&self) -> &F { unsafe { self.addr.get().as_ref().unwrap_unchecked() } }
 }
 
-/////////////////////////////////////////
-// SPECIALIZATION: vkGetDeviceProcAddr //
-/////////////////////////////////////////
 
-#[allow(non_upper_case_globals)]
-pub(crate) static vkGetDeviceProcAddr: LazyFn<
-	unsafe extern "system" fn(*const std::ffi::c_void, *const ffi::c_char) -> Option<FnPtr>,
-> = LazyFn::new("vkGetDeviceProcAddr", get_device_proc_addr_init);
+// vkGetDeviceProcAddr must be implemented manually to avoid recursion
+// 
+// #[allow(non_upper_case_globals)]
+// pub(crate) static vkGetDeviceProcAddr: LazyFn<
+// 	unsafe extern "system" fn(*const std::ffi::c_void, *const ffi::c_char) -> Option<FnPtr>,
+// > = LazyFn::new("vkGetDeviceProcAddr", get_device_proc_addr_init);
+// 
+// #[inline(never)]
+// unsafe extern "system" fn get_device_proc_addr_init(
+// 	device: *const std::ffi::c_void,
+// 	name: *const ffi::c_char,
+// ) -> Option<FnPtr> {
+// 	vkGetDeviceProcAddr.once.call_once(|| {
+// 		let fn_ptr = crate::loader::vkloader(
+// 			vkGetDeviceProcAddr.name,
+// 			VK_CONTEXT.instance.load(atomic::Ordering::Acquire),
+// 			ptr::null(),
+// 		)
+// 		.unwrap();
+// 		*cell::UnsafeCell::raw_get(&vkGetDeviceProcAddr.addr) = mem::transmute(fn_ptr);
+// 	});
+// 	vkGetDeviceProcAddr(device, name)
+// }
 
-#[inline(never)]
-unsafe extern "system" fn get_device_proc_addr_init(
-	device: *const std::ffi::c_void,
-	name: *const ffi::c_char,
-) -> Option<FnPtr> {
-	vkGetDeviceProcAddr.once.call_once(|| {
-		let fn_ptr = crate::loader::vkloader(
-			vkGetDeviceProcAddr.name,
-			VK_CONTEXT.instance.load(atomic::Ordering::Acquire),
-			ptr::null(),
-		)
-		.unwrap();
-		*cell::UnsafeCell::raw_get(&vkGetDeviceProcAddr.addr) = mem::transmute(fn_ptr);
-	});
-	vkGetDeviceProcAddr(device, name)
-}
+
+
