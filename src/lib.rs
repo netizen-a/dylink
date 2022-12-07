@@ -1,10 +1,7 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
 #![cfg_attr(feature = "opaque_types", feature(extern_types))]
 #![allow(clippy::missing_safety_doc)]
-use std::{
-	sync,
-	collections::HashSet
-};
+use std::{collections::HashSet, sync};
 
 use once_cell::sync::Lazy;
 
@@ -17,7 +14,8 @@ pub mod loader;
 
 /// This global is read every time a vulkan function is called for the first time,
 /// which silently occurs through `LazyFn::link_lib`.
-static VK_INSTANCE: sync::RwLock<Lazy<HashSet<VkInstance>>> = sync::RwLock::new(Lazy::new(|| HashSet::new()));
+static VK_INSTANCE: sync::RwLock<Lazy<HashSet<VkInstance>>> =
+	sync::RwLock::new(Lazy::new(|| HashSet::new()));
 
 /// Used as a placeholder function pointer. This should **NEVER** be called directly,
 /// and promptly cast into the correct function pointer type.
@@ -40,20 +38,19 @@ pub struct VkInstance(pub(crate) *const VkInstance_T);
 #[repr(transparent)]
 pub struct VkInstance(pub(crate) *const std::ffi::c_void);
 
-// pretend VkInstance is not a pointer. dylink never dereferences the contents (because it can't), 
+// pretend VkInstance is not a pointer. dylink never dereferences the contents (because it can't),
 // so there shouldn't be aliasing problems.
 unsafe impl Sync for VkInstance {}
 unsafe impl Send for VkInstance {}
 
 pub struct Global;
 impl Global {
-	pub fn insert_instance(&self, instance: VkInstance)
-	{
+	pub fn insert_instance(&self, instance: VkInstance) {
 		let mut write_lock = VK_INSTANCE.write().unwrap();
 		write_lock.insert(instance);
 	}
-	pub fn remove_instance(&self, instance: VkInstance)	
-	{
+
+	pub fn remove_instance(&self, instance: VkInstance) {
 		let mut write_lock = VK_INSTANCE.write().unwrap();
 		write_lock.remove(&instance);
 	}

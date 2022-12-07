@@ -5,10 +5,7 @@ extern crate self as dylink;
 
 #[dylink_macro::dylink(name = "vulkan-1")]
 extern "system" {
-	fn vkGetInstanceProcAddr(
-		instance: VkInstance,
-		pName: *const ffi::c_char,
-	) -> Option<FnPtr>;
+	fn vkGetInstanceProcAddr(instance: VkInstance, pName: *const ffi::c_char) -> Option<FnPtr>;
 }
 
 /// `vkloader` is a vulkan loader specialization.

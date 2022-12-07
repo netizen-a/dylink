@@ -1,7 +1,4 @@
-use std::{
-	cell, mem,
-	sync,
-};
+use std::{cell, mem, sync};
 
 use crate::{error::*, loader::*, FnPtr, Result, VK_INSTANCE};
 
@@ -47,21 +44,16 @@ impl<F: 'static> LazyFn<F> {
 		self.once.call_once(|| unsafe {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => {
-					let read_lock = VK_INSTANCE.read().expect("failed to get read lock");	
-					let mut result = None;
+					let read_lock = VK_INSTANCE.read().expect("failed to get read lock");
 					// check other instances if fails in case one has a higher available version number
-					for e in read_lock.iter() {
-						if let Ok(val) = vkloader(fn_name, Some(e)) {
-							result = Some(val);
-							break;
-						}
+					match read_lock
+						.iter()
+						.find_map(|instance| vkloader(fn_name, Some(instance)).ok())
+					{
+						Some(addr) => Ok(addr),
+						None => vkloader(fn_name, None),
 					}
-					if let Some(val) = result {
-						Ok(val)
-					} else {
-						vkloader(fn_name, None)
-					}
-				},
+				}
 				LinkType::OpenGL => glloader(fn_name),
 				LinkType::Normal(library) => loader(library, fn_name),
 			};
