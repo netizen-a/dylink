@@ -12,7 +12,7 @@ extern "system" {
 /// If `instance` is null, then `device` is ignored.
 pub unsafe fn vkloader(fn_name: &'static str, instance: Option<&VkInstance>) -> Result<FnPtr> {
 	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	let inst = instance.map_or(VkInstance(std::ptr::null()), |r| *r);
+	let inst = instance.map_or(VkInstance(std::ptr::null()), |r| r.clone());
 	match vkGetInstanceProcAddr(inst, c_fn_name.as_ptr()) {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
