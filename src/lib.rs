@@ -25,8 +25,7 @@ pub type Result<T> = std::result::Result<T, error::DylinkError>;
 
 #[cfg(feature = "opaque_types")]
 extern "C" {
-	#[doc(hidden)]
-	pub type VkInstance_T;
+	type VkInstance_T;
 }
 #[cfg(feature = "opaque_types")]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
