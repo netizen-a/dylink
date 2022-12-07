@@ -33,18 +33,12 @@ extern "C" {
 #[cfg(feature = "opaque_types")]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[repr(transparent)]
-pub struct VkInstance(*const VkInstance_T);
+pub struct VkInstance(pub(crate) *const VkInstance_T);
 
 #[cfg(not(feature = "opaque_types"))]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[repr(transparent)]
-pub struct VkInstance(*const std::ffi::c_void);
-
-impl <T: ?Sized> From<*const T> for VkInstance {
-	fn from(val: *const T) -> Self {
-		Self(val as *const _)
-	}
-}
+pub struct VkInstance(pub(crate) *const std::ffi::c_void);
 
 // pretend VkInstance is not a pointer. dylink never dereferences the contents (because it can't), 
 // so there shouldn't be aliasing problems.
