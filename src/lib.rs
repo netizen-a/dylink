@@ -59,7 +59,7 @@ impl Global {
 
 	/// Removes a value from the set. Returns whether the value was present in the set.
 	/// # Safety
-	/// Using this function may break checked lifetimes!
+	/// Using this function may break dylink's checked lifetimes!
 	pub unsafe fn remove_instance(&self, instance: &VkInstance) -> bool {
 		let mut write_lock = VK_INSTANCE.write().unwrap();
 		write_lock.remove(instance)
