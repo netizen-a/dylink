@@ -17,6 +17,7 @@ impl Error for DylinkError {}
 impl DylinkError {
 	#[inline]
 	pub const fn new(subject: &'static str, kind: ErrorKind) -> Self { Self { subject, kind } }
+
 	#[inline]
 	pub const fn kind(&self) -> ErrorKind { self.kind }
 }

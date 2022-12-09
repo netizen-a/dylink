@@ -29,6 +29,9 @@ unsafe impl<F: 'static> Sync for LazyFn<F> {}
 impl<F: 'static> LazyFn<F> {
 	#[inline]
 	pub const fn new(name: &'static str, thunk: F, link_ty: LinkType) -> Self {
+		// `AssertSize` asserts sizeof(F) = sizeof(fn), so `transmute_copy` is safe in `LazyFn::link`.
+		#[allow(clippy::let_unit_value)]
+		let _ = Self::ASSERT_SIZE;
 		Self {
 			name,
 			addr: cell::UnsafeCell::new(thunk),
@@ -59,9 +62,6 @@ impl<F: 'static> LazyFn<F> {
 			};
 			match maybe {
 				Ok(addr) => {
-					// `AssertSize` asserts sizeof(F) = sizeof(fn), so `transmute_copy` is safe.
-					#[allow(clippy::let_unit_value)]
-					let _ = Self::ASSERT_SIZE;
 					cell::UnsafeCell::raw_get(&self.addr).write(mem::transmute_copy(&addr));
 				}
 				Err(DylinkError { kind, .. }) => {

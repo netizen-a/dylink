@@ -41,8 +41,6 @@ pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 		Foundation::HINSTANCE,
 		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
 	};
-	
-	
 
 	static DLL_DATA: RwLock<Lazy<HashMap<String, HINSTANCE>>> =
 		RwLock::new(Lazy::new(HashMap::default));
@@ -66,7 +64,7 @@ pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 				)
 			}
-			#[cfg(unix)] 
+			#[cfg(unix)]
 			{
 				libc::dlopen(c_lib_name.as_ptr(), libc::RTLD_LOCAL | libc::RTLD_NOW) as isize
 			}
@@ -82,14 +80,15 @@ pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 		lib_handle
 	};
 
-	let maybe_fn = unsafe { 
+	let maybe_fn = unsafe {
 		#[cfg(windows)]
 		{
-			GetProcAddress(handle, c_fn_name.as_ptr() as *const _) 
+			GetProcAddress(handle, c_fn_name.as_ptr() as *const _)
 		}
 		#[cfg(unix)]
 		{
-			let addr: *const libc::c_void = libc::dlsym(handle as *const libc::c_void, c_fn_name.as_ptr());
+			let addr: *const libc::c_void =
+				libc::dlsym(handle as *const libc::c_void, c_fn_name.as_ptr());
 			if addr.is_null() {
 				None
 			} else {
@@ -97,7 +96,7 @@ pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 			}
 		}
 	};
-	//let maybe_fn = libc::dlsym(handle as *const std::ffi::c_void, c_fn_name.as_ptr());
+	// let maybe_fn = libc::dlsym(handle as *const std::ffi::c_void, c_fn_name.as_ptr());
 	match maybe_fn {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
