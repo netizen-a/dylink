@@ -9,7 +9,6 @@ pub mod error;
 pub mod lazyfn;
 
 // TODO: make this work through more than just windows
-#[cfg(windows)]
 pub mod loader;
 
 // This global is read every time a vulkan function is called for the first time,
@@ -28,12 +27,12 @@ extern "C" {
 	type VkInstance_T;
 }
 #[cfg(feature = "opaque_types")]
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[repr(transparent)]
 pub struct VkInstance(pub(crate) *const VkInstance_T);
 
 #[cfg(not(feature = "opaque_types"))]
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[repr(transparent)]
 pub struct VkInstance(pub(crate) *const std::ffi::c_void);
 
@@ -44,6 +43,7 @@ unsafe impl Send for VkInstance {}
 
 pub struct Global;
 impl Global {
+	// This is safe since vulkan will just discard garbage values
 	/// Adds an instance to the internal HashSet.
 	///
 	/// Returns whether the value was newly inserted. That is:
@@ -52,9 +52,9 @@ impl Global {
 	/// *    If the set already contained this value, `false` is returned.
 	///
 	/// *note: This function returns `false` if the instance is valid and defined through dylink.*
-	pub fn insert_instance(&self, instance: &VkInstance) -> bool {
+	pub fn insert_instance(&self, instance: VkInstance) -> bool {
 		let mut write_lock = VK_INSTANCE.write().unwrap();
-		write_lock.insert(instance.clone())
+		write_lock.insert(instance)
 	}
 
 	/// Removes a value from the set. Returns whether the value was present in the set.

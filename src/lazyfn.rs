@@ -2,14 +2,14 @@ use std::{cell, mem, sync};
 
 use crate::{error::*, loader::*, FnPtr, Result, VK_INSTANCE};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType {
 	OpenGL,
 	Vulkan,
 	Normal(&'static str),
 }
 
-pub trait AssertSize<T, U> {
+trait AssertSize<T, U> {
 	const ASSERT_SIZE: () = assert!(mem::size_of::<T>() == mem::size_of::<U>());
 }
 impl<F: 'static> AssertSize<FnPtr, F> for LazyFn<F> {}
