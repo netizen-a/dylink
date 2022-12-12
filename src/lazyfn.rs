@@ -1,4 +1,4 @@
-use std::{cell, mem, sync};
+use std::{cell, mem, sync, ffi};
 
 use crate::{error::*, loader::*, FnPtr, Result, VK_INSTANCE};
 
@@ -6,7 +6,7 @@ use crate::{error::*, loader::*, FnPtr, Result, VK_INSTANCE};
 pub enum LinkType {
 	OpenGL,
 	Vulkan,
-	Normal(&'static str),
+	Normal(&'static [u8]),
 }
 
 trait AssertSize<T, U> {
@@ -17,7 +17,7 @@ impl<F: 'static> AssertSize<FnPtr, F> for LazyFn<F> {}
 // This can be used safely without the dylink macro.
 // `F` can be anything as long as it's the size of a function pointer
 pub struct LazyFn<F: 'static> {
-	name:    &'static str,
+	name:    &'static [u8],
 	addr:    cell::UnsafeCell<F>,
 	link_ty: LinkType,
 	once:    sync::Once,
@@ -27,8 +27,14 @@ pub struct LazyFn<F: 'static> {
 unsafe impl<F: 'static> Sync for LazyFn<F> {}
 
 impl<F: 'static> LazyFn<F> {
+	/// Initializes a `LazyFn` object with all the necessary information for `LazyFn::link` to work.
+	/// # Panic
+	/// The provided slice, `name`, must be nul-terminated and not contain any interior nul bytes, 
+	/// if not the function will panic.
 	#[inline]
-	pub const fn new(name: &'static str, thunk: F, link_ty: LinkType) -> Self {
+	pub const fn new(name: &'static [u8], thunk: F, link_ty: LinkType) -> Self {
+		// this check is optimized out if called in a const context
+		assert!(matches!(name, [.., 0]));
 		// `AssertSize` asserts sizeof(F) = sizeof(fn), so `transmute_copy` is safe in `LazyFn::link`.
 		#[allow(clippy::let_unit_value)]
 		let _ = Self::ASSERT_SIZE;
@@ -43,7 +49,8 @@ impl<F: 'static> LazyFn<F> {
 
 	/// If successful, stores address and returns it.
 	pub fn link(&self) -> Result<&F> {
-		let fn_name = self.name;
+		// this is safe because nul is checked in `LazyFn::new`.
+		let fn_name = unsafe {ffi::CStr::from_bytes_with_nul_unchecked(self.name)};
 		self.once.call_once(|| unsafe {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => {
@@ -58,7 +65,7 @@ impl<F: 'static> LazyFn<F> {
 					}
 				}
 				LinkType::OpenGL => glloader(fn_name),
-				LinkType::Normal(library) => loader(library, fn_name),
+				LinkType::Normal(lib_name) => loader(ffi::CStr::from_bytes_with_nul_unchecked(lib_name), fn_name),
 			};
 			match maybe {
 				Ok(addr) => {
@@ -73,7 +80,7 @@ impl<F: 'static> LazyFn<F> {
 		// by this point. Race conditions shouldn't occur.
 		match unsafe { *self.status.get() } {
 			None => Ok(self.as_ref()),
-			Some(kind) => Err(DylinkError::new(fn_name, kind)),
+			Some(kind) => Err(DylinkError::new(fn_name.to_str().unwrap(), kind)),
 		}
 	}
 }

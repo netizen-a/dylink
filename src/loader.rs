@@ -10,29 +10,27 @@ extern "system" {
 
 /// `vkloader` is a vulkan loader specialization.
 /// If `instance` is null, then `device` is ignored.
-pub unsafe fn vkloader(fn_name: &'static str, instance: Option<&VkInstance>) -> Result<FnPtr> {
-	let c_fn_name = ffi::CString::new(fn_name).unwrap();
+pub unsafe fn vkloader(fn_name: &'static ffi::CStr, instance: Option<&VkInstance>) -> Result<FnPtr> {	
 	let inst = instance.map_or(VkInstance(std::ptr::null()), |r| r.clone());
-	match vkGetInstanceProcAddr(inst, c_fn_name.as_ptr()) {
+	match vkGetInstanceProcAddr(inst, fn_name.as_ptr()) {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(fn_name.to_str().unwrap(), ErrorKind::FnNotFound)),
 	}
 }
 
 /// `glloader` is an opengl loader specialization.
-pub unsafe fn glloader(fn_name: &'static str) -> Result<FnPtr> {
+pub unsafe fn glloader(fn_name: &'static ffi::CStr) -> Result<FnPtr> {
 	// TODO: for unix `glXGetProcAddress`
 	use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
-	let c_fn_name = ffi::CString::new(fn_name).unwrap();
-	let maybe_fn = wglGetProcAddress(c_fn_name.as_ptr() as *const _);
+	let maybe_fn = wglGetProcAddress(fn_name.as_ptr() as *const _);
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(fn_name.to_str().unwrap(), ErrorKind::FnNotFound)),
 	}
 }
 
 /// `loader` is a generalization for all other dlls.
-pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
+pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -42,11 +40,11 @@ pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
 	};
 
-	static DLL_DATA: RwLock<Lazy<HashMap<String, HINSTANCE>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<ffi::CString, HINSTANCE>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
-	let c_lib_name = ffi::CString::new(lib_name).unwrap();
-	let c_fn_name = ffi::CString::new(fn_name).unwrap();
+	//let c_lib_name = ffi::CString::new(lib_name).unwrap();
+	//let c_fn_name = ffi::CString::new(fn_name).unwrap();
 
 	let read_lock = DLL_DATA.read().unwrap();
 
@@ -59,18 +57,18 @@ pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 			#[cfg(windows)]
 			{
 				LoadLibraryExA(
-					c_lib_name.as_ptr() as *const _,
+					lib_name.as_ptr() as *const _,
 					0,
 					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 				)
 			}
 			#[cfg(unix)]
 			{
-				libc::dlopen(c_lib_name.as_ptr(), libc::RTLD_LOCAL | libc::RTLD_NOW) as isize
+				libc::dlopen(lib_name.as_ptr(), libc::RTLD_LOCAL | libc::RTLD_NOW) as isize
 			}
 		};
 		if lib_handle == 0 {
-			return Err(DylinkError::new(lib_name, ErrorKind::LibNotFound));
+			return Err(DylinkError::new(lib_name.to_str().unwrap(), ErrorKind::LibNotFound));
 		} else {
 			DLL_DATA
 				.write()
@@ -83,12 +81,12 @@ pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 	let maybe_fn = unsafe {
 		#[cfg(windows)]
 		{
-			GetProcAddress(handle, c_fn_name.as_ptr() as *const _)
+			GetProcAddress(handle, fn_name.as_ptr() as *const _)
 		}
 		#[cfg(unix)]
 		{
 			let addr: *const libc::c_void =
-				libc::dlsym(handle as *const libc::c_void, c_fn_name.as_ptr());
+				libc::dlsym(handle as *const libc::c_void, fn_name.as_ptr());
 			if addr.is_null() {
 				None
 			} else {
@@ -99,6 +97,6 @@ pub fn loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 	// let maybe_fn = libc::dlsym(handle as *const std::ffi::c_void, c_fn_name.as_ptr());
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(fn_name, ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(fn_name.to_str().unwrap(), ErrorKind::FnNotFound)),
 	}
 }
