@@ -9,11 +9,6 @@ pub enum LinkType {
 	Normal(&'static [u8]),
 }
 
-trait AssertSize<T, U> {
-	const ASSERT_SIZE: () = assert!(mem::size_of::<T>() == mem::size_of::<U>());
-}
-impl<F: 'static> AssertSize<FnPtr, F> for LazyFn<F> {}
-
 // This can be used safely without the dylink macro.
 // `F` can be anything as long as it's the size of a function pointer
 pub struct LazyFn<F: 'static> {
@@ -31,13 +26,13 @@ impl<F: 'static> LazyFn<F> {
 	/// # Panic
 	/// The provided slice, `name`, must be nul-terminated and not contain any interior nul bytes, 
 	/// if not the function will panic.
+	/// 
+	/// Thunk must be the same size as `FnPtr`.
 	#[inline]
 	pub const fn new(name: &'static [u8], thunk: F, link_ty: LinkType) -> Self {
 		// this check is optimized out if called in a const context
 		assert!(matches!(name, [.., 0]));
-		// `AssertSize` asserts sizeof(F) = sizeof(fn), so `transmute_copy` is safe in `LazyFn::link`.
-		#[allow(clippy::let_unit_value)]
-		let _ = Self::ASSERT_SIZE;
+		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		Self {
 			name,
 			addr: cell::UnsafeCell::new(thunk),
