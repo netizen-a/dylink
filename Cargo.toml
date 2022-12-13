@@ -25,6 +25,3 @@ features = [
 
 #[target.'cfg(not(windows))'.dependencies.libc]
 #version = "0.2"
-
-[features]
-opaque_types = []

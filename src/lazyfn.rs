@@ -1,6 +1,6 @@
 use std::{cell, mem, sync, ffi};
 
-use crate::{error::*, loader::*, FnPtr, Result, VK_INSTANCE};
+use crate::{error::*, loader::*, *};
 
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType {
@@ -24,13 +24,13 @@ unsafe impl<F: 'static> Sync for LazyFn<F> {}
 impl<F: 'static> LazyFn<F> {
 	/// Initializes a `LazyFn` object with all the necessary information for `LazyFn::link` to work.
 	/// # Panic
-	/// The provided slice, `name`, must be nul-terminated and not contain any interior nul bytes, 
+	/// The provided slice, `name`, must be nul-terminated and not contain any interior nul bytes,
 	/// if not the function will panic.
-	/// 
+	///
 	/// Thunk must be the same size as `FnPtr`.
 	#[inline]
 	pub const fn new(name: &'static [u8], thunk: F, link_ty: LinkType) -> Self {
-		// this check is optimized out if called in a const context
+		// These check are optimized out if called in a const context.
 		assert!(matches!(name, [.., 0]));
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		Self {
@@ -45,7 +45,7 @@ impl<F: 'static> LazyFn<F> {
 	/// If successful, stores address and returns it.
 	pub fn link(&self) -> Result<&F> {
 		// this is safe because nul is checked in `LazyFn::new`.
-		let fn_name = unsafe {ffi::CStr::from_bytes_with_nul_unchecked(self.name)};
+		let fn_name = unsafe { ffi::CStr::from_bytes_with_nul_unchecked(self.name) };
 		self.once.call_once(|| unsafe {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => {
@@ -60,7 +60,9 @@ impl<F: 'static> LazyFn<F> {
 					}
 				}
 				LinkType::OpenGL => glloader(fn_name),
-				LinkType::Normal(lib_name) => loader(ffi::CStr::from_bytes_with_nul_unchecked(lib_name), fn_name),
+				LinkType::Normal(lib_name) => {
+					loader(ffi::CStr::from_bytes_with_nul_unchecked(lib_name), fn_name)
+				}
 			};
 			match maybe {
 				Ok(addr) => {

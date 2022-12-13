@@ -10,11 +10,17 @@ extern "system" {
 
 /// `vkloader` is a vulkan loader specialization.
 /// If `instance` is null, then `device` is ignored.
-pub unsafe fn vkloader(fn_name: &'static ffi::CStr, instance: Option<&VkInstance>) -> Result<FnPtr> {	
+pub unsafe fn vkloader(
+	fn_name: &'static ffi::CStr,
+	instance: Option<&VkInstance>,
+) -> Result<FnPtr> {
 	let inst = instance.map_or(VkInstance(std::ptr::null()), |r| r.clone());
 	match vkGetInstanceProcAddr(inst, fn_name.as_ptr()) {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(fn_name.to_str().unwrap(), ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(
+			fn_name.to_str().unwrap(),
+			ErrorKind::FnNotFound,
+		)),
 	}
 }
 
@@ -25,7 +31,10 @@ pub unsafe fn glloader(fn_name: &'static ffi::CStr) -> Result<FnPtr> {
 	let maybe_fn = wglGetProcAddress(fn_name.as_ptr() as *const _);
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(fn_name.to_str().unwrap(), ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(
+			fn_name.to_str().unwrap(),
+			ErrorKind::FnNotFound,
+		)),
 	}
 }
 
@@ -43,8 +52,8 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 	static DLL_DATA: RwLock<Lazy<HashMap<ffi::CString, HINSTANCE>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
-	//let c_lib_name = ffi::CString::new(lib_name).unwrap();
-	//let c_fn_name = ffi::CString::new(fn_name).unwrap();
+	// let c_lib_name = ffi::CString::new(lib_name).unwrap();
+	// let c_fn_name = ffi::CString::new(fn_name).unwrap();
 
 	let read_lock = DLL_DATA.read().unwrap();
 
@@ -68,7 +77,10 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 			}
 		};
 		if lib_handle == 0 {
-			return Err(DylinkError::new(lib_name.to_str().unwrap(), ErrorKind::LibNotFound));
+			return Err(DylinkError::new(
+				lib_name.to_str().unwrap(),
+				ErrorKind::LibNotFound,
+			));
 		} else {
 			DLL_DATA
 				.write()
@@ -97,6 +109,9 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 	// let maybe_fn = libc::dlsym(handle as *const std::ffi::c_void, c_fn_name.as_ptr());
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(fn_name.to_str().unwrap(), ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(
+			fn_name.to_str().unwrap(),
+			ErrorKind::FnNotFound,
+		)),
 	}
 }
