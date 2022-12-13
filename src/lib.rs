@@ -1,7 +1,7 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
-#![cfg_attr(feature = "opaque_types", feature(extern_types))]
+
 #![allow(clippy::missing_safety_doc)]
-use std::{collections::HashSet, sync};
+use std::{collections::HashSet, sync, ffi::c_void};
 
 use once_cell::sync::Lazy;
 
@@ -32,29 +32,23 @@ pub type Result<T> = std::result::Result<T, error::DylinkError>;
 // 	type VkDevice_T;
 // }
 
-// #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 // #[repr(transparent)]
+// #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 // pub struct VkInstance(pub(crate) *const VkInstance_T);
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[repr(transparent)]
-pub struct VkInstance(pub(crate) *const std::ffi::c_void);
-
-// pretend VkInstance is not a pointer. dylink never dereferences the contents (because it can't),
-// so there shouldn't be aliasing problems.
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct VkInstance(pub(crate) *const c_void);
 unsafe impl Sync for VkInstance {}
 unsafe impl Send for VkInstance {}
 
-// #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 // #[repr(transparent)]
+// #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 // pub struct VkDevice(pub(crate) *const VkDevice_T);
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 #[repr(transparent)]
-pub struct VkDevice(pub(crate) *const std::ffi::c_void);
-
-// pretend VkInstance is not a pointer. dylink never dereferences the contents (because it can't),
-// so there shouldn't be aliasing problems.
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct VkDevice(pub(crate) *const c_void);
 unsafe impl Sync for VkDevice {}
 unsafe impl Send for VkDevice {}
 
