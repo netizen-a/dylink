@@ -1,4 +1,4 @@
-use std::{cell, mem, sync, ffi};
+use std::{cell, ffi, mem, sync};
 
 use crate::{error::*, loader::*, *};
 
@@ -12,14 +12,15 @@ pub enum LinkType {
 // This can be used safely without the dylink macro.
 // `F` can be anything as long as it's the size of a function pointer
 pub struct LazyFn<F: 'static> {
+	// used to retrieve function address
 	name:    &'static [u8],
+	// The function to be called.
+	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
 	addr:    cell::UnsafeCell<F>,
 	link_ty: LinkType,
 	once:    sync::Once,
 	status:  cell::UnsafeCell<Option<ErrorKind>>,
 }
-
-unsafe impl<F: 'static> Sync for LazyFn<F> {}
 
 impl<F: 'static> LazyFn<F> {
 	/// Initializes a `LazyFn` object with all the necessary information for `LazyFn::link` to work.
@@ -49,15 +50,25 @@ impl<F: 'static> LazyFn<F> {
 		self.once.call_once(|| unsafe {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => {
-					let read_lock = VK_INSTANCE.read().expect("failed to get read lock");
-					// check other instances if fails in case one has a higher available version number
-					match read_lock
+					let device_read_lock = VK_DEVICE.read().expect("failed to get read lock");
+					match device_read_lock
 						.iter()
-						.find_map(|instance| vkloader(fn_name, Some(instance)).ok())
+						.find_map(|device| vkGetDeviceProcAddr(*device, fn_name.as_ptr()))
 					{
 						Some(addr) => Ok(addr),
-						None => vkloader(fn_name, None),
-					}
+						None => {
+							mem::drop(device_read_lock);
+							let instance_read_lock = VK_INSTANCE.read().expect("failed to get read lock");
+							// check other instances if fails in case one has a higher available version number
+							match instance_read_lock
+								.iter()
+								.find_map(|instance| vkloader(Some(instance), fn_name).ok())
+							{
+								Some(addr) => Ok(addr),
+								None => vkloader(None, fn_name),
+							}
+						},
+					}					
 				}
 				LinkType::OpenGL => glloader(fn_name),
 				LinkType::Normal(lib_name) => {
@@ -81,6 +92,10 @@ impl<F: 'static> LazyFn<F> {
 		}
 	}
 }
+
+unsafe impl<F: 'static> Send for LazyFn<F> {}
+unsafe impl<F: 'static> Sync for LazyFn<F> {}
+
 impl<F: 'static> std::ops::Deref for LazyFn<F> {
 	type Target = F;
 
@@ -89,29 +104,33 @@ impl<F: 'static> std::ops::Deref for LazyFn<F> {
 
 impl<F: 'static> std::convert::AsRef<F> for LazyFn<F> {
 	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
+	#[inline]
 	fn as_ref(&self) -> &F { unsafe { self.addr.get().as_ref().unwrap_unchecked() } }
 }
 
 // vkGetDeviceProcAddr must be implemented manually to avoid recursion
-//
-// #[allow(non_upper_case_globals)]
-// pub(crate) static vkGetDeviceProcAddr: LazyFn<
-// 	unsafe extern "system" fn(*const std::ffi::c_void, *const ffi::c_char) -> Option<FnPtr>,
-// > = LazyFn::new("vkGetDeviceProcAddr", get_device_proc_addr_init);
-//
-// #[inline(never)]
-// unsafe extern "system" fn get_device_proc_addr_init(
-// 	device: *const std::ffi::c_void,
-// 	name: *const ffi::c_char,
-// ) -> Option<FnPtr> {
-// 	vkGetDeviceProcAddr.once.call_once(|| {
-// 		let fn_ptr = crate::loader::vkloader(
-// 			vkGetDeviceProcAddr.name,
-// 			VK_CONTEXT.instance.load(atomic::Ordering::Acquire),
-// 			ptr::null(),
-// 		)
-// 		.unwrap();
-// 		*cell::UnsafeCell::raw_get(&vkGetDeviceProcAddr.addr) = mem::transmute(fn_ptr);
-// 	});
-// 	vkGetDeviceProcAddr(device, name)
-// }
+#[allow(non_snake_case)]
+pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
+	device: VkDevice,
+	name: *const ffi::c_char,
+) -> Option<FnPtr> {
+	pub(crate) static DYN_FUNC: LazyFn<
+		unsafe extern "system" fn(VkDevice, *const ffi::c_char) -> Option<FnPtr>,
+	> = LazyFn::new(b"vkGetDeviceProcAddr\0", initial_fn, LinkType::Vulkan);
+
+	unsafe extern "system" fn initial_fn(
+		device: VkDevice,
+		name: *const ffi::c_char,
+	) -> Option<FnPtr> {
+		DYN_FUNC.once.call_once(|| {
+			let read_lock = VK_INSTANCE.read().expect("failed to get read lock");
+			// check other instances if fails in case one has a higher available version number
+			let fn_ptr = read_lock.iter().find_map(|instance| {
+				crate::loader::vkGetInstanceProcAddr(*instance, DYN_FUNC.name.as_ptr().cast())
+			});
+			*cell::UnsafeCell::raw_get(&DYN_FUNC.addr) = mem::transmute(fn_ptr);
+		});
+		DYN_FUNC(device, name)
+	}
+	DYN_FUNC(device, name)
+}

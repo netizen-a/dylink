@@ -1,7 +1,7 @@
 // Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
 
 #![allow(clippy::missing_safety_doc)]
-use std::{collections::HashSet, sync, ffi::c_void};
+use std::{collections::HashSet, ffi::c_void, sync};
 
 use once_cell::sync::Lazy;
 
@@ -64,6 +64,7 @@ impl Global {
 	///
 	/// *note: This function returns `false` if the instance is valid and defined through dylink.*
 	pub fn insert_instance(&self, instance: VkInstance) -> bool {
+		//println!("insert_instance called!");
 		let mut write_lock = VK_INSTANCE.write().unwrap();
 		write_lock.insert(instance)
 	}
@@ -72,6 +73,7 @@ impl Global {
 	/// # Safety
 	/// Using this function may break dylink's checked lifetimes!
 	pub unsafe fn remove_instance(&self, instance: &VkInstance) -> bool {
+		//println!("remove_instance called!");
 		let mut write_lock = VK_INSTANCE.write().unwrap();
 		write_lock.remove(instance)
 	}
@@ -86,6 +88,7 @@ impl Global {
 	///
 	/// *note: This function returns `false` if the device is valid and defined through dylink.*
 	pub fn insert_device(&self, device: VkDevice) -> bool {
+		//println!("insert_device called!");
 		let mut write_lock = VK_DEVICE.write().unwrap();
 		write_lock.insert(device)
 	}
@@ -94,6 +97,7 @@ impl Global {
 	/// # Safety
 	/// Using this function may break dylink's checked lifetimes!
 	pub unsafe fn remove_device(&self, device: &VkDevice) -> bool {
+		//println!("remove_device called!");
 		let mut write_lock = VK_DEVICE.write().unwrap();
 		write_lock.remove(device)
 	}

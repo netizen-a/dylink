@@ -5,34 +5,34 @@ extern crate self as dylink;
 
 #[dylink_macro::dylink(name = "vulkan-1")]
 extern "system" {
-	fn vkGetInstanceProcAddr(instance: VkInstance, pName: *const ffi::c_char) -> Option<FnPtr>;
+	pub(crate) fn vkGetInstanceProcAddr(
+		instance: VkInstance,
+		pName: *const ffi::c_char,
+	) -> Option<FnPtr>;
 }
 
 /// `vkloader` is a vulkan loader specialization.
 /// If `instance` is null, then `device` is ignored.
-pub unsafe fn vkloader(
-	fn_name: &'static ffi::CStr,
-	instance: Option<&VkInstance>,
-) -> Result<FnPtr> {
+pub unsafe fn vkloader(instance: Option<&VkInstance>, name: &'static ffi::CStr) -> Result<FnPtr> {
 	let inst = instance.map_or(VkInstance(std::ptr::null()), |r| r.clone());
-	match vkGetInstanceProcAddr(inst, fn_name.as_ptr()) {
+	match vkGetInstanceProcAddr(inst, name.as_ptr()) {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(
-			fn_name.to_str().unwrap(),
+			name.to_str().unwrap(),
 			ErrorKind::FnNotFound,
 		)),
 	}
 }
 
 /// `glloader` is an opengl loader specialization.
-pub unsafe fn glloader(fn_name: &'static ffi::CStr) -> Result<FnPtr> {
+pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
 	// TODO: for unix `glXGetProcAddress`
 	use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
-	let maybe_fn = wglGetProcAddress(fn_name.as_ptr() as *const _);
+	let maybe_fn = wglGetProcAddress(name.as_ptr() as *const _);
 	match maybe_fn {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(
-			fn_name.to_str().unwrap(),
+			name.to_str().unwrap(),
 			ErrorKind::FnNotFound,
 		)),
 	}
@@ -51,9 +51,6 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 
 	static DLL_DATA: RwLock<Lazy<HashMap<ffi::CString, HINSTANCE>>> =
 		RwLock::new(Lazy::new(HashMap::default));
-
-	// let c_lib_name = ffi::CString::new(lib_name).unwrap();
-	// let c_fn_name = ffi::CString::new(fn_name).unwrap();
 
 	let read_lock = DLL_DATA.read().unwrap();
 
