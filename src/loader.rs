@@ -3,13 +3,16 @@ use std::{ffi, mem, sync::RwLock};
 use crate::{error::*, FnPtr, Result, VkInstance};
 extern crate self as dylink;
 
-#[dylink_macro::dylink(name = "vulkan-1")]
+#[cfg_attr(windows, dylink_macro::dylink(name = "vulkan-1"))]
+#[cfg_attr(unix, dylink_macro::dylink(name = "libvulkan.so.1"))]
 extern "system" {
 	pub(crate) fn vkGetInstanceProcAddr(
 		instance: VkInstance,
 		pName: *const ffi::c_char,
 	) -> Option<FnPtr>;
 }
+
+
 
 /// `vkloader` is a vulkan loader specialization.
 /// If `instance` is null, then `device` is ignored.
@@ -26,15 +29,34 @@ pub unsafe fn vkloader(instance: Option<&VkInstance>, name: &'static ffi::CStr) 
 
 /// `glloader` is an opengl loader specialization.
 pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
-	// TODO: for unix `glXGetProcAddress`
-	use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
-	let maybe_fn = wglGetProcAddress(name.as_ptr() as *const _);
-	match maybe_fn {
-		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(
-			name.to_str().unwrap(),
-			ErrorKind::FnNotFound,
-		)),
+	#[cfg(unix)]
+	{
+		#[dylink_macro::dylink(name = "opengl32")]
+		extern "system" {
+			pub(crate) fn glXGetProcAddress(
+				pName: *const ffi::c_char,
+			) -> Option<FnPtr>;
+		}
+		let maybe_fn = glXGetProcAddress(name.as_ptr() as *const _);
+		match maybe_fn {
+			Some(addr) => Ok(addr),
+			None => Err(DylinkError::new(
+				name.to_str().unwrap(),
+				ErrorKind::FnNotFound,
+			)),
+		}
+	}
+	#[cfg(windows)]
+	{
+		use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
+		let maybe_fn = wglGetProcAddress(name.as_ptr() as *const _);
+		match maybe_fn {
+			Some(addr) => Ok(addr),
+			None => Err(DylinkError::new(
+				name.to_str().unwrap(),
+				ErrorKind::FnNotFound,
+			)),
+		}
 	}
 }
 
@@ -45,16 +67,16 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 	use once_cell::sync::Lazy;
 	#[cfg(windows)]
 	use windows_sys::Win32::{
-		Foundation::HINSTANCE,
+		//Foundation::HINSTANCE,
 		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
 	};
 
-	static DLL_DATA: RwLock<Lazy<HashMap<ffi::CString, HINSTANCE>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<ffi::CString, isize>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
 	let read_lock = DLL_DATA.read().unwrap();
 
-	let handle: HINSTANCE = if let Some(handle) = read_lock.get(lib_name) {
+	let handle: isize = if let Some(handle) = read_lock.get(lib_name) {
 		*handle
 	} else {
 		mem::drop(read_lock);
@@ -70,7 +92,7 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 			}
 			#[cfg(unix)]
 			{
-				libc::dlopen(lib_name.as_ptr(), libc::RTLD_LOCAL | libc::RTLD_NOW) as isize
+				libc::dlopen(lib_name.as_ptr(), libc::RTLD_NOW) as isize
 			}
 		};
 		if lib_handle == 0 {
@@ -95,7 +117,7 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 		#[cfg(unix)]
 		{
 			let addr: *const libc::c_void =
-				libc::dlsym(handle as *const libc::c_void, fn_name.as_ptr());
+				libc::dlsym(handle as *mut libc::c_void, fn_name.as_ptr());
 			if addr.is_null() {
 				None
 			} else {
