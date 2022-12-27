@@ -3,7 +3,7 @@ use std::{ffi, mem, sync::RwLock};
 use crate::{error::*, FnPtr, Result, VkInstance};
 extern crate self as dylink;
 
-#[cfg_attr(windows, dylink_macro::dylink(name = "vulkan-1"))]
+#[cfg_attr(windows, dylink_macro::dylink(name = "vulkan-1.dll"))]
 #[cfg_attr(unix, dylink_macro::dylink(name = "libvulkan.so.1"))]
 extern "system" {
 	pub(crate) fn vkGetInstanceProcAddr(
@@ -11,8 +11,6 @@ extern "system" {
 		pName: *const ffi::c_char,
 	) -> Option<FnPtr>;
 }
-
-
 
 /// `vkloader` is a vulkan loader specialization.
 /// If `instance` is null, then `device` is ignored.
@@ -33,9 +31,7 @@ pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
 	{
 		#[dylink_macro::dylink(name = "opengl32")]
 		extern "system" {
-			pub(crate) fn glXGetProcAddress(
-				pName: *const ffi::c_char,
-			) -> Option<FnPtr>;
+			pub(crate) fn glXGetProcAddress(pName: *const ffi::c_char) -> Option<FnPtr>;
 		}
 		let maybe_fn = glXGetProcAddress(name.as_ptr() as *const _);
 		match maybe_fn {
@@ -66,9 +62,8 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 
 	use once_cell::sync::Lazy;
 	#[cfg(windows)]
-	use windows_sys::Win32::{
-		//Foundation::HINSTANCE,
-		System::LibraryLoader::{GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS},
+	use windows_sys::Win32::System::LibraryLoader::{
+		GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 	};
 
 	static DLL_DATA: RwLock<Lazy<HashMap<ffi::CString, isize>>> =
@@ -125,7 +120,6 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 			}
 		}
 	};
-	// let maybe_fn = libc::dlsym(handle as *const std::ffi::c_void, c_fn_name.as_ptr());
 	match maybe_fn {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(

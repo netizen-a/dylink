@@ -13,13 +13,13 @@ pub enum LinkType {
 // `F` can be anything as long as it's the size of a function pointer
 pub struct LazyFn<F: 'static> {
 	// used to retrieve function address
-	name:    &'static [u8],
+	name: &'static [u8],
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
-	addr:    cell::UnsafeCell<F>,
+	addr: cell::UnsafeCell<F>,
 	link_ty: LinkType,
-	once:    sync::Once,
-	status:  cell::UnsafeCell<Option<ErrorKind>>,
+	once: sync::Once,
+	status: cell::UnsafeCell<Option<ErrorKind>>,
 }
 
 impl<F: 'static> LazyFn<F> {
@@ -58,7 +58,8 @@ impl<F: 'static> LazyFn<F> {
 						Some(addr) => Ok(addr),
 						None => {
 							mem::drop(device_read_lock);
-							let instance_read_lock = VK_INSTANCE.read().expect("failed to get read lock");
+							let instance_read_lock =
+								VK_INSTANCE.read().expect("failed to get read lock");
 							// check other instances if fails in case one has a higher available version number
 							match instance_read_lock
 								.iter()
@@ -67,8 +68,8 @@ impl<F: 'static> LazyFn<F> {
 								Some(addr) => Ok(addr),
 								None => vkloader(None, fn_name),
 							}
-						},
-					}					
+						}
+					}
 				}
 				LinkType::OpenGL => glloader(fn_name),
 				LinkType::Normal(lib_name) => {
@@ -99,13 +100,17 @@ unsafe impl<F: 'static> Sync for LazyFn<F> {}
 impl<F: 'static> std::ops::Deref for LazyFn<F> {
 	type Target = F;
 
-	fn deref(&self) -> &Self::Target { self.as_ref() }
+	fn deref(&self) -> &Self::Target {
+		self.as_ref()
+	}
 }
 
 impl<F: 'static> std::convert::AsRef<F> for LazyFn<F> {
 	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
 	#[inline]
-	fn as_ref(&self) -> &F { unsafe { self.addr.get().as_ref().unwrap_unchecked() } }
+	fn as_ref(&self) -> &F {
+		unsafe { self.addr.get().as_ref().unwrap_unchecked() }
+	}
 }
 
 // vkGetDeviceProcAddr must be implemented manually to avoid recursion
