@@ -4,7 +4,8 @@ use crate::{error::*, FnPtr, Result, VkInstance};
 extern crate self as dylink;
 
 #[cfg_attr(windows, dylink_macro::dylink(name = "vulkan-1.dll"))]
-#[cfg_attr(unix, dylink_macro::dylink(name = "libvulkan.so.1"))]
+#[cfg_attr(target_os = "linux", dylink_macro::dylink(any(name = "libvulkan.so.1", name = "libvulkan.so")))]
+#[cfg_attr(target_os = "macos", dylink_macro::dylink(any(name = "libvulkan.dylib", name = "libvulkan.1.dylib", name = "libMoltenVK.dylib")))]
 extern "system" {
 	pub(crate) fn vkGetInstanceProcAddr(
 		instance: VkInstance,
@@ -14,18 +15,20 @@ extern "system" {
 
 /// `vkloader` is a vulkan loader specialization.
 /// If `instance` is null, then `device` is ignored.
+#[cfg(any(windows, target_os = "linux"))]
 pub unsafe fn vkloader(instance: Option<&VkInstance>, name: &'static ffi::CStr) -> Result<FnPtr> {
 	let inst = instance.map_or(VkInstance(std::ptr::null()), |r| r.clone());
 	match vkGetInstanceProcAddr(inst, name.as_ptr()) {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(
-			name.to_str().unwrap(),
+			Some(name.to_str().unwrap()),
 			ErrorKind::FnNotFound,
 		)),
 	}
 }
 
 /// `glloader` is an opengl loader specialization.
+#[cfg(any(windows, target_os = "linux"))]
 pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
 	#[cfg(unix)]
 	{
@@ -49,7 +52,7 @@ pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
 		match maybe_fn {
 			Some(addr) => Ok(addr),
 			None => Err(DylinkError::new(
-				name.to_str().unwrap(),
+				Some(name.to_str().unwrap()),
 				ErrorKind::FnNotFound,
 			)),
 		}
@@ -57,6 +60,7 @@ pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
 }
 
 /// `loader` is a generalization for all other dlls.
+#[cfg(any(windows, unix))]
 pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
@@ -87,12 +91,12 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 			}
 			#[cfg(unix)]
 			{
-				libc::dlopen(lib_name.as_ptr(), libc::RTLD_NOW) as isize
+				libc::dlopen(lib_name.as_ptr(), libc::RTLD_NOW | RTLD_LOCAL) as isize
 			}
 		};
 		if lib_handle == 0 {
 			return Err(DylinkError::new(
-				lib_name.to_str().unwrap(),
+				Some(lib_name.to_str().unwrap()),
 				ErrorKind::LibNotFound,
 			));
 		} else {
@@ -123,7 +127,7 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 	match maybe_fn {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::new(
-			fn_name.to_str().unwrap(),
+			Some(fn_name.to_str().unwrap()),
 			ErrorKind::FnNotFound,
 		)),
 	}

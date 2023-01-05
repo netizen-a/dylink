@@ -4,11 +4,12 @@ use std::{error::Error, fmt};
 pub enum ErrorKind {
 	FnNotFound,
 	LibNotFound,
+	ListNotFound
 }
 
 #[derive(Debug)]
 pub struct DylinkError {
-	subject: &'static str,
+	subject: Option<&'static str>,
 	pub(crate) kind: ErrorKind,
 }
 
@@ -16,7 +17,7 @@ impl Error for DylinkError {}
 
 impl DylinkError {
 	#[inline]
-	pub const fn new(subject: &'static str, kind: ErrorKind) -> Self {
+	pub const fn new(subject: Option<&'static str>, kind: ErrorKind) -> Self {
 		Self { subject, kind }
 	}
 
@@ -28,10 +29,16 @@ impl DylinkError {
 
 impl fmt::Display for DylinkError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		let subject = self.subject;
 		let err = match self.kind {
-			ErrorKind::FnNotFound => format!("function `{subject}` not found"),
-			ErrorKind::LibNotFound => format!("library `{subject}` not found"),
+			ErrorKind::FnNotFound => match self.subject {
+				Some(name) => format!("function `{name}` not found"),
+				None => "function not found".to_owned()
+			},
+			ErrorKind::LibNotFound => match self.subject {
+				Some(name) => format!("library `{name}` not found"),
+				None => "library not found".to_owned(),
+			},
+			ErrorKind::ListNotFound => format!("libraries not found"),
 		};
 		write!(f, "Dylink Error: {err}")
 	}
