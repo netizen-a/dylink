@@ -73,17 +73,16 @@ pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
 }
 
 /// `loader` is a generalization for all other dlls.
-#[cfg(any(windows, unix))]
-pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Result<FnPtr> {
+pub fn loader(lib_name: &'static [u8], fn_name: &'static ffi::CStr) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
 	#[cfg(windows)]
 	use windows_sys::Win32::System::LibraryLoader::{
-		GetProcAddress, LoadLibraryExA, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
+		GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 	};
 
-	static DLL_DATA: RwLock<Lazy<HashMap<ffi::CString, isize>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<&'static [u8], isize>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
 	let read_lock = DLL_DATA.read().unwrap();
@@ -96,9 +95,12 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 		let lib_handle = unsafe {
 			#[cfg(windows)]
 			{
-				#[cfg(windows)]
-				LoadLibraryExA(
-					lib_name.as_ptr() as *const _,
+				use std::os::windows::ffi::OsStrExt;
+				let utf8_str = std::str::from_utf8(lib_name).unwrap();
+				let wide_str: Vec<u16> = ffi::OsStr::new(utf8_str).encode_wide().collect();
+				// TODO: handle unicode strings
+				LoadLibraryExW(
+					wide_str.as_ptr() as *const _,
 					0,
 					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 				)
@@ -110,14 +112,11 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 		};
 		if lib_handle == 0 {
 			return Err(DylinkError::new(
-				Some(lib_name.to_str().unwrap()),
+				Some(std::str::from_utf8(lib_name).unwrap()),
 				ErrorKind::LibNotFound,
 			));
 		} else {
-			DLL_DATA
-				.write()
-				.unwrap()
-				.insert(lib_name.to_owned(), lib_handle);
+			DLL_DATA.write().unwrap().insert(lib_name, lib_handle);
 		}
 		lib_handle
 	};

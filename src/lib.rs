@@ -7,11 +7,11 @@ use once_cell::sync::Lazy;
 
 pub mod error;
 pub mod lazyfn;
+// TODO: make private
 pub mod loader;
 
-// TODO: implement macOS support
-#[cfg(not(any(windows, unix)))]
-compile_error!("Dylink Error: Target platform unsupported.");
+#[cfg(wasm)]
+compile_error!("Dylink Error: Wasm is unsupported.");
 
 // This global is read every time a vulkan function is called for the first time,
 // which occurs through `LazyFn::link`.

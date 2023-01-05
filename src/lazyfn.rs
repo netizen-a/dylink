@@ -82,7 +82,7 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 				LinkType::Normal(lib_list) => {
 					let mut result = Err(error::DylinkError::new(None, ErrorKind::ListNotFound));
 					for name in lib_list {
-						match loader(ffi::CStr::from_bytes_with_nul(name).unwrap(), fn_name) {
+						match loader(name, fn_name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!

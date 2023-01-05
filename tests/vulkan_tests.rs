@@ -2,11 +2,11 @@
 #[test]
 fn load_vulkan_dll() {
 	use std::ffi::CStr;
-	let vulkan_dll = if cfg!(windows) {
-		CStr::from_bytes_with_nul(b"vulkan-1.dll\0").unwrap()
+	let vulkan_dll: &'static [u8] = if cfg!(windows) {
+		b"vulkan-1.dll\0"
 	} else if cfg!(target_os = "linux") {
 		// the other way is the target "libvulkan.so"
-		CStr::from_bytes_with_nul(b"libvulkan.so.1\0").unwrap()
+		b"libvulkan.so.1\0"
 	} else {
 		// TODO: implement version for macOS.
 		todo!()
