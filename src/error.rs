@@ -4,7 +4,7 @@ use std::{error::Error, fmt};
 pub enum ErrorKind {
 	FnNotFound,
 	LibNotFound,
-	ListNotFound
+	ListNotFound,
 }
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl fmt::Display for DylinkError {
 		let err = match self.kind {
 			ErrorKind::FnNotFound => match self.subject {
 				Some(name) => format!("function `{name}` not found"),
-				None => "function not found".to_owned()
+				None => "function not found".to_owned(),
 			},
 			ErrorKind::LibNotFound => match self.subject {
 				Some(name) => format!("library `{name}` not found"),

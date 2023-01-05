@@ -1,11 +1,29 @@
 use std::{ffi, mem, sync::RwLock};
 
 use crate::{error::*, FnPtr, Result, VkInstance};
+// dylink_macro internally uses dylink as it's root namespace,
+// but since we are in dylink the namespace is actually named `self`.
+// this is just here to resolve the missing namespace issue.
 extern crate self as dylink;
 
+// the dylink macro is ironically used to resolve itself, but it only uses
+// normal linking, so it's nonrecursive.
+//
+// windows and linux are fully tested and useable as of this comment.
+// macos should theoretically work, but it's untested.
 #[cfg_attr(windows, dylink_macro::dylink(name = "vulkan-1.dll"))]
-#[cfg_attr(target_os = "linux", dylink_macro::dylink(any(name = "libvulkan.so.1", name = "libvulkan.so")))]
-#[cfg_attr(target_os = "macos", dylink_macro::dylink(any(name = "libvulkan.dylib", name = "libvulkan.1.dylib", name = "libMoltenVK.dylib")))]
+#[cfg_attr(
+	all(unix, not(target_os = "macos")),
+	dylink_macro::dylink(any(name = "libvulkan.so.1", name = "libvulkan.so"))
+)]
+#[cfg_attr(
+	target_os = "macos",
+	dylink_macro::dylink(any(
+		name = "libvulkan.dylib",
+		name = "libvulkan.1.dylib",
+		name = "libMoltenVK.dylib"
+	))
+)]
 extern "system" {
 	pub(crate) fn vkGetInstanceProcAddr(
 		instance: VkInstance,
@@ -78,6 +96,7 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 		let lib_handle = unsafe {
 			#[cfg(windows)]
 			{
+				#[cfg(windows)]
 				LoadLibraryExA(
 					lib_name.as_ptr() as *const _,
 					0,
@@ -103,7 +122,7 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 		lib_handle
 	};
 
-	let maybe_fn = unsafe {
+	let maybe_fn: Option<FnPtr> = unsafe {
 		#[cfg(windows)]
 		{
 			GetProcAddress(handle, fn_name.as_ptr() as *const _)
@@ -112,11 +131,7 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 		{
 			let addr: *const libc::c_void =
 				libc::dlsym(handle as *mut libc::c_void, fn_name.as_ptr());
-			if addr.is_null() {
-				None
-			} else {
-				Some(std::mem::transmute(addr))
-			}
+			std::mem::transmute(addr)
 		}
 	};
 	match maybe_fn {

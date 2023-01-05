@@ -9,7 +9,7 @@ pub enum LinkType<const N: usize> {
 	Normal([&'static [u8]; N]),
 }
 
-impl <const N: usize> LinkType<N> {
+impl<const N: usize> LinkType<N> {
 	const fn lib_count(&self) -> usize {
 		N
 	}
@@ -87,14 +87,14 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 								result = Ok(addr);
 								// success! lib and function retrieved!
 								break;
-							},
+							}
 							Err(err) => {
 								if let ErrorKind::FnNotFound = err.kind() {
 									result = Err(err);
 									// lib detected, but function failed to load
 									break;
 								}
-							},
+							}
 						}
 					}
 					result
