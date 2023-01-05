@@ -30,32 +30,27 @@ pub unsafe fn vkloader(instance: Option<&VkInstance>, name: &'static ffi::CStr) 
 /// `glloader` is an opengl loader specialization.
 #[cfg(any(windows, target_os = "linux"))]
 pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
-	#[cfg(unix)]
-	{
-		#[dylink_macro::dylink(name = "opengl32")]
-		extern "system" {
-			pub(crate) fn glXGetProcAddress(pName: *const ffi::c_char) -> Option<FnPtr>;
+	let maybe_fn = {
+		#[cfg(unix)]
+		{
+			#[dylink_macro::dylink(name = "opengl32")]
+			extern "system" {
+				pub(crate) fn glXGetProcAddress(pName: *const ffi::c_char) -> Option<FnPtr>;
+			}
+			glXGetProcAddress(name.as_ptr() as *const _)
 		}
-		let maybe_fn = glXGetProcAddress(name.as_ptr() as *const _);
-		match maybe_fn {
-			Some(addr) => Ok(addr),
-			None => Err(DylinkError::new(
-				name.to_str().unwrap(),
-				ErrorKind::FnNotFound,
-			)),
+		#[cfg(windows)]
+		{
+			use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
+			wglGetProcAddress(name.as_ptr() as *const _)
 		}
-	}
-	#[cfg(windows)]
-	{
-		use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
-		let maybe_fn = wglGetProcAddress(name.as_ptr() as *const _);
-		match maybe_fn {
-			Some(addr) => Ok(addr),
-			None => Err(DylinkError::new(
-				Some(name.to_str().unwrap()),
-				ErrorKind::FnNotFound,
-			)),
-		}
+	};
+	match maybe_fn {
+		Some(addr) => Ok(addr),
+		None => Err(DylinkError::new(
+			Some(name.to_str().unwrap()),
+			ErrorKind::FnNotFound,
+		)),
 	}
 }
 
@@ -91,7 +86,7 @@ pub fn loader(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> Resu
 			}
 			#[cfg(unix)]
 			{
-				libc::dlopen(lib_name.as_ptr(), libc::RTLD_NOW | RTLD_LOCAL) as isize
+				libc::dlopen(lib_name.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) as isize
 			}
 		};
 		if lib_handle == 0 {
