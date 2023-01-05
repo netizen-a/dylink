@@ -97,8 +97,7 @@ pub fn loader(lib_name: &'static [u8], fn_name: &'static ffi::CStr) -> Result<Fn
 			{
 				use std::os::windows::ffi::OsStrExt;
 				let utf8_str = std::str::from_utf8(lib_name).unwrap();
-				let wide_str: Vec<u16> = ffi::OsStr::new(utf8_str).encode_wide().collect();
-				// TODO: handle unicode strings
+				let wide_str: Vec<u16> = ffi::OsStr::new(utf8_str).encode_wide().collect();				
 				LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
 					0,
@@ -107,7 +106,7 @@ pub fn loader(lib_name: &'static [u8], fn_name: &'static ffi::CStr) -> Result<Fn
 			}
 			#[cfg(unix)]
 			{
-				libc::dlopen(lib_name.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) as isize
+				libc::dlopen(lib_name.as_ptr() as *const _, libc::RTLD_NOW | libc::RTLD_LOCAL) as isize
 			}
 		};
 		if lib_handle == 0 {
