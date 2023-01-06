@@ -1,4 +1,4 @@
-use std::{cell, ffi, mem, sync};
+use std::{cell, mem, sync};
 
 use crate::{error::*, loader::*, *};
 
@@ -6,7 +6,7 @@ use crate::{error::*, loader::*, *};
 pub enum LinkType<const N: usize> {
 	OpenGL,
 	Vulkan,
-	Normal([&'static [u8]; N]),
+	Normal([&'static str; N]),
 }
 
 impl<const N: usize> LinkType<N> {
@@ -19,7 +19,7 @@ impl<const N: usize> LinkType<N> {
 // `F` can be anything as long as it's the size of a function pointer
 pub struct LazyFn<F: 'static, const N: usize = 1> {
 	// used to retrieve function address
-	name: &'static [u8],
+	name: &'static str,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
 	addr: cell::UnsafeCell<F>,
@@ -36,9 +36,9 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 	///
 	/// Thunk must be the same size as `FnPtr`.
 	#[inline]
-	pub const fn new(name: &'static [u8], thunk: F, link_ty: LinkType<N>) -> Self {
+	pub const fn new(name: &'static str, thunk: F, link_ty: LinkType<N>) -> Self {
 		// These check are optimized out if called in a const context.
-		assert!(matches!(name, [.., 0]));
+		assert!(matches!(name.as_bytes(), [.., 0]));
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		assert!(link_ty.lib_count() != 0);
 		Self {
@@ -53,36 +53,38 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 	/// If successful, stores address and returns it.
 	pub fn link(&self) -> Result<&F> {
 		// this is safe because nul is checked in `LazyFn::new`.
-		let fn_name = unsafe { ffi::CStr::from_bytes_with_nul_unchecked(self.name) };
+		//let fn_name = unsafe { ffi::CStr::from_bytes_with_nul_unchecked(self.name) };
 		self.once.call_once(|| unsafe {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => {
 					let device_read_lock = VK_DEVICE.read().expect("failed to get read lock");
-					match device_read_lock
-						.iter()
-						.find_map(|device| vkGetDeviceProcAddr(*device, fn_name.as_ptr()))
-					{
+					match device_read_lock.iter().find_map(|device| {
+						vkGetDeviceProcAddr(*device, self.name.as_ptr() as *const _)
+					}) {
 						Some(addr) => Ok(addr),
 						None => {
 							mem::drop(device_read_lock);
 							let instance_read_lock =
 								VK_INSTANCE.read().expect("failed to get read lock");
 							// check other instances if fails in case one has a higher available version number
-							match instance_read_lock
-								.iter()
-								.find_map(|instance| vkloader(Some(instance), fn_name).ok())
-							{
+							match instance_read_lock.iter().find_map(|instance| {
+								vkGetInstanceProcAddr(*instance, self.name.as_ptr())
+							}) {
 								Some(addr) => Ok(addr),
-								None => vkloader(None, fn_name),
+								None => vkGetInstanceProcAddr(
+									VkInstance(std::ptr::null()),
+									self.name.as_ptr(),
+								)
+								.ok_or(error::DylinkError::new(Some(self.name), ErrorKind::FnNotFound)),
 							}
 						}
 					}
 				}
-				LinkType::OpenGL => glloader(fn_name),
+				LinkType::OpenGL => glloader(self.name),
 				LinkType::Normal(lib_list) => {
 					let mut result = Err(error::DylinkError::new(None, ErrorKind::ListNotFound));
 					for name in lib_list {
-						match loader(name, fn_name) {
+						match loader(std::ffi::OsStr::new(name), self.name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!
@@ -113,7 +115,7 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 		// by this point. Race conditions shouldn't occur.
 		match unsafe { *self.status.get() } {
 			None => Ok(self.as_ref()),
-			Some(kind) => Err(DylinkError::new(Some(fn_name.to_str().unwrap()), kind)),
+			Some(kind) => Err(DylinkError::new(Some(self.name), kind)),
 		}
 	}
 }
@@ -141,16 +143,13 @@ impl<F: 'static, const N: usize> std::convert::AsRef<F> for LazyFn<F, N> {
 #[allow(non_snake_case)]
 pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	device: VkDevice,
-	name: *const ffi::c_char,
+	name: *const u8,
 ) -> Option<FnPtr> {
 	pub(crate) static DYN_FUNC: LazyFn<
-		unsafe extern "system" fn(VkDevice, *const ffi::c_char) -> Option<FnPtr>,
-	> = LazyFn::new(b"vkGetDeviceProcAddr\0", initial_fn, LinkType::Vulkan);
+		unsafe extern "system" fn(VkDevice, *const u8) -> Option<FnPtr>,
+	> = LazyFn::new("vkGetDeviceProcAddr\0", initial_fn, LinkType::Vulkan);
 
-	unsafe extern "system" fn initial_fn(
-		device: VkDevice,
-		name: *const ffi::c_char,
-	) -> Option<FnPtr> {
+	unsafe extern "system" fn initial_fn(device: VkDevice, name: *const u8) -> Option<FnPtr> {
 		DYN_FUNC.once.call_once(|| {
 			let read_lock = VK_INSTANCE.read().expect("failed to get read lock");
 			// check other instances if fails in case one has a higher available version number

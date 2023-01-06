@@ -10,10 +10,11 @@ pub mod lazyfn;
 // TODO: make private
 pub mod loader;
 
+// I don't know how to implement wasm, so I'll just drop this here...
 #[cfg(wasm)]
 compile_error!("Dylink Error: Wasm is unsupported.");
 
-// This global is read every time a vulkan function is called for the first time,
+// These globals are read every time a vulkan function is called for the first time,
 // which occurs through `LazyFn::link`.
 static VK_INSTANCE: sync::RwLock<Lazy<HashSet<VkInstance>>> =
 	sync::RwLock::new(Lazy::new(|| HashSet::new()));

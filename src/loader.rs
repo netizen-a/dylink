@@ -6,9 +6,6 @@ use crate::{error::*, FnPtr, Result, VkInstance};
 // this is just here to resolve the missing namespace issue.
 extern crate self as dylink;
 
-// the dylink macro is ironically used to resolve itself, but it only uses
-// normal linking, so it's nonrecursive.
-//
 // windows and linux are fully tested and useable as of this comment.
 // macos should theoretically work, but it's untested.
 #[cfg_attr(windows, dylink_macro::dylink(name = "vulkan-1.dll"))]
@@ -25,29 +22,12 @@ extern crate self as dylink;
 	))
 )]
 extern "system" {
-	pub(crate) fn vkGetInstanceProcAddr(
-		instance: VkInstance,
-		pName: *const ffi::c_char,
-	) -> Option<FnPtr>;
-}
-
-/// `vkloader` is a vulkan loader specialization.
-/// If `instance` is null, then `device` is ignored.
-#[cfg(any(windows, target_os = "linux"))]
-pub unsafe fn vkloader(instance: Option<&VkInstance>, name: &'static ffi::CStr) -> Result<FnPtr> {
-	let inst = instance.map_or(VkInstance(std::ptr::null()), |r| r.clone());
-	match vkGetInstanceProcAddr(inst, name.as_ptr()) {
-		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(
-			Some(name.to_str().unwrap()),
-			ErrorKind::FnNotFound,
-		)),
-	}
+	pub fn vkGetInstanceProcAddr(instance: VkInstance, pName: *const u8) -> Option<FnPtr>;
 }
 
 /// `glloader` is an opengl loader specialization.
 #[cfg(any(windows, target_os = "linux"))]
-pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
+pub unsafe fn glloader(name: &'static str) -> Result<FnPtr> {
 	let maybe_fn = {
 		#[cfg(unix)]
 		{
@@ -65,15 +45,12 @@ pub unsafe fn glloader(name: &'static ffi::CStr) -> Result<FnPtr> {
 	};
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(
-			Some(name.to_str().unwrap()),
-			ErrorKind::FnNotFound,
-		)),
+		None => Err(DylinkError::new(Some(name), ErrorKind::FnNotFound)),
 	}
 }
 
 /// `loader` is a generalization for all other dlls.
-pub fn loader(lib_name: &'static [u8], fn_name: &'static ffi::CStr) -> Result<FnPtr> {
+pub fn loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -82,7 +59,7 @@ pub fn loader(lib_name: &'static [u8], fn_name: &'static ffi::CStr) -> Result<Fn
 		GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 	};
 
-	static DLL_DATA: RwLock<Lazy<HashMap<&'static [u8], isize>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<&'static ffi::OsStr, isize>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
 	let read_lock = DLL_DATA.read().unwrap();
@@ -96,8 +73,7 @@ pub fn loader(lib_name: &'static [u8], fn_name: &'static ffi::CStr) -> Result<Fn
 			#[cfg(windows)]
 			{
 				use std::os::windows::ffi::OsStrExt;
-				let utf8_str = std::str::from_utf8(lib_name).unwrap();
-				let wide_str: Vec<u16> = ffi::OsStr::new(utf8_str).encode_wide().collect();				
+				let wide_str: Vec<u16> = lib_name.encode_wide().collect();
 				LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
 					0,
@@ -106,14 +82,15 @@ pub fn loader(lib_name: &'static [u8], fn_name: &'static ffi::CStr) -> Result<Fn
 			}
 			#[cfg(unix)]
 			{
-				libc::dlopen(lib_name.as_ptr() as *const _, libc::RTLD_NOW | libc::RTLD_LOCAL) as isize
+				use std::os::unix::ffi::OsStrExt;
+				libc::dlopen(
+					lib_name.as_bytes().as_ptr() as *const _,
+					libc::RTLD_NOW | libc::RTLD_LOCAL,
+				) as isize
 			}
 		};
 		if lib_handle == 0 {
-			return Err(DylinkError::new(
-				Some(std::str::from_utf8(lib_name).unwrap()),
-				ErrorKind::LibNotFound,
-			));
+			return Err(DylinkError::new(lib_name.to_str(), ErrorKind::LibNotFound));
 		} else {
 			DLL_DATA.write().unwrap().insert(lib_name, lib_handle);
 		}
@@ -128,15 +105,12 @@ pub fn loader(lib_name: &'static [u8], fn_name: &'static ffi::CStr) -> Result<Fn
 		#[cfg(unix)]
 		{
 			let addr: *const libc::c_void =
-				libc::dlsym(handle as *mut libc::c_void, fn_name.as_ptr());
+				libc::dlsym(handle as *mut libc::c_void, fn_name.as_ptr() as *const _);
 			std::mem::transmute(addr)
 		}
 	};
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(
-			Some(fn_name.to_str().unwrap()),
-			ErrorKind::FnNotFound,
-		)),
+		None => Err(DylinkError::new(Some(fn_name), ErrorKind::FnNotFound)),
 	}
 }
