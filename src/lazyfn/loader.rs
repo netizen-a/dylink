@@ -1,6 +1,6 @@
 use std::{mem, sync::RwLock};
 
-use crate::{error::*, FnPtr, Result, lazyfn, ffi};
+use crate::{error::*, ffi, lazyfn, FnPtr, Result};
 // dylink_macro internally uses dylink as it's root namespace,
 // but since we are in dylink the namespace is actually named `self`.
 // this is just here to resolve the missing namespace issue.
@@ -22,26 +22,36 @@ extern crate self as dylink;
 	))
 )]
 extern "system" {
-	pub(super) fn vkGetInstanceProcAddr(instance: ffi::VkInstance, pName: *const u8) -> Option<FnPtr>;
+	pub(super) fn vkGetInstanceProcAddr(
+		instance: ffi::VkInstance,
+		pName: *const ffi::c_char,
+	) -> Option<FnPtr>;
 }
 
 // vkGetDeviceProcAddr must be implemented manually to avoid recursion
 #[allow(non_snake_case)]
 pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
 	device: ffi::VkDevice,
-	name: *const u8,
+	name: *const ffi::c_char,
 ) -> Option<FnPtr> {
 	static DYN_FUNC: lazyfn::LazyFn<
-		unsafe extern "system" fn(ffi::VkDevice, *const u8) -> Option<FnPtr>,
-	> = lazyfn::LazyFn::new("vkGetDeviceProcAddr\0", initial_fn, super::LinkType::Vulkan);
+		unsafe extern "system" fn(ffi::VkDevice, *const ffi::c_char) -> Option<FnPtr>,
+	> = lazyfn::LazyFn::new(
+		unsafe { ffi::CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") },
+		initial_fn,
+		super::LinkType::Vulkan,
+	);
 
-	unsafe extern "system" fn initial_fn(device: ffi::VkDevice, name: *const u8) -> Option<FnPtr> {
+	unsafe extern "system" fn initial_fn(
+		device: ffi::VkDevice,
+		name: *const ffi::c_char,
+	) -> Option<FnPtr> {
 		DYN_FUNC.once.call_once(|| {
 			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");
 			// check other instances if fails in case one has a higher available version number
-			let fn_ptr = read_lock.iter().find_map(|instance| {
-				vkGetInstanceProcAddr(*instance, DYN_FUNC.name.as_ptr().cast())
-			});
+			let fn_ptr = read_lock
+				.iter()
+				.find_map(|instance| vkGetInstanceProcAddr(*instance, DYN_FUNC.name.as_ptr()));
 			*std::cell::UnsafeCell::raw_get(&DYN_FUNC.addr) = mem::transmute(fn_ptr);
 		});
 		DYN_FUNC(device, name)

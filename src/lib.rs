@@ -5,14 +5,14 @@ use std::{collections::HashSet, sync};
 
 use once_cell::sync::Lazy;
 
-mod lazyfn;
 mod error;
 mod ffi;
+mod lazyfn;
 
-pub use error::*;
-pub use lazyfn::*;
-pub use ffi::*;
 pub use dylink_macro::dylink;
+pub use error::*;
+pub use ffi::*;
+pub use lazyfn::*;
 
 // I don't know how to implement wasm, so I'll just drop this here...
 #[cfg(wasm)]
@@ -31,8 +31,6 @@ static VK_DEVICE: sync::RwLock<Lazy<HashSet<ffi::VkDevice>>> =
 pub type FnPtr = unsafe extern "system" fn() -> isize;
 /// The result of a dylink function
 pub type Result<T> = std::result::Result<T, error::DylinkError>;
-
-
 
 pub struct Global;
 impl Global {

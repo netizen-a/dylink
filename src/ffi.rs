@@ -1,4 +1,4 @@
-pub(crate) use std::ffi::{c_void, OsStr};
+pub(crate) use std::ffi::{c_char, c_void, CStr, OsStr};
 
 // FIXME: when extern types are stablized they must replace the `c_void` variation
 

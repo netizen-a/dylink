@@ -1,6 +1,6 @@
 use std::{cell, mem, sync};
 
-use crate::{error::*, *};
+use crate::*;
 
 mod loader;
 
@@ -21,7 +21,7 @@ impl<const N: usize> LinkType<N> {
 // `F` can be anything as long as it's the size of a function pointer
 pub struct LazyFn<F: 'static, const N: usize = 1> {
 	// used to retrieve function address
-	name: &'static str,
+	name: &'static ffi::CStr,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
 	addr: cell::UnsafeCell<F>,
@@ -33,14 +33,9 @@ pub struct LazyFn<F: 'static, const N: usize = 1> {
 impl<F: 'static, const N: usize> LazyFn<F, N> {
 	/// Initializes a `LazyFn` object with all the necessary information for `LazyFn::link` to work.
 	/// # Panic
-	/// The provided string, `name`, must be nul-terminated and not contain any interior nul bytes,
-	/// if not the function will panic.
-	///
-	/// Thunk must be the same size as `FnPtr`.
+	/// Type `F` must be the same size as `FnPtr`.
 	#[inline]
-	pub const fn new(name: &'static str, thunk: F, link_ty: LinkType<N>) -> Self {
-		// These check are optimized out if called in a const context.
-		assert!(matches!(name.as_bytes(), [.., 0]));
+	pub const fn new(name: &'static ffi::CStr, thunk: F, link_ty: LinkType<N>) -> Self {
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		assert!(link_ty.lib_count() != 0);
 		Self {
@@ -54,8 +49,7 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 
 	/// If successful, stores address and returns it.
 	pub fn link(&self) -> Result<&F> {
-		// this is safe because nul is checked in `LazyFn::new`.
-		//let fn_name = unsafe { ffi::CStr::from_bytes_with_nul_unchecked(self.name) };
+		let name = self.name.to_str().unwrap();
 		self.once.call_once(|| unsafe {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => {
@@ -77,16 +71,16 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 									ffi::VkInstance(std::ptr::null()),
 									self.name.as_ptr(),
 								)
-								.ok_or(error::DylinkError::new(Some(self.name), ErrorKind::FnNotFound)),
+								.ok_or(error::DylinkError::new(Some(name), ErrorKind::FnNotFound)),
 							}
 						}
 					}
 				}
-				LinkType::OpenGL => loader::glloader(self.name),
+				LinkType::OpenGL => loader::glloader(name),
 				LinkType::Normal(lib_list) => {
 					let mut result = Err(error::DylinkError::new(None, ErrorKind::ListNotFound));
-					for name in lib_list {
-						match loader::loader(ffi::OsStr::new(name), self.name) {
+					for lib_name in lib_list {
+						match loader::loader(ffi::OsStr::new(lib_name), name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!
@@ -117,7 +111,7 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 		// by this point. Race conditions shouldn't occur.
 		match unsafe { *self.status.get() } {
 			None => Ok(self.as_ref()),
-			Some(kind) => Err(DylinkError::new(Some(self.name), kind)),
+			Some(kind) => Err(DylinkError::new(Some(name), kind)),
 		}
 	}
 }
@@ -140,5 +134,3 @@ impl<F: 'static, const N: usize> std::convert::AsRef<F> for LazyFn<F, N> {
 		unsafe { self.addr.get().as_ref().unwrap_unchecked() }
 	}
 }
-
-
