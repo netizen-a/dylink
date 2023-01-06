@@ -1,6 +1,8 @@
 use std::{cell, mem, sync};
 
-use crate::{error::*, loader::*, *};
+use crate::{error::*, *};
+
+mod loader;
 
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType<const N: usize> {
@@ -31,7 +33,7 @@ pub struct LazyFn<F: 'static, const N: usize = 1> {
 impl<F: 'static, const N: usize> LazyFn<F, N> {
 	/// Initializes a `LazyFn` object with all the necessary information for `LazyFn::link` to work.
 	/// # Panic
-	/// The provided slice, `name`, must be nul-terminated and not contain any interior nul bytes,
+	/// The provided string, `name`, must be nul-terminated and not contain any interior nul bytes,
 	/// if not the function will panic.
 	///
 	/// Thunk must be the same size as `FnPtr`.
@@ -59,7 +61,7 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 				LinkType::Vulkan => {
 					let device_read_lock = VK_DEVICE.read().expect("failed to get read lock");
 					match device_read_lock.iter().find_map(|device| {
-						vkGetDeviceProcAddr(*device, self.name.as_ptr() as *const _)
+						loader::vkGetDeviceProcAddr(*device, self.name.as_ptr() as *const _)
 					}) {
 						Some(addr) => Ok(addr),
 						None => {
@@ -68,11 +70,11 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 								VK_INSTANCE.read().expect("failed to get read lock");
 							// check other instances if fails in case one has a higher available version number
 							match instance_read_lock.iter().find_map(|instance| {
-								vkGetInstanceProcAddr(*instance, self.name.as_ptr())
+								loader::vkGetInstanceProcAddr(*instance, self.name.as_ptr())
 							}) {
 								Some(addr) => Ok(addr),
-								None => vkGetInstanceProcAddr(
-									VkInstance(std::ptr::null()),
+								None => loader::vkGetInstanceProcAddr(
+									ffi::VkInstance(std::ptr::null()),
 									self.name.as_ptr(),
 								)
 								.ok_or(error::DylinkError::new(Some(self.name), ErrorKind::FnNotFound)),
@@ -80,11 +82,11 @@ impl<F: 'static, const N: usize> LazyFn<F, N> {
 						}
 					}
 				}
-				LinkType::OpenGL => glloader(self.name),
+				LinkType::OpenGL => loader::glloader(self.name),
 				LinkType::Normal(lib_list) => {
 					let mut result = Err(error::DylinkError::new(None, ErrorKind::ListNotFound));
 					for name in lib_list {
-						match loader(std::ffi::OsStr::new(name), self.name) {
+						match loader::loader(ffi::OsStr::new(name), self.name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!
@@ -139,26 +141,4 @@ impl<F: 'static, const N: usize> std::convert::AsRef<F> for LazyFn<F, N> {
 	}
 }
 
-// vkGetDeviceProcAddr must be implemented manually to avoid recursion
-#[allow(non_snake_case)]
-pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
-	device: VkDevice,
-	name: *const u8,
-) -> Option<FnPtr> {
-	pub(crate) static DYN_FUNC: LazyFn<
-		unsafe extern "system" fn(VkDevice, *const u8) -> Option<FnPtr>,
-	> = LazyFn::new("vkGetDeviceProcAddr\0", initial_fn, LinkType::Vulkan);
 
-	unsafe extern "system" fn initial_fn(device: VkDevice, name: *const u8) -> Option<FnPtr> {
-		DYN_FUNC.once.call_once(|| {
-			let read_lock = VK_INSTANCE.read().expect("failed to get read lock");
-			// check other instances if fails in case one has a higher available version number
-			let fn_ptr = read_lock.iter().find_map(|instance| {
-				crate::loader::vkGetInstanceProcAddr(*instance, DYN_FUNC.name.as_ptr().cast())
-			});
-			*cell::UnsafeCell::raw_get(&DYN_FUNC.addr) = mem::transmute(fn_ptr);
-		});
-		DYN_FUNC(device, name)
-	}
-	DYN_FUNC(device, name)
-}

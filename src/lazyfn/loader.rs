@@ -1,6 +1,6 @@
-use std::{ffi, mem, sync::RwLock};
+use std::{mem, sync::RwLock};
 
-use crate::{error::*, FnPtr, Result, VkInstance};
+use crate::{error::*, FnPtr, Result, lazyfn, ffi};
 // dylink_macro internally uses dylink as it's root namespace,
 // but since we are in dylink the namespace is actually named `self`.
 // this is just here to resolve the missing namespace issue.
@@ -8,44 +8,78 @@ extern crate self as dylink;
 
 // windows and linux are fully tested and useable as of this comment.
 // macos should theoretically work, but it's untested.
-#[cfg_attr(windows, dylink_macro::dylink(name = "vulkan-1.dll"))]
+#[cfg_attr(windows, crate::dylink(name = "vulkan-1.dll"))]
 #[cfg_attr(
 	all(unix, not(target_os = "macos")),
-	dylink_macro::dylink(any(name = "libvulkan.so.1", name = "libvulkan.so"))
+	crate::dylink(any(name = "libvulkan.so.1", name = "libvulkan.so"))
 )]
 #[cfg_attr(
 	target_os = "macos",
-	dylink_macro::dylink(any(
+	crate::dylink(any(
 		name = "libvulkan.dylib",
 		name = "libvulkan.1.dylib",
 		name = "libMoltenVK.dylib"
 	))
 )]
 extern "system" {
-	pub fn vkGetInstanceProcAddr(instance: VkInstance, pName: *const u8) -> Option<FnPtr>;
+	pub(super) fn vkGetInstanceProcAddr(instance: ffi::VkInstance, pName: *const u8) -> Option<FnPtr>;
 }
 
+// vkGetDeviceProcAddr must be implemented manually to avoid recursion
+#[allow(non_snake_case)]
+pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
+	device: ffi::VkDevice,
+	name: *const u8,
+) -> Option<FnPtr> {
+	static DYN_FUNC: lazyfn::LazyFn<
+		unsafe extern "system" fn(ffi::VkDevice, *const u8) -> Option<FnPtr>,
+	> = lazyfn::LazyFn::new("vkGetDeviceProcAddr\0", initial_fn, super::LinkType::Vulkan);
+
+	unsafe extern "system" fn initial_fn(device: ffi::VkDevice, name: *const u8) -> Option<FnPtr> {
+		DYN_FUNC.once.call_once(|| {
+			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");
+			// check other instances if fails in case one has a higher available version number
+			let fn_ptr = read_lock.iter().find_map(|instance| {
+				vkGetInstanceProcAddr(*instance, DYN_FUNC.name.as_ptr().cast())
+			});
+			*std::cell::UnsafeCell::raw_get(&DYN_FUNC.addr) = mem::transmute(fn_ptr);
+		});
+		DYN_FUNC(device, name)
+	}
+	DYN_FUNC(device, name)
+}
+
+// TODO: figure out what macos and linux call their DLLs
 /// `glloader` is an opengl loader specialization.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(windows)]
 pub unsafe fn glloader(name: &'static str) -> Result<FnPtr> {
-	let maybe_fn = {
-		#[cfg(unix)]
-		{
-			#[dylink_macro::dylink(name = "opengl32")]
-			extern "system" {
-				pub(crate) fn glXGetProcAddress(pName: *const ffi::c_char) -> Option<FnPtr>;
+	#[cfg(any(windows, all(unix, not(target_os = "macos"))))]
+	{
+		let maybe_fn = {
+			#[cfg(all(unix, not(target_os = "macos")))]
+			{
+				#[dylink_macro::dylink(any(name = "libGL.so", name = "libGL.so.1"))]
+				extern "system" {
+					pub(crate) fn glXGetProcAddress(pName: *const u8) -> Option<FnPtr>;
+				}
+				glXGetProcAddress(name.as_ptr())
 			}
-			glXGetProcAddress(name.as_ptr() as *const _)
+			#[cfg(windows)]
+			{
+				use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
+				wglGetProcAddress(name.as_ptr() as *const _)
+			}
+		};
+		match maybe_fn {
+			Some(addr) => Ok(addr),
+			None => Err(DylinkError::new(Some(name), ErrorKind::FnNotFound)),
 		}
-		#[cfg(windows)]
-		{
-			use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
-			wglGetProcAddress(name.as_ptr() as *const _)
-		}
-	};
-	match maybe_fn {
-		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(Some(name), ErrorKind::FnNotFound)),
+	}
+	#[cfg(target_os = "macos")]
+	{
+		// gl functions are weak linked, so a direct call is fine
+		loader(ffi::OsStr::new("libGL.so"), name)
+			.or_else(|_| loader(ffi::OsStr::new("libGL.so.1"), name))
 	}
 }
 
