@@ -36,8 +36,9 @@ pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
 ) -> Option<FnPtr> {
 	static DYN_FUNC: lazyfn::LazyFn<
 		unsafe extern "system" fn(ffi::VkDevice, *const ffi::c_char) -> Option<FnPtr>,
+		1,
 	> = lazyfn::LazyFn::new(
-		unsafe { ffi::CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") },
+		
 		initial_fn,
 		super::LinkType::Vulkan,
 	);
@@ -48,10 +49,11 @@ pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
 	) -> Option<FnPtr> {
 		DYN_FUNC.once.call_once(|| {
 			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");
+			const FN_NAME: &'static ffi::CStr = unsafe { ffi::CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") };
 			// check other instances if fails in case one has a higher available version number
 			let fn_ptr = read_lock
 				.iter()
-				.find_map(|instance| vkGetInstanceProcAddr(*instance, DYN_FUNC.name.as_ptr()));
+				.find_map(|instance| vkGetInstanceProcAddr(*instance, FN_NAME.as_ptr()));
 			*std::cell::UnsafeCell::raw_get(&DYN_FUNC.addr) = mem::transmute(fn_ptr);
 		});
 		DYN_FUNC(device, name)
