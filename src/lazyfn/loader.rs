@@ -36,11 +36,8 @@ pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
 ) -> Option<FnPtr> {
 	static DYN_FUNC: lazyfn::LazyFn<
 		unsafe extern "system" fn(ffi::VkDevice, *const ffi::c_char) -> Option<FnPtr>,
-		1,
-	> = lazyfn::LazyFn::new(
-		
-		initial_fn,
-		super::LinkType::Vulkan,
+	> = lazyfn::LazyFn::new(		
+		initial_fn		
 	);
 
 	unsafe extern "system" fn initial_fn(
