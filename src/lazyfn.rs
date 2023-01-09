@@ -6,7 +6,6 @@ mod loader;
 
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType {
-	OpenGL,
 	Vulkan,
 	Normal(&'static [&'static str]),
 }
@@ -72,7 +71,6 @@ impl<F: 'static> LazyFn<F> {
 						}
 					}
 				}
-				LinkType::OpenGL => loader::glloader(str_name),
 				LinkType::Normal(lib_list) => {
 					let mut result = Err(error::DylinkError::new(None, ErrorKind::ListNotFound));
 					for lib_name in lib_list {

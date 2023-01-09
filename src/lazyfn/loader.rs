@@ -58,40 +58,6 @@ pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
 	DYN_FUNC(device, name)
 }
 
-// TODO: figure out what macos and linux call their DLLs
-/// `glloader` is an opengl loader specialization.
-#[cfg(windows)]
-pub unsafe fn glloader(name: &'static str) -> Result<FnPtr> {
-	#[cfg(any(windows, all(unix, not(target_os = "macos"))))]
-	{
-		let maybe_fn = {
-			#[cfg(all(unix, not(target_os = "macos")))]
-			{
-				#[dylink_macro::dylink(any(name = "libGL.so", name = "libGL.so.1"))]
-				extern "system" {
-					pub(crate) fn glXGetProcAddress(pName: *const u8) -> Option<FnPtr>;
-				}
-				glXGetProcAddress(name.as_ptr())
-			}
-			#[cfg(windows)]
-			{
-				use windows_sys::Win32::Graphics::OpenGL::wglGetProcAddress;
-				wglGetProcAddress(name.as_ptr() as *const _)
-			}
-		};
-		match maybe_fn {
-			Some(addr) => Ok(addr),
-			None => Err(DylinkError::new(Some(name), ErrorKind::FnNotFound)),
-		}
-	}
-	#[cfg(target_os = "macos")]
-	{
-		// gl functions are weak linked, so a direct call is fine
-		loader(ffi::OsStr::new("libGL.so"), name)
-			.or_else(|_| loader(ffi::OsStr::new("libGL.so.1"), name))
-	}
-}
-
 /// `loader` is a generalization for all other dlls.
 pub fn loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Result<FnPtr> {
 	use std::collections::HashMap;
