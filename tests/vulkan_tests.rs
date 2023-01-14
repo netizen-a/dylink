@@ -1,4 +1,7 @@
 #![allow(non_snake_case)]
+
+use dylink::dylink;
+
 // This test is not allowed to fail: This asserts that vulkan is loaded properly in dylink.
 #[test]
 fn test_vk_instance_layer_properties() {
@@ -13,7 +16,7 @@ fn test_vk_instance_layer_properties() {
 		    _implementationVersion: u32,
 		    _description: [c_char; VK_MAX_DESCRIPTION_SIZE],
 	}
-	#[dylink::dylink(vulkan)]
+	#[dylink(vulkan)]
 	extern "system" {
 		fn vkEnumerateInstanceLayerProperties(
 			pPropertyCount: *mut u32,

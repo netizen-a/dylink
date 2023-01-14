@@ -4,6 +4,7 @@ use crate::*;
 
 mod loader;
 
+#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType {
 	Vulkan,
@@ -18,6 +19,7 @@ pub enum LinkType {
 
 // This can be used safely without the dylink macro.
 // `F` can be anything as long as it's the size of a function pointer
+#[doc(hidden)]
 pub struct LazyFn<F: 'static> {
 	// it's imperative that LazyFn manages once, so that `LazyFn::load` is sound.
 	once: sync::Once,

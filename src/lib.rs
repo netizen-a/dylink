@@ -9,10 +9,29 @@ mod error;
 mod ffi;
 mod lazyfn;
 
-pub use dylink_macro::dylink;
+
 pub use error::*;
 pub use ffi::*;
 pub use lazyfn::*;
+
+// TODO: add a `#[link_name = <name>]` sub attribute to shut up clippy properly
+
+/// Macro for generating dynamically linked functions procedurally.
+/// 
+/// This macro supports all ABI strings that rust natively supports.
+/// For `dylink(vulkan)` mode, it is recommended to use the `"system"` ABI for cross-platform compatibility.
+/// # Example
+/// ```rust
+/// #[dylink(vulkan)]
+/// extern "system" {
+/// 	fn vkCreateInstance(
+/// 		pCreateInfo: *const VkInstanceCreateInfo,
+/// 		pAllocator: *const VkAllocationCallbacks,
+/// 		pInstance: *mut VkInstance,
+/// 	) -> VkResult;
+/// }
+/// ```
+pub use dylink_macro::dylink;
 
 // I don't know how to implement wasm, so I'll just drop this here...
 #[cfg(wasm)]
@@ -26,11 +45,11 @@ static VK_INSTANCE: sync::RwLock<Lazy<HashSet<ffi::VkInstance>>> =
 static VK_DEVICE: sync::RwLock<Lazy<HashSet<ffi::VkDevice>>> =
 	sync::RwLock::new(Lazy::new(|| HashSet::new()));
 
-/// Used as a placeholder function pointer. This should **NEVER** be called directly,
-/// and promptly cast into the correct function pointer type.
-pub type FnPtr = unsafe extern "system" fn() -> isize;
-/// The result of a dylink function
-pub type Result<T> = std::result::Result<T, error::DylinkError>;
+// Used as a placeholder function pointer. This should **NEVER** be called directly,
+// and promptly cast into the correct function pointer type.
+pub(crate) type FnPtr = unsafe extern "system" fn() -> isize;
+// The result of a dylink function
+pub(crate) type Result<T> = std::result::Result<T, error::DylinkError>;
 
 pub struct Global;
 impl Global {

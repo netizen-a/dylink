@@ -1,5 +1,6 @@
 use std::{error::Error, fmt};
 
+
 #[derive(Debug, Clone, Copy)]
 pub enum ErrorKind {
 	FnNotFound,
@@ -7,6 +8,9 @@ pub enum ErrorKind {
 	ListNotFound,
 }
 
+// TODO: document to use unwind friendly ABI for dealing with panics
+
+// This error structure may propagate from a dylink'd function generated from [dylink](crate::dylink).
 #[derive(Debug)]
 pub struct DylinkError {
 	subject: Option<&'static str>,
