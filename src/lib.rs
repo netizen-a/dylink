@@ -22,6 +22,11 @@ pub use lazyfn::*;
 /// For `dylink(vulkan)` mode, it is recommended to use the `"system"` ABI for cross-platform compatibility.
 /// # Example
 /// ```rust
+/// # use dylink::dylink;
+/// # type VkInstanceCreateInfo = std::ffi::c_void;
+/// # type VkAllocationCallbacks = std::ffi::c_void;
+/// # type VkInstance = std::ffi::c_void;
+/// # type VkResult = i32;
 /// #[dylink(vulkan)]
 /// extern "system" {
 /// 	fn vkCreateInstance(
