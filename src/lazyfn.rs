@@ -1,3 +1,4 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use std::{cell, mem, sync};
 
 use crate::*;
@@ -11,12 +12,6 @@ pub enum LinkType {
 	Normal(&'static [&'static str]),
 }
 
-/*impl<const N: usize> LinkType<N> {
-	const fn lib_count(&self) -> usize {
-		N
-	}
-}*/
-
 // This can be used safely without the dylink macro.
 // `F` can be anything as long as it's the size of a function pointer
 #[doc(hidden)]
@@ -24,7 +19,7 @@ pub struct LazyFn<F: 'static> {
 	// it's imperative that LazyFn manages once, so that `LazyFn::load` is sound.
 	once: sync::Once,
 	// this is here to track the state of the instance.
-	status: cell::UnsafeCell<Option<ErrorKind>>,
+	status: cell::UnsafeCell<Option<error::DylinkError>>,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
 	addr: cell::UnsafeCell<F>,
@@ -74,7 +69,12 @@ impl<F: 'static> LazyFn<F> {
 					}
 				}
 				LinkType::Normal(lib_list) => {
-					let mut result = Err(error::DylinkError::new(None, ErrorKind::ListNotFound));
+					let default_error = if lib_list.len() > 1 {						
+						error::DylinkError::new(None, ErrorKind::ListNotFound)
+					} else {
+						error::DylinkError::new(Some(lib_list[0]), ErrorKind::LibNotFound)
+					};
+					let mut result = Err(default_error);
 					for lib_name in lib_list {
 						match loader::loader(ffi::OsStr::new(lib_name), str_name) {
 							Ok(addr) => {
@@ -98,16 +98,16 @@ impl<F: 'static> LazyFn<F> {
 				Ok(addr) => {
 					cell::UnsafeCell::raw_get(&self.addr).write(mem::transmute_copy(&addr));
 				}
-				Err(DylinkError { kind, .. }) => {
-					cell::UnsafeCell::raw_get(&self.status).write(Some(kind));
+				Err(err) => {
+					cell::UnsafeCell::raw_get(&self.status).write(Some(err));
 				}
 			}
 		});
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
-		match unsafe { *self.status.get() } {
+		match unsafe { (*self.status.get()).clone() } {
 			None => Ok(self.as_ref()),
-			Some(kind) => Err(DylinkError::new(Some(str_name), kind)),
+			Some(err) => Err(err),
 		}
 	}
 }

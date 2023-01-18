@@ -11,16 +11,16 @@ fn test_vk_instance_layer_properties() {
 	const VK_MAX_DESCRIPTION_SIZE: usize = 256;
 	#[derive(Debug)]
 	struct VkLayerProperties {
-		    _layerName: [c_char; VK_MAX_EXTENSION_NAME_SIZE],
-		    _specVersion: u32,
-		    _implementationVersion: u32,
-		    _description: [c_char; VK_MAX_DESCRIPTION_SIZE],
+		_layerName: [c_char; VK_MAX_EXTENSION_NAME_SIZE],
+		_specVersion: u32,
+		_implementationVersion: u32,
+		_description: [c_char; VK_MAX_DESCRIPTION_SIZE],
 	}
 	#[dylink(vulkan)]
 	extern "system" {
 		fn vkEnumerateInstanceLayerProperties(
 			pPropertyCount: *mut u32,
-			pProperties: *mut VkLayerProperties
+			pProperties: *mut VkLayerProperties,
 		) -> VkResult;
 	}
 
@@ -30,7 +30,8 @@ fn test_vk_instance_layer_properties() {
 		let result = vkEnumerateInstanceLayerProperties(&mut property_count, std::ptr::null_mut());
 		assert!(result >= 0);
 		properties = Vec::with_capacity(property_count as usize);
-		let result = vkEnumerateInstanceLayerProperties(&mut property_count, properties.as_mut_ptr());
+		let result =
+			vkEnumerateInstanceLayerProperties(&mut property_count, properties.as_mut_ptr());
 		assert!(result >= 0);
 		properties.set_len(property_count as usize);
 	}

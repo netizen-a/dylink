@@ -1,5 +1,6 @@
-use std::{error::Error, fmt};
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
+use std::{error::Error, fmt};
 
 #[derive(Debug, Clone, Copy)]
 pub enum ErrorKind {
@@ -11,7 +12,7 @@ pub enum ErrorKind {
 // TODO: document to use unwind friendly ABI for dealing with panics
 
 // This error structure may propagate from a dylink'd function generated from [dylink](crate::dylink).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DylinkError {
 	subject: Option<&'static str>,
 	pub(crate) kind: ErrorKind,

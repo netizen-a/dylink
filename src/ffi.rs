@@ -1,3 +1,5 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
+
 // Everything in this module must not be documented.
 
 pub(crate) use std::ffi::{c_char, c_void, CStr, OsStr};

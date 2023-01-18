@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Jonathan "Razordor" Alan Thomason
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 #![allow(clippy::missing_safety_doc)]
 use std::{collections::HashSet, sync};
@@ -9,7 +9,6 @@ mod error;
 mod ffi;
 mod lazyfn;
 
-
 pub use error::*;
 pub use ffi::*;
 pub use lazyfn::*;
@@ -17,7 +16,7 @@ pub use lazyfn::*;
 // TODO: add a `#[link_name = <name>]` sub attribute to shut up clippy properly
 
 /// Macro for generating dynamically linked functions procedurally.
-/// 
+///
 /// This macro supports all ABI strings that rust natively supports.
 /// For `dylink(vulkan)` mode, it is recommended to use the `"system"` ABI for cross-platform compatibility.
 /// # Example

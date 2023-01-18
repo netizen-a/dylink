@@ -1,3 +1,5 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
+
 use std::{mem, sync::RwLock};
 
 use crate::{error::*, ffi, lazyfn, FnPtr, Result};
@@ -36,9 +38,7 @@ pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
 ) -> Option<FnPtr> {
 	static DYN_FUNC: lazyfn::LazyFn<
 		unsafe extern "system" fn(ffi::VkDevice, *const ffi::c_char) -> Option<FnPtr>,
-	> = lazyfn::LazyFn::new(		
-		initial_fn		
-	);
+	> = lazyfn::LazyFn::new(initial_fn);
 
 	unsafe extern "system" fn initial_fn(
 		device: ffi::VkDevice,
@@ -46,7 +46,8 @@ pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
 	) -> Option<FnPtr> {
 		DYN_FUNC.once.call_once(|| {
 			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");
-			const FN_NAME: &'static ffi::CStr = unsafe { ffi::CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") };
+			const FN_NAME: &'static ffi::CStr =
+				unsafe { ffi::CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") };
 			// check other instances if fails in case one has a higher available version number
 			let fn_ptr = read_lock
 				.iter()
