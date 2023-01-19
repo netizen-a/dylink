@@ -1,6 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-#![allow(clippy::missing_safety_doc)]
 use std::{collections::HashSet, sync};
 
 use once_cell::sync::Lazy;
@@ -13,12 +12,9 @@ pub use error::*;
 pub use ffi::*;
 pub use lazyfn::*;
 
-// TODO: add a `#[link_name = <name>]` sub attribute to shut up clippy properly
-
 /// Macro for generating dynamically linked functions procedurally.
 ///
 /// This macro supports all ABI strings that rust natively supports.
-/// For `dylink(vulkan)` mode, it is recommended to use the `"system"` ABI for cross-platform compatibility.
 /// # Example
 /// ```rust
 /// # use dylink::dylink;
@@ -55,6 +51,11 @@ pub(crate) type FnPtr = unsafe extern "system" fn() -> isize;
 // The result of a dylink function
 pub(crate) type Result<T> = std::result::Result<T, error::DylinkError>;
 
+/// The global context for specializations.
+/// 
+/// This implicitly controls how the specialization `#[dylink(vulkan)]` handles function loading.
+/// This Global is injected when building specializations, but is excluded when building generalizations,
+/// such as `#[dylink(name = "my_lib.so")]`.
 pub struct Global;
 impl Global {
 	// This is safe since vulkan will just discard garbage values
