@@ -92,10 +92,13 @@ impl<F: 'static> LazyFn<F> {
 					}
 				}
 				LinkType::Normal(lib_list) => {
-					let default_error = if lib_list.len() > 1 {
-						error::DylinkError::new(None, ErrorKind::ListNotFound)
-					} else {
-						error::DylinkError::new(Some(lib_list[0]), ErrorKind::LibNotFound)
+					let default_error = {
+						let (subject, kind) = if lib_list.len() > 1 {
+							(None, ErrorKind::ListNotFound)
+						} else {
+							(Some(lib_list[0]), ErrorKind::LibNotFound)
+						};
+						error::DylinkError::new(subject, kind)
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
