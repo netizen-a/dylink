@@ -39,37 +39,60 @@ impl<F: 'static> LazyFn<F> {
 		}
 	}
 
+	// This is intentionally non-generic to reduce code bloat, and the function overhead has been found to be relatively trivial.
 	/// If successful, stores address and returns it.
 	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<&F> {
 		let str_name = fn_name.to_str().unwrap();
 		self.once.call_once(|| unsafe {
 			let maybe = match link_ty {
 				LinkType::Vulkan => {
-					let device_read_lock = VK_DEVICE.read().expect("failed to get read lock");
-					match device_read_lock.iter().find_map(|device| {
-						loader::vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const _)
-					}) {
-						Some(addr) => Ok(addr),
-						None => {
-							mem::drop(device_read_lock);
-							let instance_read_lock =
-								VK_INSTANCE.read().expect("failed to get read lock");
-							// check other instances if fails in case one has a higher available version number
-							match instance_read_lock.iter().find_map(|instance| {
-								loader::vkGetInstanceProcAddr(*instance, fn_name.as_ptr())
+					match fn_name.to_str().unwrap() {
+						"vkGetInstanceProcAddr" => Ok(mem::transmute::<
+							unsafe extern "system" fn(
+								instance: ffi::VkInstance,
+								pName: *const ffi::c_char,
+							) -> Option<FnPtr>,
+							FnPtr,
+						>(loader::vkGetInstanceProcAddr)),
+						"vkGetDeviceProcAddr" => Ok(mem::transmute::<
+							unsafe extern "system" fn(
+								device: ffi::VkDevice,
+								name: *const ffi::c_char,
+							) -> Option<FnPtr>,
+							FnPtr,
+						>(loader::vkGetDeviceProcAddr)),
+						_ => {
+							let device_read_lock =
+								VK_DEVICE.read().expect("failed to get read lock");
+							match device_read_lock.iter().find_map(|device| {
+								loader::vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const _)
 							}) {
 								Some(addr) => Ok(addr),
-								None => loader::vkGetInstanceProcAddr(
-									ffi::VkInstance(std::ptr::null()),
-									fn_name.as_ptr(),
-								)
-								.ok_or(error::DylinkError::new(Some(str_name), ErrorKind::FnNotFound)),
+								None => {
+									mem::drop(device_read_lock);
+									let instance_read_lock =
+										VK_INSTANCE.read().expect("failed to get read lock");
+									// check other instances if fails in case one has a higher available version number
+									match instance_read_lock.iter().find_map(|instance| {
+										loader::vkGetInstanceProcAddr(*instance, fn_name.as_ptr())
+									}) {
+										Some(addr) => Ok(addr),
+										None => loader::vkGetInstanceProcAddr(
+											ffi::VkInstance(std::ptr::null()),
+											fn_name.as_ptr(),
+										)
+										.ok_or(error::DylinkError::new(
+											Some(str_name),
+											ErrorKind::FnNotFound,
+										)),
+									}
+								}
 							}
 						}
 					}
 				}
 				LinkType::Normal(lib_list) => {
-					let default_error = if lib_list.len() > 1 {						
+					let default_error = if lib_list.len() > 1 {
 						error::DylinkError::new(None, ErrorKind::ListNotFound)
 					} else {
 						error::DylinkError::new(Some(lib_list[0]), ErrorKind::LibNotFound)
