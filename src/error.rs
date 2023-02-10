@@ -2,7 +2,6 @@
 
 use std::{error, fmt};
 
-
 #[derive(Debug, Clone, Copy)]
 pub enum ErrorKind {
 	/// Declares the library was found, but the function was not.
@@ -15,11 +14,10 @@ pub enum ErrorKind {
 
 // TODO: document to use unwind friendly ABI for dealing with panics
 
-
 /// The error structure dylink uses to define the error status.
-/// 
+///
 /// This error structure may propagate from a dylink'd function generated from [dylink](crate::dylink).
-/// You can check if the function panicked through [catch_unwind](std::panic::catch_unwind), however, 
+/// You can check if the function panicked through [catch_unwind](std::panic::catch_unwind), however,
 /// many [ABIs](https://doc.rust-lang.org/reference/items/external-blocks.html#abi) are not [UnwindSafe](std::panic::UnwindSafe).
 /// It's ideal not to rely on unwinding unless you know for sure that the ABI you are using can unwind safely like `extern "Rust"`.
 #[derive(Debug, Clone)]

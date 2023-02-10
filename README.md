@@ -7,6 +7,15 @@ When functions are loaded they are evaluated through a thunk for first time call
 respective library. Proceeding calls after initialization have no overhead or additional branching checks, as the thunk is
 replaced by the loaded function.
 
+## Supported platforms
+
+Dylink has been implemented for all major platforms, but has only been locally tested on Windows and Linux.
+
+| Win32 | Linux | MacOS    | Unix(other) |
+|:-----:|:-----:|:--------:|:-----------:|
+| YES   | YES   | Untested | Untested    |
+
+
 ## Usage
 
 Add this to your `Cargo.toml`
@@ -16,11 +25,22 @@ Add this to your `Cargo.toml`
 dylink = "0.1"
 ```
 
+## Example
+
+Below is a basic working example on how to use the macro. For windows, the `.dll` file extension is *optional*, but
+still recommended.
+
+```rust
+#[dylink(name = "Kernel32.dll")]
+extern "stdcall" {
+    fn GetLastError() -> u32;
+}
+```
+
 <br>
 
-#### License
+### License
 
-<sub>
 Licensed under either of
 
 * Apache License, Version 2.0
@@ -29,12 +49,10 @@ Licensed under either of
    ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
-</sub>
 
-#### Contribution
+### Contribution
 
-<sub>
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
-</sub>
+

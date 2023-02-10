@@ -3,6 +3,7 @@
 use dylink::dylink;
 
 // This test is not allowed to fail: This asserts that vulkan is loaded properly in dylink.
+// If vulkan drivers are not installed properly, then this test will fail regardless.
 #[test]
 fn test_vk_instance_layer_properties() {
 	use std::ffi::c_char;

@@ -5,16 +5,18 @@ use crate::*;
 
 mod loader;
 
-#[doc(hidden)]
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType {
+	/// Specialization for loading vulkan functions
 	Vulkan,
+	/// Generalization for loading normal functions.
 	Normal(&'static [&'static str]),
 }
 
-// This can be used safely without the dylink macro.
-// `F` can be anything as long as it's the size of a function pointer
-#[doc(hidden)]
+/// Fundamental data type of dylink.
+///
+/// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
+/// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
 pub struct LazyFn<F: 'static> {
 	// it's imperative that LazyFn manages once, so that `LazyFn::load` is sound.
 	once: sync::Once,
@@ -28,9 +30,10 @@ pub struct LazyFn<F: 'static> {
 impl<F: 'static> LazyFn<F> {
 	/// Initializes a `LazyFn` object with all the necessary information for `LazyFn::link` to work.
 	/// # Panic
-	/// Type `F` must be the same size as `FnPtr`.
+	/// Type `F` must be the same size as a [function pointer](fn).
 	#[inline]
 	pub const fn new(thunk: F) -> Self {
+		// In a const context this assert will be optimized out.
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		Self {
 			addr: cell::UnsafeCell::new(thunk),

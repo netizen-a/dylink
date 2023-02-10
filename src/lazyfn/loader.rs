@@ -10,6 +10,7 @@ extern crate self as dylink;
 
 // windows and linux are fully tested and useable as of this comment.
 // macos should theoretically work, but it's untested.
+// This function is in itself an axiom of the vulkan specialization.
 #[cfg_attr(windows, crate::dylink(name = "vulkan-1.dll"))]
 #[cfg_attr(
 	all(unix, not(target_os = "macos")),
