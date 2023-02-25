@@ -15,7 +15,6 @@ Dylink has been implemented for all major platforms, but has only been locally t
 |:-----:|:-----:|:--------:|:-----------:|
 | YES   | YES   | Untested | Untested    |
 
-
 ## Usage
 
 Add this to your `Cargo.toml`
@@ -27,17 +26,27 @@ dylink = "0.1"
 
 ## Example
 
-Below is a basic working example on how to use the macro. For windows, the `.dll` file extension is *optional*, but
-still recommended.
+Below is a basic working example on how to use the macro. For windows, the `.dll` file extension is *optional*, but still recommended.
 
 ```rust
 #[dylink(name = "Kernel32.dll")]
 extern "stdcall" {
     fn GetLastError() -> u32;
+    fn SetLastError(_: u32);
+}
+fn main() {
+   unsafe {
+      SetLastError(52);
+      println!("{}", GetLastError());
+   }
 }
 ```
 
-<br>
+Output:
+
+```text
+52
+```
 
 ### License
 
@@ -55,4 +64,3 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
-

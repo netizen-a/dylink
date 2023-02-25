@@ -28,9 +28,9 @@ pub struct LazyFn<F: 'static> {
 }
 
 impl<F: 'static> LazyFn<F> {
-	/// Initializes a `LazyFn` object with all the necessary information for `LazyFn::link` to work.
+	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
-	/// Type `F` must be the same size as a [function pointer](fn).
+	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
 	#[inline]
 	pub const fn new(thunk: F) -> Self {
 		// In a const context this assert will be optimized out.
@@ -43,7 +43,7 @@ impl<F: 'static> LazyFn<F> {
 	}
 
 	// This is intentionally non-generic to reduce code bloat, and the function overhead has been found to be relatively trivial.
-	/// If successful, stores address and returns it.
+	/// If successful, stores address in current instance and returns a reference to the stored value.
 	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<&F> {
 		let str_name = fn_name.to_str().unwrap();
 		self.once.call_once(|| unsafe {
