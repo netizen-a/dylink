@@ -1,3 +1,5 @@
+![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink)
+
 # Dylink
 
 ## Overview
@@ -11,7 +13,7 @@ replaced by the loaded function.
 
 Dylink has been implemented for all major platforms, but has only been locally tested on Windows and Linux.
 
-| Win32 | Linux | MacOS    | Unix(other) |
+| Win64 | Linux | MacOS    | Unix(other) |
 |:-----:|:-----:|:--------:|:-----------:|
 | YES   | YES   | Untested | Untested    |
 
@@ -29,11 +31,14 @@ dylink = "0.1"
 Below is a basic working example on how to use the macro. For windows, the `.dll` file extension is *optional*, but still recommended.
 
 ```rust
+use dylink::dylink;
+
 #[dylink(name = "Kernel32.dll")]
 extern "stdcall" {
     fn GetLastError() -> u32;
     fn SetLastError(_: u32);
 }
+
 fn main() {
    unsafe {
       SetLastError(52);
