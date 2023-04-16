@@ -4,7 +4,9 @@ version = "0.1.0"
 authors = ["Jonathan Thomason"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
-keywords = ["external-ffi-bindings"]
+keywords = ["ffi"]
+description = "Dynamic function loading utilities."
+repository = "https://github.com/Razordor/dylink.git"
 #publish = false
 
 [dependencies]
