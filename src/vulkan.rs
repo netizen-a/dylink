@@ -1,9 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-
-// Everything in this module must not be documented.
-
-pub(crate) use std::ffi::{c_char, c_void, CStr, OsStr};
-
+use std::ffi;
 // FIXME: when extern types are stablized they must replace the `c_void` variation
 
 // extern "C" {
@@ -18,7 +14,7 @@ pub(crate) use std::ffi::{c_char, c_void, CStr, OsStr};
 #[doc(hidden)]
 #[repr(transparent)]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct VkInstance(pub(crate) *const c_void);
+pub struct VkInstance(pub(crate) *const ffi::c_void);
 unsafe impl Sync for VkInstance {}
 unsafe impl Send for VkInstance {}
 
@@ -29,6 +25,6 @@ unsafe impl Send for VkInstance {}
 #[doc(hidden)]
 #[repr(transparent)]
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct VkDevice(pub(crate) *const c_void);
+pub struct VkDevice(pub(crate) *const ffi::c_void);
 unsafe impl Sync for VkDevice {}
 unsafe impl Send for VkDevice {}

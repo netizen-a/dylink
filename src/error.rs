@@ -2,6 +2,9 @@
 
 use std::{error, fmt};
 
+/// An enumeration of the context of the error.
+///
+/// Used with [DylinkError].
 #[derive(Debug, Clone, Copy)]
 pub enum ErrorKind {
 	/// Declares the library was found, but the function was not.

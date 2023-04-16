@@ -1,8 +1,8 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::{mem, sync::RwLock};
+use std::{ffi, mem, sync::RwLock};
 
-use crate::{error::*, ffi, lazyfn, FnPtr, Result};
+use crate::{error::*, lazyfn, vulkan, FnPtr, Result};
 // dylink_macro internally uses dylink as it's root namespace,
 // but since we are in dylink the namespace is actually named `self`.
 // this is just here to resolve the missing namespace issue.
@@ -26,7 +26,7 @@ extern crate self as dylink;
 )]
 extern "system" {
 	pub(super) fn vkGetInstanceProcAddr(
-		instance: ffi::VkInstance,
+		instance: vulkan::VkInstance,
 		pName: *const ffi::c_char,
 	) -> Option<FnPtr>;
 }
@@ -34,15 +34,15 @@ extern "system" {
 // vkGetDeviceProcAddr must be implemented manually to avoid recursion
 #[allow(non_snake_case)]
 pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
-	device: ffi::VkDevice,
+	device: vulkan::VkDevice,
 	name: *const ffi::c_char,
 ) -> Option<FnPtr> {
 	static DYN_FUNC: lazyfn::LazyFn<
-		unsafe extern "system" fn(ffi::VkDevice, *const ffi::c_char) -> Option<FnPtr>,
+		unsafe extern "system" fn(vulkan::VkDevice, *const ffi::c_char) -> Option<FnPtr>,
 	> = lazyfn::LazyFn::new(initial_fn);
 
 	unsafe extern "system" fn initial_fn(
-		device: ffi::VkDevice,
+		device: vulkan::VkDevice,
 		name: *const ffi::c_char,
 	) -> Option<FnPtr> {
 		DYN_FUNC.once.call_once(|| {

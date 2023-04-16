@@ -1,10 +1,11 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use std::{cell, mem, sync};
+use std::{cell, ffi, mem, sync};
 
 use crate::*;
 
 mod loader;
 
+/// Determines what library to look up when [LazyFn::load] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType {
 	/// Specialization for loading vulkan functions
@@ -18,7 +19,7 @@ pub enum LinkType {
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
 pub struct LazyFn<F: 'static> {
-	// it's imperative that LazyFn manages once, so that `LazyFn::load` is sound.
+	// It's imperative that LazyFn manages once, so that `LazyFn::load` is sound.
 	once: sync::Once,
 	// this is here to track the state of the instance.
 	status: cell::UnsafeCell<Option<error::DylinkError>>,
@@ -42,7 +43,8 @@ impl<F: 'static> LazyFn<F> {
 		}
 	}
 
-	// This is intentionally non-generic to reduce code bloat, and the function overhead has been found to be relatively trivial.
+	// This is intentionally non-generic to reduce code bloat, and the performance overhead has been
+	// found to be relatively trivial (<1ms).
 	/// If successful, stores address in current instance and returns a reference to the stored value.
 	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<&F> {
 		let str_name = fn_name.to_str().unwrap();
@@ -52,14 +54,14 @@ impl<F: 'static> LazyFn<F> {
 					match fn_name.to_str().unwrap() {
 						"vkGetInstanceProcAddr" => Ok(mem::transmute::<
 							unsafe extern "system" fn(
-								instance: ffi::VkInstance,
+								instance: vulkan::VkInstance,
 								pName: *const ffi::c_char,
 							) -> Option<FnPtr>,
 							FnPtr,
 						>(loader::vkGetInstanceProcAddr)),
 						"vkGetDeviceProcAddr" => Ok(mem::transmute::<
 							unsafe extern "system" fn(
-								device: ffi::VkDevice,
+								device: vulkan::VkDevice,
 								name: *const ffi::c_char,
 							) -> Option<FnPtr>,
 							FnPtr,
@@ -81,7 +83,7 @@ impl<F: 'static> LazyFn<F> {
 									}) {
 										Some(addr) => Ok(addr),
 										None => loader::vkGetInstanceProcAddr(
-											ffi::VkInstance(std::ptr::null()),
+											vulkan::VkInstance(std::ptr::null()),
 											fn_name.as_ptr(),
 										)
 										.ok_or(error::DylinkError::new(

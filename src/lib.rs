@@ -5,7 +5,8 @@
 //!
 //! # General Example
 //! ```rust
-//! # use dylink::dylink;
+//! use dylink::dylink;
+//!
 //! #[dylink(name = "Kernel32.dll")]
 //!	extern "system" {
 //!		fn GetLastError() -> u32;
@@ -16,7 +17,8 @@
 //! There is also a builtin vulkan loader option in the macro as well, which automatically looks for the shared library where expected.
 //! The appropriate ABI to use with the vulkan loader is `extern "system"`.
 //! ```rust
-//! # use dylink::dylink;
+//! use dylink::dylink;
+//!
 //! # type VkInstanceCreateInfo = std::ffi::c_void;
 //! # type VkAllocationCallbacks = std::ffi::c_void;
 //! # type VkInstance = std::ffi::c_void;
@@ -49,12 +51,12 @@ use std::{collections::HashSet, sync};
 use once_cell::sync::Lazy;
 
 mod error;
-mod ffi;
 mod lazyfn;
+mod vulkan;
 
 pub use error::*;
-pub use ffi::*;
 pub use lazyfn::*;
+pub use vulkan::*;
 
 /// Macro for generating dynamically linked functions procedurally.
 ///
@@ -83,10 +85,10 @@ compile_error!("Dylink Error: Wasm is unsupported.");
 
 // These globals are read every time a vulkan function is called for the first time,
 // which occurs through `LazyFn::link`.
-static VK_INSTANCE: sync::RwLock<Lazy<HashSet<ffi::VkInstance>>> =
+static VK_INSTANCE: sync::RwLock<Lazy<HashSet<vulkan::VkInstance>>> =
 	sync::RwLock::new(Lazy::new(|| HashSet::new()));
 
-static VK_DEVICE: sync::RwLock<Lazy<HashSet<ffi::VkDevice>>> =
+static VK_DEVICE: sync::RwLock<Lazy<HashSet<vulkan::VkDevice>>> =
 	sync::RwLock::new(Lazy::new(|| HashSet::new()));
 
 // Used as a placeholder function pointer. This should **NEVER** be called directly,
@@ -115,7 +117,7 @@ impl Global {
 	/// *    If the set already contained this value, `false` is returned.
 	///
 	/// *note: This function returns `false` if the instance is valid and defined through dylink.*
-	pub fn insert_instance(&self, instance: ffi::VkInstance) -> bool {
+	pub fn insert_instance(&self, instance: vulkan::VkInstance) -> bool {
 		//println!("insert_instance called!");
 		let mut write_lock = VK_INSTANCE.write().unwrap();
 		write_lock.insert(instance)
@@ -124,7 +126,7 @@ impl Global {
 	/// Removes an instance from the set. Returns whether the instance was present in the set.
 	/// # Safety
 	/// Using this function may break dylink's checked lifetimes!
-	pub unsafe fn remove_instance(&self, instance: &ffi::VkInstance) -> bool {
+	pub unsafe fn remove_instance(&self, instance: &vulkan::VkInstance) -> bool {
 		//println!("remove_instance called!");
 		let mut write_lock = VK_INSTANCE.write().unwrap();
 		write_lock.remove(instance)
@@ -139,7 +141,7 @@ impl Global {
 	/// *    If the set already contained this value, `false` is returned.
 	///
 	/// *note: This function returns `false` if the device is valid and defined through dylink.*
-	pub fn insert_device(&self, device: ffi::VkDevice) -> bool {
+	pub fn insert_device(&self, device: vulkan::VkDevice) -> bool {
 		//println!("insert_device called!");
 		let mut write_lock = VK_DEVICE.write().unwrap();
 		write_lock.insert(device)
@@ -148,7 +150,7 @@ impl Global {
 	/// Removes a device from the set. Returns whether the value was present in the set.
 	/// # Safety
 	/// Using this function may break dylink's checked lifetimes!
-	pub unsafe fn remove_device(&self, device: &ffi::VkDevice) -> bool {
+	pub unsafe fn remove_device(&self, device: &vulkan::VkDevice) -> bool {
 		//println!("remove_device called!");
 		let mut write_lock = VK_DEVICE.write().unwrap();
 		write_lock.remove(device)

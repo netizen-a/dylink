@@ -9,13 +9,10 @@ publish = false
 
 [dependencies]
 once_cell = "1.16"
-
-[dependencies.dylink_macro]
-git = "https://github.com/Razordor/dylink_macro"
-#path = "../dylink_macro"
+dylink_macro = "0.2"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.45"
+version = "0.48"
 features = ["Win32_Foundation", "Win32_System_LibraryLoader"]
 
 [target.'cfg(unix)'.dependencies.libc]
