@@ -56,7 +56,7 @@ mod vulkan;
 
 pub use error::*;
 pub use lazyfn::*;
-pub use vulkan::*;
+pub use vulkan::{VkDevice, VkInstance};
 
 /// Macro for generating dynamically linked functions procedurally.
 ///

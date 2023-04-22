@@ -1,6 +1,6 @@
 [package]
 name = "dylink"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Jonathan Thomason"]
 edition = "2021"
 license = "MIT OR Apache-2.0"

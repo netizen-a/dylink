@@ -20,12 +20,12 @@ pub enum LinkType {
 /// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
 pub struct LazyFn<F: 'static> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::load` is sound.
-	once: sync::Once,
+	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance.
 	status: cell::UnsafeCell<Option<error::DylinkError>>,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
-	addr: cell::UnsafeCell<F>,
+	pub(crate) addr: cell::UnsafeCell<F>,
 }
 
 impl<F: 'static> LazyFn<F> {
@@ -47,55 +47,10 @@ impl<F: 'static> LazyFn<F> {
 	// found to be relatively trivial (<1ms).
 	/// If successful, stores address in current instance and returns a reference to the stored value.
 	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<&F> {
-		let str_name = fn_name.to_str().unwrap();
+		let str_name: &'static str = fn_name.to_str().unwrap();
 		self.once.call_once(|| unsafe {
 			let maybe = match link_ty {
-				LinkType::Vulkan => {
-					match fn_name.to_str().unwrap() {
-						"vkGetInstanceProcAddr" => Ok(mem::transmute::<
-							unsafe extern "system" fn(
-								instance: vulkan::VkInstance,
-								pName: *const ffi::c_char,
-							) -> Option<FnPtr>,
-							FnPtr,
-						>(loader::vkGetInstanceProcAddr)),
-						"vkGetDeviceProcAddr" => Ok(mem::transmute::<
-							unsafe extern "system" fn(
-								device: vulkan::VkDevice,
-								name: *const ffi::c_char,
-							) -> Option<FnPtr>,
-							FnPtr,
-						>(loader::vkGetDeviceProcAddr)),
-						_ => {
-							let device_read_lock =
-								VK_DEVICE.read().expect("failed to get read lock");
-							match device_read_lock.iter().find_map(|device| {
-								loader::vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const _)
-							}) {
-								Some(addr) => Ok(addr),
-								None => {
-									mem::drop(device_read_lock);
-									let instance_read_lock =
-										VK_INSTANCE.read().expect("failed to get read lock");
-									// check other instances if fails in case one has a higher available version number
-									match instance_read_lock.iter().find_map(|instance| {
-										loader::vkGetInstanceProcAddr(*instance, fn_name.as_ptr())
-									}) {
-										Some(addr) => Ok(addr),
-										None => loader::vkGetInstanceProcAddr(
-											vulkan::VkInstance(std::ptr::null()),
-											fn_name.as_ptr(),
-										)
-										.ok_or(error::DylinkError::new(
-											Some(str_name),
-											ErrorKind::FnNotFound,
-										)),
-									}
-								}
-							}
-						}
-					}
-				}
+				LinkType::Vulkan => loader::vkloader(str_name),
 				LinkType::Normal(lib_list) => {
 					let default_error = {
 						let (subject, kind) = if lib_list.len() > 1 {
