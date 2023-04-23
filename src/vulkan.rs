@@ -40,8 +40,8 @@ unsafe impl Send for VkDevice {}
 
 
 
-// windows and linux are fully tested and useable as of this comment.
-// macos should theoretically work, but it's untested.
+// Windows and Linux are fully tested and useable as of this comment.
+// MacOS should theoretically work, but it's untested.
 // This function is in itself an axiom of the vulkan specialization.
 #[cfg_attr(windows, crate::dylink(name = "vulkan-1.dll"))]
 #[cfg_attr(
@@ -64,31 +64,27 @@ extern "system" {
 }
 
 // vkGetDeviceProcAddr must be implemented manually to avoid recursion
-#[allow(non_snake_case)]
-#[inline]
-pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
-	device: VkDevice,
-	name: *const ffi::c_char,
-) -> Option<FnPtr> {
-	static DYN_FUNC: lazyfn::LazyFn<
-		unsafe extern "system" fn(VkDevice, *const ffi::c_char) -> Option<FnPtr>,
-	> = lazyfn::LazyFn::new(initial_fn);
-
+#[allow(non_upper_case_globals)]
+pub(crate) static vkGetDeviceProcAddr: lazyfn::LazyFn<
+	unsafe extern "system" fn(VkDevice, *const ffi::c_char) -> Option<FnPtr>,
+> = lazyfn::LazyFn::new({
 	unsafe extern "system" fn initial_fn(
 		device: VkDevice,
 		name: *const ffi::c_char,
 	) -> Option<FnPtr> {
-		DYN_FUNC.once.call_once(|| {
-			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");
-			const FN_NAME: &'static ffi::CStr =
-				unsafe { ffi::CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") };
+		vkGetDeviceProcAddr.once.call_once(|| {
+			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");			
 			// check other instances if fails in case one has a higher available version number
 			let fn_ptr = read_lock
 				.iter()
-				.find_map(|instance| vkGetInstanceProcAddr(*instance, FN_NAME.as_ptr()));
-			*std::cell::UnsafeCell::raw_get(&DYN_FUNC.addr) = mem::transmute(fn_ptr);
+				.find_map(|instance| {
+					vkGetInstanceProcAddr(
+						*instance, 
+						b"vkGetDeviceProcAddr\0".as_ptr() as *const ffi::c_char
+					)
+				});
+			*std::cell::UnsafeCell::raw_get(&vkGetDeviceProcAddr.addr) = mem::transmute(fn_ptr);
 		});
-		DYN_FUNC(device, name)
-	}
-	DYN_FUNC(device, name)
-}
+		vkGetDeviceProcAddr(device, name)
+	}initial_fn}
+);

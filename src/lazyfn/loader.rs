@@ -19,7 +19,7 @@ pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
 				*const ffi::c_char,
 			) -> Option<FnPtr>,
 			FnPtr,
-		>(vulkan::vkGetDeviceProcAddr)),
+		>(*vulkan::vkGetDeviceProcAddr.as_ref())),
 		_ => {
 			let device_read_lock =
 				crate::VK_DEVICE.read().expect("failed to get read lock");
@@ -33,12 +33,12 @@ pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
 						crate::VK_INSTANCE.read().expect("failed to get read lock");
 					// check other instances if fails in case one has a higher available version number
 					match instance_read_lock.iter().find_map(|instance| {
-						vulkan::vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const i8)
+						vulkan::vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char)
 					}) {
 						Some(addr) => Ok(addr),
 						None => vulkan::vkGetInstanceProcAddr(
 							vulkan::VkInstance(std::ptr::null()),
-							fn_name.as_ptr() as *const i8,
+							fn_name.as_ptr() as *const ffi::c_char,
 						)
 						.ok_or(DylinkError::new(
 							Some(fn_name),
@@ -76,6 +76,7 @@ pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Re
 			{
 				use std::os::windows::ffi::OsStrExt;
 				let wide_str: Vec<u16> = lib_name.encode_wide().collect();
+				// miri hates this function, but it works fine.
 				LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
 					0,

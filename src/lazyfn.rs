@@ -10,6 +10,7 @@ mod loader;
 pub enum LinkType {
 	/// Specialization for loading vulkan functions
 	Vulkan,
+	// TODO: change name from `Normal` to `System` in next major release
 	/// Generalization for loading normal functions.
 	Normal(&'static [&'static str]),
 }
