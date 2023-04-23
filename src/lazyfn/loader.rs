@@ -4,7 +4,7 @@ use std::{ffi, mem, sync::RwLock};
 
 use crate::{error::*, vulkan, FnPtr, Result};
 
-pub unsafe fn vkloader(fn_name: &'static str) -> Result<FnPtr> {
+pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
 	match fn_name {
 		"vkGetInstanceProcAddr" => Ok(mem::transmute::<
 			unsafe extern "system" fn(
@@ -52,7 +52,7 @@ pub unsafe fn vkloader(fn_name: &'static str) -> Result<FnPtr> {
 }
 
 /// `loader` is a generalization for all other dlls.
-pub fn loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Result<FnPtr> {
+pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;

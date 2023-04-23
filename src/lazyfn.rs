@@ -43,14 +43,13 @@ impl<F: 'static> LazyFn<F> {
 		}
 	}
 
-	// This is intentionally non-generic to reduce code bloat, and the performance overhead has been
-	// found to be relatively trivial (<1ms).
+	// This is intentionally non-generic to reduce code bloat.
 	/// If successful, stores address in current instance and returns a reference to the stored value.
 	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<&F> {
 		let str_name: &'static str = fn_name.to_str().unwrap();
 		self.once.call_once(|| unsafe {
 			let maybe = match link_ty {
-				LinkType::Vulkan => loader::vkloader(str_name),
+				LinkType::Vulkan => loader::vulkan_loader(str_name),
 				LinkType::Normal(lib_list) => {
 					let default_error = {
 						let (subject, kind) = if lib_list.len() > 1 {
@@ -62,7 +61,7 @@ impl<F: 'static> LazyFn<F> {
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
-						match loader::loader(ffi::OsStr::new(lib_name), str_name) {
+						match loader::system_loader(ffi::OsStr::new(lib_name), str_name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!
