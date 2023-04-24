@@ -7,17 +7,11 @@ use crate::{error::*, vulkan, FnPtr, Result};
 pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
 	let mut maybe_fn = match fn_name {
 		"vkGetInstanceProcAddr" => Some(mem::transmute::<
-			unsafe extern "system" fn(
-				vulkan::VkInstance,
-				*const ffi::c_char,
-			) -> Option<FnPtr>,
+			vulkan::PFN_vkGetInstanceProcAddr,
 			FnPtr,
 		>(vulkan::vkGetInstanceProcAddr)),
 		"vkGetDeviceProcAddr" => Some(mem::transmute::<
-			unsafe extern "system" fn(
-				vulkan::VkDevice,
-				*const ffi::c_char,
-			) -> Option<FnPtr>,
+			vulkan::PFN_vkGetDeviceProcAddr,
 			FnPtr,
 		>(*vulkan::vkGetDeviceProcAddr.as_ref())),
 		_ => None,
@@ -34,14 +28,13 @@ pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
 	};
 	maybe_fn = match maybe_fn {
 		Some(addr) => return Ok(addr),
-		None => {
-			let instance_read_lock =
-				crate::VK_INSTANCE.read().expect("failed to get read lock");
-			// check other instances if fails in case one has a higher available version number
-			instance_read_lock.iter().find_map(|instance| {
+		None => crate::VK_INSTANCE
+			.read()
+			.expect("failed to get read lock")
+			.iter()
+			.find_map(|instance| {
 				vulkan::vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char)
 			})
-		}
 	};
 	match maybe_fn {
 		Some(addr) => Ok(addr),
