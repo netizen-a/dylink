@@ -13,7 +13,7 @@ pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
 		"vkGetDeviceProcAddr" => Some(mem::transmute::<
 			vulkan::PFN_vkGetDeviceProcAddr,
 			FnPtr,
-		>(*vulkan::vkGetDeviceProcAddr.as_ref())),
+		>(vulkan::vkGetDeviceProcAddr)),
 		_ => None,
 	};	
 	maybe_fn = match maybe_fn {

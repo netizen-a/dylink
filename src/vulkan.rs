@@ -68,29 +68,35 @@ pub(crate) type PFN_vkGetDeviceProcAddr = unsafe extern "system" fn(VkDevice, *c
 #[allow(non_camel_case_types)]
 pub(crate) type PFN_vkGetInstanceProcAddr = unsafe extern "system" fn(VkInstance, *const ffi::c_char,) -> Option<FnPtr>;
 
-unsafe extern "system" fn initial_fn(
+
+// vkGetDeviceProcAddr must be implemented manually to avoid recursion
+#[allow(non_snake_case)]
+pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	device: VkDevice,
 	name: *const ffi::c_char,
 ) -> Option<FnPtr> {
-	vkGetDeviceProcAddr.once.call_once(|| {
-		let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");			
-		// check other instances if fails in case one has a higher available version number
-		let fn_ptr = read_lock
-			.iter()
-			.find_map(|instance| {
-				vkGetInstanceProcAddr(
-					*instance, 
-					b"vkGetDeviceProcAddr\0".as_ptr() as *const ffi::c_char
-				)
-			});
-		*std::cell::UnsafeCell::raw_get(&vkGetDeviceProcAddr.addr) = mem::transmute(fn_ptr);
-	});
-	vkGetDeviceProcAddr(device, name)
+	unsafe extern "system" fn initial_fn(
+		device: VkDevice,
+		name: *const ffi::c_char,
+	) -> Option<FnPtr> {
+		DEVICE_PROC_ADDR.once.call_once(|| {
+			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");			
+			// check other instances if fails in case one has a higher available version number
+			let fn_ptr = read_lock
+				.iter()
+				.find_map(|instance| {
+					vkGetInstanceProcAddr(
+						*instance, 
+						b"vkGetDeviceProcAddr\0".as_ptr() as *const ffi::c_char
+					)
+				});
+			*std::cell::UnsafeCell::raw_get(&DEVICE_PROC_ADDR.addr) = mem::transmute(fn_ptr);
+		});
+		DEVICE_PROC_ADDR(device, name)
+	}
+	
+	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> = lazyfn::LazyFn::new(
+		initial_fn
+	);
+	DEVICE_PROC_ADDR(device, name)
 }
-
-
-// vkGetDeviceProcAddr must be implemented manually to avoid recursion
-#[allow(non_upper_case_globals)]
-pub(crate) static vkGetDeviceProcAddr: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> = lazyfn::LazyFn::new(
-	initial_fn
-);
