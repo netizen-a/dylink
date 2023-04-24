@@ -5,49 +5,54 @@ use std::{ffi, mem, sync::RwLock};
 use crate::{error::*, vulkan, FnPtr, Result};
 
 pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
-	match fn_name {
-		"vkGetInstanceProcAddr" => Ok(mem::transmute::<
+	let mut maybe_fn = match fn_name {
+		"vkGetInstanceProcAddr" => Some(mem::transmute::<
 			unsafe extern "system" fn(
 				vulkan::VkInstance,
 				*const ffi::c_char,
 			) -> Option<FnPtr>,
 			FnPtr,
 		>(vulkan::vkGetInstanceProcAddr)),
-		"vkGetDeviceProcAddr" => Ok(mem::transmute::<
+		"vkGetDeviceProcAddr" => Some(mem::transmute::<
 			unsafe extern "system" fn(
 				vulkan::VkDevice,
 				*const ffi::c_char,
 			) -> Option<FnPtr>,
 			FnPtr,
 		>(*vulkan::vkGetDeviceProcAddr.as_ref())),
-		_ => {
-			let device_read_lock =
-				crate::VK_DEVICE.read().expect("failed to get read lock");
-			match device_read_lock.iter().find_map(|device| {
+		_ => None,
+	};	
+	maybe_fn = match maybe_fn {
+		Some(addr) => return Ok(addr),
+		None => crate::VK_DEVICE
+			.read()
+			.expect("failed to get read lock")
+			.iter()
+			.find_map(|device| {
 				vulkan::vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const _)
-			}) {
-				Some(addr) => Ok(addr),
-				None => {
-					mem::drop(device_read_lock);
-					let instance_read_lock =
-						crate::VK_INSTANCE.read().expect("failed to get read lock");
-					// check other instances if fails in case one has a higher available version number
-					match instance_read_lock.iter().find_map(|instance| {
-						vulkan::vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char)
-					}) {
-						Some(addr) => Ok(addr),
-						None => vulkan::vkGetInstanceProcAddr(
-							vulkan::VkInstance(std::ptr::null()),
-							fn_name.as_ptr() as *const ffi::c_char,
-						)
-						.ok_or(DylinkError::new(
-							Some(fn_name),
-							ErrorKind::FnNotFound,
-						)),
-					}
-				}
-			}
+			}),
+	};
+	maybe_fn = match maybe_fn {
+		Some(addr) => return Ok(addr),
+		None => {
+			let instance_read_lock =
+				crate::VK_INSTANCE.read().expect("failed to get read lock");
+			// check other instances if fails in case one has a higher available version number
+			instance_read_lock.iter().find_map(|instance| {
+				vulkan::vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char)
+			})
 		}
+	};
+	match maybe_fn {
+		Some(addr) => Ok(addr),
+		None => vulkan::vkGetInstanceProcAddr(
+			vulkan::VkInstance(std::ptr::null()),
+			fn_name.as_ptr() as *const ffi::c_char,
+		)
+		.ok_or(DylinkError::new(
+			Some(fn_name),
+			ErrorKind::FnNotFound,
+		)),
 	}
 }
 
