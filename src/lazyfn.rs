@@ -10,7 +10,7 @@ mod loader;
 pub enum LinkType {
 	/// Specialization for loading vulkan functions
 	Vulkan,
-	// TODO: change name from `Normal` to `System` in next major release
+	// TODO: change name from `Normal` to `System` in next minor release
 	/// Generalization for loading normal functions.
 	Normal(&'static [&'static str]),
 }
@@ -30,6 +30,7 @@ pub struct LazyFn<F: 'static> {
 }
 
 impl<F: 'static> LazyFn<F> {
+	// TODO: modify `thunk: F` to use `thunk: AtomicPtr<F>` in the next minor release
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
@@ -43,7 +44,7 @@ impl<F: 'static> LazyFn<F> {
 			status: cell::UnsafeCell::new(None),
 		}
 	}
-
+	// TODO: change return type from `Return<&F>` to `Return<F>` in next minor release
 	// This is intentionally non-generic to reduce code bloat.
 	/// If successful, stores address in current instance and returns a reference to the stored value.
 	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<&F> {
