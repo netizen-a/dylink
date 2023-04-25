@@ -10,9 +10,8 @@ mod loader;
 pub enum LinkType {
 	/// Specialization for loading vulkan functions
 	Vulkan,
-	// TODO: change name from `Normal` to `System` in next minor release
 	/// Generalization for loading normal functions.
-	Normal(&'static [&'static str]),
+	System(&'static [&'static str]),
 }
 
 /// Fundamental data type of dylink.
@@ -52,7 +51,7 @@ impl<F: 'static + Copy> LazyFn<F> {
 		self.once.call_once(|| unsafe {
 			let maybe = match link_ty {
 				LinkType::Vulkan => loader::vulkan_loader(str_name),
-				LinkType::Normal(lib_list) => {
+				LinkType::System(lib_list) => {
 					let default_error = {
 						let (subject, kind) = if lib_list.len() > 1 {
 							(None, ErrorKind::ListNotFound)
