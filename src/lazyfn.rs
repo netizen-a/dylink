@@ -10,7 +10,7 @@ mod loader;
 pub enum LinkType {
 	/// Specialization for loading vulkan functions
 	Vulkan,
-	/// Generalization for loading normal functions.
+	/// Generalization for loading functions using system loaders.
 	System(&'static [&'static str]),
 }
 
@@ -45,7 +45,7 @@ impl<F: 'static + Copy> LazyFn<F> {
 		}
 	}
 
-	/// If successful, stores address in current instance and returns a reference to the stored value.
+	/// If successful, stores address in current instance and returns a copy of the stored value.
 	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<F> {
 		let str_name: &'static str = fn_name.to_str().unwrap();
 		self.once.call_once(|| unsafe {
@@ -112,7 +112,7 @@ impl<F: 'static> std::ops::Deref for LazyFn<F> {
 }
 
 impl<F: 'static> std::convert::AsRef<F> for LazyFn<F> {
-	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
+	// `addr_ptr` is never uninitialized, so `unwrap_unchecked` is safe.
 	#[inline]
 	fn as_ref(&self) -> &F {
 		unsafe { self.addr_ptr.load(Ordering::Relaxed).as_ref().unwrap_unchecked() }
