@@ -1,5 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use std::{cell, ffi, mem, sync};
+use std::{cell, ffi, mem, sync::{self, atomic::{AtomicPtr, Ordering}}};
 
 use crate::*;
 
@@ -26,7 +26,7 @@ pub struct LazyFn<F: 'static> {
 	status: cell::UnsafeCell<Option<error::DylinkError>>,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
-	pub(crate) addr: cell::UnsafeCell<F>,
+	pub(crate) addr: AtomicPtr<F>,
 }
 
 impl<F: 'static> LazyFn<F> {
@@ -35,11 +35,11 @@ impl<F: 'static> LazyFn<F> {
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
 	#[inline]
-	pub const fn new(thunk: F) -> Self {
+	pub const fn new(thunk: AtomicPtr<F>) -> Self {
 		// In a const context this assert will be optimized out.
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		Self {
-			addr: cell::UnsafeCell::new(thunk),
+			addr: thunk,
 			once: sync::Once::new(),
 			status: cell::UnsafeCell::new(None),
 		}
@@ -83,7 +83,10 @@ impl<F: 'static> LazyFn<F> {
 			};
 			match maybe {
 				Ok(addr) => {
-					cell::UnsafeCell::raw_get(&self.addr).write(mem::transmute_copy(&addr));
+					// allocate and move from Box to AtomicPtr
+					let leaked = std::boxed::Box::leak(std::boxed::Box::new(addr));
+					self.addr.store(mem::transmute(leaked), Ordering::Relaxed);
+					//cell::UnsafeCell::raw_get(&self.addr).write(mem::transmute_copy(&addr));
 				}
 				Err(err) => {
 					cell::UnsafeCell::raw_get(&self.status).write(Some(err));
@@ -114,6 +117,6 @@ impl<F: 'static> std::convert::AsRef<F> for LazyFn<F> {
 	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
 	#[inline]
 	fn as_ref(&self) -> &F {
-		unsafe { self.addr.get().as_ref().unwrap_unchecked() }
+		unsafe { self.addr.load(Ordering::Relaxed).as_ref().unwrap_unchecked() }
 	}
 }

@@ -1,3 +1,4 @@
+use std::sync::atomic::{Ordering, AtomicPtr};
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use std::{ffi, mem};
 use crate::FnPtr;
@@ -90,13 +91,14 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 						b"vkGetDeviceProcAddr\0".as_ptr() as *const ffi::c_char
 					)
 				});
-			*std::cell::UnsafeCell::raw_get(&DEVICE_PROC_ADDR.addr) = mem::transmute(fn_ptr);
+			DEVICE_PROC_ADDR.addr.store(&mut mem::transmute(fn_ptr), Ordering::Relaxed);
+			//*std::cell::UnsafeCell::raw_get(&DEVICE_PROC_ADDR.addr) = mem::transmute(fn_ptr);
 		});
 		DEVICE_PROC_ADDR(device, name)
 	}
 	
-	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> = lazyfn::LazyFn::new(
-		initial_fn
+	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> = lazyfn::LazyFn::new(		
+		AtomicPtr::new(unsafe {std::mem::transmute(&(initial_fn as PFN_vkGetDeviceProcAddr))})
 	);
 	DEVICE_PROC_ADDR(device, name)
 }
