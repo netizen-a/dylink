@@ -2,66 +2,55 @@
 
 use std::{ffi, mem, sync::RwLock};
 
-use crate::{error::*, lazyfn, vulkan, FnPtr, Result};
-// dylink_macro internally uses dylink as it's root namespace,
-// but since we are in dylink the namespace is actually named `self`.
-// this is just here to resolve the missing namespace issue.
-extern crate self as dylink;
+use crate::{error::*, vulkan, FnPtr, Result};
 
-// windows and linux are fully tested and useable as of this comment.
-// macos should theoretically work, but it's untested.
-// This function is in itself an axiom of the vulkan specialization.
-#[cfg_attr(windows, crate::dylink(name = "vulkan-1.dll"))]
-#[cfg_attr(
-	all(unix, not(target_os = "macos")),
-	crate::dylink(any(name = "libvulkan.so.1", name = "libvulkan.so"))
-)]
-#[cfg_attr(
-	target_os = "macos",
-	crate::dylink(any(
-		name = "libvulkan.dylib",
-		name = "libvulkan.1.dylib",
-		name = "libMoltenVK.dylib"
-	))
-)]
-extern "system" {
-	pub(super) fn vkGetInstanceProcAddr(
-		instance: vulkan::VkInstance,
-		pName: *const ffi::c_char,
-	) -> Option<FnPtr>;
-}
-
-// vkGetDeviceProcAddr must be implemented manually to avoid recursion
-#[allow(non_snake_case)]
-pub(super) unsafe extern "system" fn vkGetDeviceProcAddr(
-	device: vulkan::VkDevice,
-	name: *const ffi::c_char,
-) -> Option<FnPtr> {
-	static DYN_FUNC: lazyfn::LazyFn<
-		unsafe extern "system" fn(vulkan::VkDevice, *const ffi::c_char) -> Option<FnPtr>,
-	> = lazyfn::LazyFn::new(initial_fn);
-
-	unsafe extern "system" fn initial_fn(
-		device: vulkan::VkDevice,
-		name: *const ffi::c_char,
-	) -> Option<FnPtr> {
-		DYN_FUNC.once.call_once(|| {
-			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");
-			const FN_NAME: &'static ffi::CStr =
-				unsafe { ffi::CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") };
-			// check other instances if fails in case one has a higher available version number
-			let fn_ptr = read_lock
-				.iter()
-				.find_map(|instance| vkGetInstanceProcAddr(*instance, FN_NAME.as_ptr()));
-			*std::cell::UnsafeCell::raw_get(&DYN_FUNC.addr) = mem::transmute(fn_ptr);
-		});
-		DYN_FUNC(device, name)
+pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
+	let mut maybe_fn = match fn_name {
+		"vkGetInstanceProcAddr" => Some(mem::transmute::<
+			vulkan::PFN_vkGetInstanceProcAddr,
+			FnPtr,
+		>(vulkan::vkGetInstanceProcAddr)),
+		"vkGetDeviceProcAddr" => Some(mem::transmute::<
+			vulkan::PFN_vkGetDeviceProcAddr,
+			FnPtr,
+		>(vulkan::vkGetDeviceProcAddr)),
+		_ => None,
+	};	
+	maybe_fn = match maybe_fn {
+		Some(addr) => return Ok(addr),
+		None => crate::VK_DEVICE
+			.read()
+			.expect("failed to get read lock")
+			.iter()
+			.find_map(|device| {
+				vulkan::vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const _)
+			}),
+	};
+	maybe_fn = match maybe_fn {
+		Some(addr) => return Ok(addr),
+		None => crate::VK_INSTANCE
+			.read()
+			.expect("failed to get read lock")
+			.iter()
+			.find_map(|instance| {
+				vulkan::vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char)
+			})
+	};
+	match maybe_fn {
+		Some(addr) => Ok(addr),
+		None => vulkan::vkGetInstanceProcAddr(
+			vulkan::VkInstance(std::ptr::null()),
+			fn_name.as_ptr() as *const ffi::c_char,
+		)
+		.ok_or(DylinkError::new(
+			Some(fn_name),
+			ErrorKind::FnNotFound,
+		)),
 	}
-	DYN_FUNC(device, name)
 }
 
 /// `loader` is a generalization for all other dlls.
-pub fn loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Result<FnPtr> {
+pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -85,6 +74,7 @@ pub fn loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Result<Fn
 			{
 				use std::os::windows::ffi::OsStrExt;
 				let wide_str: Vec<u16> = lib_name.encode_wide().collect();
+				// miri hates this function, but it works fine.
 				LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
 					0,

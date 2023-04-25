@@ -1,5 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use std::{cell, ffi, mem, sync};
+use std::{cell, ffi, mem, sync::{self, atomic::{AtomicPtr, Ordering}}};
 
 use crate::*;
 
@@ -11,7 +11,7 @@ pub enum LinkType {
 	/// Specialization for loading vulkan functions
 	Vulkan,
 	/// Generalization for loading normal functions.
-	Normal(&'static [&'static str]),
+	System(&'static [&'static str]),
 }
 
 /// Fundamental data type of dylink.
@@ -20,83 +20,38 @@ pub enum LinkType {
 /// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
 pub struct LazyFn<F: 'static> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::load` is sound.
-	once: sync::Once,
+	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance.
 	status: cell::UnsafeCell<Option<error::DylinkError>>,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
-	addr: cell::UnsafeCell<F>,
+	pub(crate) addr_ptr: AtomicPtr<F>,
+	addr: cell::UnsafeCell<Option<F>>,
 }
 
-impl<F: 'static> LazyFn<F> {
+impl<F: 'static + Copy> LazyFn<F> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
 	#[inline]
-	pub const fn new(thunk: F) -> Self {
+	pub const fn new(thunk: AtomicPtr<F>) -> Self {
 		// In a const context this assert will be optimized out.
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		Self {
-			addr: cell::UnsafeCell::new(thunk),
+			addr_ptr: thunk,
 			once: sync::Once::new(),
 			status: cell::UnsafeCell::new(None),
+			addr: cell::UnsafeCell::new(None)
 		}
 	}
 
-	// This is intentionally non-generic to reduce code bloat, and the performance overhead has been
-	// found to be relatively trivial (<1ms).
 	/// If successful, stores address in current instance and returns a reference to the stored value.
-	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<&F> {
-		let str_name = fn_name.to_str().unwrap();
+	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<F> {
+		let str_name: &'static str = fn_name.to_str().unwrap();
 		self.once.call_once(|| unsafe {
 			let maybe = match link_ty {
-				LinkType::Vulkan => {
-					match fn_name.to_str().unwrap() {
-						"vkGetInstanceProcAddr" => Ok(mem::transmute::<
-							unsafe extern "system" fn(
-								instance: vulkan::VkInstance,
-								pName: *const ffi::c_char,
-							) -> Option<FnPtr>,
-							FnPtr,
-						>(loader::vkGetInstanceProcAddr)),
-						"vkGetDeviceProcAddr" => Ok(mem::transmute::<
-							unsafe extern "system" fn(
-								device: vulkan::VkDevice,
-								name: *const ffi::c_char,
-							) -> Option<FnPtr>,
-							FnPtr,
-						>(loader::vkGetDeviceProcAddr)),
-						_ => {
-							let device_read_lock =
-								VK_DEVICE.read().expect("failed to get read lock");
-							match device_read_lock.iter().find_map(|device| {
-								loader::vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const _)
-							}) {
-								Some(addr) => Ok(addr),
-								None => {
-									mem::drop(device_read_lock);
-									let instance_read_lock =
-										VK_INSTANCE.read().expect("failed to get read lock");
-									// check other instances if fails in case one has a higher available version number
-									match instance_read_lock.iter().find_map(|instance| {
-										loader::vkGetInstanceProcAddr(*instance, fn_name.as_ptr())
-									}) {
-										Some(addr) => Ok(addr),
-										None => loader::vkGetInstanceProcAddr(
-											vulkan::VkInstance(std::ptr::null()),
-											fn_name.as_ptr(),
-										)
-										.ok_or(error::DylinkError::new(
-											Some(str_name),
-											ErrorKind::FnNotFound,
-										)),
-									}
-								}
-							}
-						}
-					}
-				}
-				LinkType::Normal(lib_list) => {
+				LinkType::Vulkan => loader::vulkan_loader(str_name),
+				LinkType::System(lib_list) => {
 					let default_error = {
 						let (subject, kind) = if lib_list.len() > 1 {
 							(None, ErrorKind::ListNotFound)
@@ -107,7 +62,7 @@ impl<F: 'static> LazyFn<F> {
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
-						match loader::loader(ffi::OsStr::new(lib_name), str_name) {
+						match loader::system_loader(ffi::OsStr::new(lib_name), str_name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!
@@ -127,17 +82,19 @@ impl<F: 'static> LazyFn<F> {
 			};
 			match maybe {
 				Ok(addr) => {
-					cell::UnsafeCell::raw_get(&self.addr).write(mem::transmute_copy(&addr));
+					let addr_ptr = self.addr.get();
+					addr_ptr.write(Some(mem::transmute_copy(&addr)));
+					self.addr_ptr.store(mem::transmute(addr_ptr), Ordering::Relaxed);
 				}
 				Err(err) => {
-					cell::UnsafeCell::raw_get(&self.status).write(Some(err));
+					self.status.get().write(Some(err));
 				}
 			}
 		});
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
 		match unsafe { (*self.status.get()).clone() } {
-			None => Ok(self.as_ref()),
+			None => Ok(*self.as_ref()),
 			Some(err) => Err(err),
 		}
 	}
@@ -158,6 +115,6 @@ impl<F: 'static> std::convert::AsRef<F> for LazyFn<F> {
 	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
 	#[inline]
 	fn as_ref(&self) -> &F {
-		unsafe { self.addr.get().as_ref().unwrap_unchecked() }
+		unsafe { self.addr_ptr.load(Ordering::Relaxed).as_ref().unwrap_unchecked() }
 	}
 }

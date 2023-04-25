@@ -1,8 +1,7 @@
-use dylink::dylink;
-
 #[cfg(windows)]
 #[test]
 fn test_win32_kernel32() {
+	use dylink::dylink;
 	use windows_sys::Win32::Foundation::{ERROR_INVALID_PRINTER_COMMAND, WIN32_ERROR};
 	#[dylink(name = "Kernel32.dll")]
 	extern "stdcall" {

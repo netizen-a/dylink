@@ -23,7 +23,7 @@ Add this to your `Cargo.toml`
 
 ```toml
 [dependencies]
-dylink = "0.1"
+dylink = "0.2"
 ```
 
 ## Example

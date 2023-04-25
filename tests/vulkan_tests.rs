@@ -1,12 +1,13 @@
-#![allow(non_snake_case)]
 
-use dylink::dylink;
 
 // This test is not allowed to fail: This asserts that vulkan is loaded properly in dylink.
 // If vulkan drivers are not installed properly, then this test will fail regardless.
 #[test]
 fn test_vk_instance_layer_properties() {
+	#![allow(non_snake_case)]
+	use dylink::dylink;
 	use std::ffi::c_char;
+	
 	type VkResult = i32;
 	const VK_MAX_EXTENSION_NAME_SIZE: usize = 256;
 	const VK_MAX_DESCRIPTION_SIZE: usize = 256;
