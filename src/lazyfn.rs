@@ -26,11 +26,11 @@ pub struct LazyFn<F: 'static> {
 	status: cell::UnsafeCell<Option<error::DylinkError>>,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
-	pub(crate) addr: AtomicPtr<F>,
+	pub(crate) addr_ptr: AtomicPtr<F>,
+	addr: cell::UnsafeCell<Option<F>>,
 }
 
-impl<F: 'static> LazyFn<F> {
-	// TODO: modify `thunk: F` to use `thunk: AtomicPtr<F>` in the next minor release
+impl<F: 'static + Copy> LazyFn<F> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
@@ -39,15 +39,15 @@ impl<F: 'static> LazyFn<F> {
 		// In a const context this assert will be optimized out.
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		Self {
-			addr: thunk,
+			addr_ptr: thunk,
 			once: sync::Once::new(),
 			status: cell::UnsafeCell::new(None),
+			addr: cell::UnsafeCell::new(None)
 		}
 	}
-	// TODO: change return type from `Return<&F>` to `Return<F>` in next minor release
-	// This is intentionally non-generic to reduce code bloat.
+
 	/// If successful, stores address in current instance and returns a reference to the stored value.
-	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<&F> {
+	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<F> {
 		let str_name: &'static str = fn_name.to_str().unwrap();
 		self.once.call_once(|| unsafe {
 			let maybe = match link_ty {
@@ -83,20 +83,19 @@ impl<F: 'static> LazyFn<F> {
 			};
 			match maybe {
 				Ok(addr) => {
-					// allocate and move from Box to AtomicPtr
-					let leaked = std::boxed::Box::leak(std::boxed::Box::new(addr));
-					self.addr.store(mem::transmute(leaked), Ordering::Relaxed);
-					//cell::UnsafeCell::raw_get(&self.addr).write(mem::transmute_copy(&addr));
+					let addr_ptr = self.addr.get();
+					addr_ptr.write(Some(mem::transmute_copy(&addr)));
+					self.addr_ptr.store(mem::transmute(addr_ptr), Ordering::Relaxed);
 				}
 				Err(err) => {
-					cell::UnsafeCell::raw_get(&self.status).write(Some(err));
+					self.status.get().write(Some(err));
 				}
 			}
 		});
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
 		match unsafe { (*self.status.get()).clone() } {
-			None => Ok(self.as_ref()),
+			None => Ok(*self.as_ref()),
 			Some(err) => Err(err),
 		}
 	}
@@ -117,6 +116,6 @@ impl<F: 'static> std::convert::AsRef<F> for LazyFn<F> {
 	// `addr` is never uninitialized, so `unwrap_unchecked` is safe.
 	#[inline]
 	fn as_ref(&self) -> &F {
-		unsafe { self.addr.load(Ordering::Relaxed).as_ref().unwrap_unchecked() }
+		unsafe { self.addr_ptr.load(Ordering::Relaxed).as_ref().unwrap_unchecked() }
 	}
 }
