@@ -26,7 +26,7 @@ pub struct LazyFn<F: 'static> {
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
 	pub(crate) addr_ptr: AtomicPtr<F>,
-	addr: cell::UnsafeCell<Option<F>>,
+	pub(crate) addr: cell::UnsafeCell<Option<F>>,
 }
 
 impl<F: 'static + Copy> LazyFn<F> {
