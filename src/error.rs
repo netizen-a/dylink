@@ -54,7 +54,7 @@ impl fmt::Display for DylinkError {
 				Some(name) => format!("library `{name}` not found"),
 				None => "library not found".to_owned(),
 			},
-			ErrorKind::ListNotFound => format!("libraries not found"),
+			ErrorKind::ListNotFound => "libraries not found".to_string(),
 		};
 		write!(f, "Dylink Error: {err}")
 	}

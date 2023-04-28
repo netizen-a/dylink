@@ -10,6 +10,8 @@ mod loader;
 pub enum LinkType {
 	/// Specialization for loading vulkan functions
 	Vulkan,
+	// FIXME: &str isn't intuitive since it requires a null terminator.
+	// 		  This should change to use some other data type or handle the code without null term.
 	/// Generalization for loading functions using system loaders.
 	System(&'static [&'static str]),
 }

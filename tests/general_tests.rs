@@ -36,6 +36,5 @@ fn test_win32_lifetimes() {
 	
 	assert_eq!(*old_ref, foo as PfnTy);	
 	assert_ne!(new_addr, foo as PfnTy);	
-	assert_ne!(lazyfn.as_ref(), old_ref);
-	
+	assert_ne!(lazyfn.as_ref(), old_ref);	
 }
