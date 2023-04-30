@@ -1,10 +1,10 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::{ffi, mem, sync::RwLock};
+use std::{ffi::{self, OsStr}, mem, sync::RwLock, path::{Path, PathBuf}};
 
 use crate::{error::*, vulkan, FnPtr, Result};
 
-pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
+pub(crate) unsafe fn vulkan_loader(fn_name: &str) -> Result<FnPtr> {
 	let mut maybe_fn = match fn_name {
 		"vkGetInstanceProcAddr" => Some(mem::transmute::<
 			vulkan::PFN_vkGetInstanceProcAddr,
@@ -43,14 +43,14 @@ pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
 			fn_name.as_ptr() as *const ffi::c_char,
 		)
 		.ok_or(DylinkError::new(
-			Some(fn_name),
+			Some(fn_name.to_owned()),
 			ErrorKind::FnNotFound,
 		)),
 	}
 }
 
 /// `loader` is a generalization for all other dlls.
-pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Result<FnPtr> {
+pub(crate) fn system_loader(lib_path: &Path, fn_name: &OsStr) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -59,12 +59,16 @@ pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Re
 		GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 	};
 
-	static DLL_DATA: RwLock<Lazy<HashMap<&'static ffi::OsStr, isize>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<PathBuf, isize>>> =
 		RwLock::new(Lazy::new(HashMap::default));
+
+	let path_str = lib_path.to_str().unwrap();
+	
+	let fn_str = fn_name.to_str().unwrap();
 
 	let read_lock = DLL_DATA.read().unwrap();
 
-	let handle: isize = if let Some(handle) = read_lock.get(lib_name) {
+	let handle: isize = if let Some(handle) = read_lock.get(lib_path) {
 		*handle
 	} else {
 		mem::drop(read_lock);
@@ -73,7 +77,9 @@ pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Re
 			#[cfg(windows)]
 			{
 				use std::os::windows::ffi::OsStrExt;
-				let wide_str: Vec<u16> = lib_name.encode_wide().collect();
+				let os_str = lib_path.as_os_str();
+				let mut wide_str: Vec<u16> = os_str.encode_wide().collect();
+				wide_str.push(0);
 				// miri hates this function, but it works fine.
 				LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
@@ -82,18 +88,19 @@ pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Re
 				)
 			}
 			#[cfg(unix)]
-			{
-				use std::os::unix::ffi::OsStrExt;
+			{				
+				let c_str = std::ffi::CString::new(path_str).unwrap();
+				let filename = c_str.into_bytes_with_nul();
 				libc::dlopen(
-					lib_name.as_bytes().as_ptr() as *const _,
+					filename.as_ptr() as *const _,
 					libc::RTLD_NOW | libc::RTLD_LOCAL,
 				) as isize
 			}
 		};
 		if lib_handle == 0 {
-			return Err(DylinkError::new(lib_name.to_str(), ErrorKind::LibNotFound));
+			return Err(DylinkError::new(Some(path_str.to_owned()), ErrorKind::LibNotFound));
 		} else {
-			DLL_DATA.write().unwrap().insert(lib_name, lib_handle);
+			DLL_DATA.write().unwrap().insert(lib_path.to_owned(), lib_handle);
 		}
 		lib_handle
 	};
@@ -101,17 +108,17 @@ pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Re
 	let maybe_fn: Option<FnPtr> = unsafe {
 		#[cfg(windows)]
 		{
-			GetProcAddress(handle, fn_name.as_ptr() as *const _)
+			GetProcAddress(handle, fn_str.as_ptr() as *const _)
 		}
 		#[cfg(unix)]
 		{
 			let addr: *const libc::c_void =
-				libc::dlsym(handle as *mut libc::c_void, fn_name.as_ptr() as *const _);
+				libc::dlsym(handle as *mut libc::c_void, fn_str.as_ptr() as *const _);
 			std::mem::transmute(addr)
 		}
 	};
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(Some(fn_name), ErrorKind::FnNotFound)),
+		None => Err(DylinkError::new(Some(path_str.to_owned()), ErrorKind::FnNotFound)),
 	}
 }

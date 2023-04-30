@@ -25,7 +25,7 @@ pub enum ErrorKind {
 /// It's ideal not to rely on unwinding unless you know for sure that the ABI you are using can unwind safely like `extern "Rust"`.
 #[derive(Debug, Clone)]
 pub struct DylinkError {
-	subject: Option<&'static str>,
+	subject: Option<String>,
 	pub(crate) kind: ErrorKind,
 }
 
@@ -33,7 +33,7 @@ impl error::Error for DylinkError {}
 
 impl DylinkError {
 	#[inline]
-	pub const fn new(subject: Option<&'static str>, kind: ErrorKind) -> Self {
+	pub const fn new(subject: Option<String>, kind: ErrorKind) -> Self {
 		Self { subject, kind }
 	}
 
@@ -47,14 +47,14 @@ impl fmt::Display for DylinkError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		let err = match self.kind {
 			ErrorKind::FnNotFound => match self.subject {
-				Some(name) => format!("function `{name}` not found"),
+				Some(ref name) => format!("function `{name}` not found"),
 				None => "function not found".to_owned(),
 			},
 			ErrorKind::LibNotFound => match self.subject {
-				Some(name) => format!("library `{name}` not found"),
+				Some(ref name) => format!("library `{name}` not found"),
 				None => "library not found".to_owned(),
 			},
-			ErrorKind::ListNotFound => format!("libraries not found"),
+			ErrorKind::ListNotFound => "libraries not found".to_owned(),
 		};
 		write!(f, "Dylink Error: {err}")
 	}

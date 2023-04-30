@@ -4,10 +4,10 @@
 
 ## Overview
 
-Dylink is a framework for lazily evaluating shared libraries such as `.dll` files for windows and `.so` files for unix.
-When functions are loaded they are evaluated through a thunk for first time calls, which loads the function from it's
-respective library. Proceeding calls after initialization have no overhead or additional branching checks, as the thunk is
-replaced by the loaded function.
+Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries such as `.dll` files for windows
+and `.so` files for unix. When functions are loaded they are evaluated through a thunk for first time calls, which loads the
+function from it's respective library. Proceeding calls after initialization have no overhead or additional branching checks,
+as the thunk is replaced by the loaded function.
 
 ## Supported platforms
 

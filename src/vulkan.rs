@@ -100,7 +100,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	}
 	
 	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> = lazyfn::LazyFn::new(		
-		AtomicPtr::new(unsafe {std::mem::transmute(&(initial_fn as PFN_vkGetDeviceProcAddr))})
+		AtomicPtr::new(&(initial_fn as PFN_vkGetDeviceProcAddr) as *const PFN_vkGetDeviceProcAddr as *mut PFN_vkGetDeviceProcAddr)
 	);
 	DEVICE_PROC_ADDR(device, name)
 }

@@ -1,5 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use std::{cell, ffi, mem, sync::{self, atomic::{AtomicPtr, Ordering}}};
+use std::{cell, ffi::{OsStr, OsString}, mem, sync::{self, atomic::{AtomicPtr, Ordering}}, path::Path};
 
 use crate::*;
 
@@ -8,9 +8,9 @@ mod loader;
 /// Determines what library to look up when [LazyFn::load] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType {
-	/// Specialization for loading vulkan functions
+	/// Specifies a specialization for loading vulkan functions using vulkan loaders.
 	Vulkan,
-	/// Generalization for loading functions using system loaders.
+	/// Specifies a generalization for loading functions using native system loaders.
 	System(&'static [&'static str]),
 }
 
@@ -46,23 +46,24 @@ impl<F: 'static + Copy> LazyFn<F> {
 	}
 
 	/// If successful, stores address in current instance and returns a copy of the stored value.
-	pub fn load(&self, fn_name: &'static ffi::CStr, link_ty: LinkType) -> Result<F> {
-		let str_name: &'static str = fn_name.to_str().unwrap();
+	pub fn load<P: AsRef<OsStr>>(&self, fn_name: P, link_ty: LinkType) -> Result<F> {
 		self.once.call_once(|| unsafe {
+			let mut str_name: OsString = fn_name.as_ref().to_owned();
+			str_name.push("\0");
 			let maybe = match link_ty {
-				LinkType::Vulkan => loader::vulkan_loader(str_name),
+				LinkType::Vulkan => loader::vulkan_loader(str_name.to_str().unwrap()),
 				LinkType::System(lib_list) => {
 					let default_error = {
 						let (subject, kind) = if lib_list.len() > 1 {
 							(None, ErrorKind::ListNotFound)
 						} else {
-							(Some(lib_list[0]), ErrorKind::LibNotFound)
+							(Some(lib_list[0].to_owned()), ErrorKind::LibNotFound)
 						};
 						error::DylinkError::new(subject, kind)
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
-						match loader::system_loader(ffi::OsStr::new(lib_name), str_name) {
+						match loader::system_loader(Path::new(lib_name), &str_name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!

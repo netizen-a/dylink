@@ -8,9 +8,9 @@
 //! use dylink::dylink;
 //!
 //! #[dylink(name = "Kernel32.dll")]
-//!	extern "system" {
-//!		fn GetLastError() -> u32;
-//!	}
+//! extern "system" {
+//!     fn GetLastError() -> u32;
+//! }
 //! ```
 //!
 //! # Vulkan Specialization
@@ -25,11 +25,11 @@
 //! # type VkResult = i32;
 //! #[dylink(vulkan)]
 //! extern "system" {
-//! 	fn vkCreateInstance(
-//! 		pCreateInfo: *const VkInstanceCreateInfo,
-//! 		pAllocator: *const VkAllocationCallbacks,
-//! 		pInstance: *mut VkInstance,
-//! 	) -> VkResult;
+//!     fn vkCreateInstance(
+//!         pCreateInfo: *const VkInstanceCreateInfo,
+//!         pAllocator: *const VkAllocationCallbacks,
+//!         pInstance: *mut VkInstance,
+//!     ) -> VkResult;
 //! }
 //! ```
 //!
@@ -40,9 +40,10 @@
 //! Note: `any()` only handles the library predicate, and not the function predicate.
 //! This means that if the library is found, but the function is not, a panic will occur.
 //! ```rust
+//! # use dylink::dylink;
 //! #[dylink(any(name = "example_lib.so", name = "example_lib.so.1"))]
 //! extern "C" {
-//! 	fn my_function();
+//!     fn my_function();
 //! }
 //! ```
 
@@ -70,11 +71,11 @@ pub use vulkan::{VkDevice, VkInstance};
 /// # type VkResult = i32;
 /// #[dylink(vulkan)]
 /// extern "system" {
-/// 	fn vkCreateInstance(
-/// 		pCreateInfo: *const VkInstanceCreateInfo,
-/// 		pAllocator: *const VkAllocationCallbacks,
-/// 		pInstance: *mut VkInstance,
-/// 	) -> VkResult;
+///     fn vkCreateInstance(
+///         pCreateInfo: *const VkInstanceCreateInfo,
+///         pAllocator: *const VkAllocationCallbacks,
+///         pInstance: *mut VkInstance,
+///     ) -> VkResult;
 /// }
 /// ```
 pub use dylink_macro::dylink;
@@ -86,10 +87,10 @@ compile_error!("Dylink Error: Wasm is unsupported.");
 // These globals are read every time a vulkan function is called for the first time,
 // which occurs through `LazyFn::link`.
 static VK_INSTANCE: sync::RwLock<Lazy<HashSet<vulkan::VkInstance>>> =
-	sync::RwLock::new(Lazy::new(|| HashSet::new()));
+	sync::RwLock::new(Lazy::new(HashSet::new));
 
 static VK_DEVICE: sync::RwLock<Lazy<HashSet<vulkan::VkDevice>>> =
-	sync::RwLock::new(Lazy::new(|| HashSet::new()));
+	sync::RwLock::new(Lazy::new(HashSet::new));
 
 // Used as a placeholder function pointer. This should **NEVER** be called directly,
 // and promptly cast into the correct function pointer type.
