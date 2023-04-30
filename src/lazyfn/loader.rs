@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::{ffi::{self, OsStr}, mem, sync::RwLock, path::Path};
+use std::{ffi::{self, OsStr}, mem, sync::RwLock, path::{Path, PathBuf}};
 
 use crate::{error::*, vulkan, FnPtr, Result};
 
@@ -60,7 +60,7 @@ pub fn system_loader<PL: AsRef<Path>, PF: AsRef<OsStr>>(lib_path: PL, fn_name: P
 		GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 	};
 
-	static DLL_DATA: RwLock<Lazy<HashMap<String, isize>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<PathBuf, isize>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
 	let lib_path_ref = lib_path.as_ref();
@@ -71,7 +71,7 @@ pub fn system_loader<PL: AsRef<Path>, PF: AsRef<OsStr>>(lib_path: PL, fn_name: P
 
 	let read_lock = DLL_DATA.read().unwrap();
 
-	let handle: isize = if let Some(handle) = read_lock.get(path_str) {
+	let handle: isize = if let Some(handle) = read_lock.get(lib_path_ref) {
 		*handle
 	} else {
 		mem::drop(read_lock);
@@ -80,7 +80,7 @@ pub fn system_loader<PL: AsRef<Path>, PF: AsRef<OsStr>>(lib_path: PL, fn_name: P
 			#[cfg(windows)]
 			{
 				use std::os::windows::ffi::OsStrExt;
-				let os_str = std::ffi::OsStr::new(path_str);
+				let os_str = lib_path_ref.as_os_str();
 				let mut wide_str: Vec<u16> = os_str.encode_wide().collect();
 				wide_str.push(0);
 				// miri hates this function, but it works fine.
@@ -91,7 +91,7 @@ pub fn system_loader<PL: AsRef<Path>, PF: AsRef<OsStr>>(lib_path: PL, fn_name: P
 				)
 			}
 			#[cfg(unix)]
-			{
+			{				
 				let c_str = std::ffi::CString::new(path_str).unwrap();
 				let filename = c_str.into_bytes_with_nul();
 				libc::dlopen(
@@ -103,7 +103,7 @@ pub fn system_loader<PL: AsRef<Path>, PF: AsRef<OsStr>>(lib_path: PL, fn_name: P
 		if lib_handle == 0 {
 			return Err(DylinkError::new(Some(path_str.to_owned()), ErrorKind::LibNotFound));
 		} else {
-			DLL_DATA.write().unwrap().insert(path_str.to_owned(), lib_handle);
+			DLL_DATA.write().unwrap().insert(lib_path_ref.to_owned(), lib_handle);
 		}
 		lib_handle
 	};
