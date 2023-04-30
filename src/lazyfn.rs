@@ -1,5 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use std::{cell, ffi::{OsStr, OsString}, mem, sync::{self, atomic::{AtomicPtr, Ordering}}};
+use std::{cell, ffi::{OsStr, OsString}, mem, sync::{self, atomic::{AtomicPtr, Ordering}}, path::Path};
 
 use crate::*;
 
@@ -47,12 +47,11 @@ impl<F: 'static + Copy> LazyFn<F> {
 
 	/// If successful, stores address in current instance and returns a copy of the stored value.
 	pub fn load<P: AsRef<OsStr>>(&self, fn_name: P, link_ty: LinkType) -> Result<F> {
-		let mut str_name: OsString = fn_name.as_ref().to_owned();
-		str_name.push("\0");
-
 		self.once.call_once(|| unsafe {
+			let mut str_name: OsString = fn_name.as_ref().to_owned();
+			str_name.push("\0");
 			let maybe = match link_ty {
-				LinkType::Vulkan => loader::vulkan_loader(str_name),
+				LinkType::Vulkan => loader::vulkan_loader(str_name.to_str().unwrap()),
 				LinkType::System(lib_list) => {
 					let default_error = {
 						let (subject, kind) = if lib_list.len() > 1 {
@@ -64,7 +63,7 @@ impl<F: 'static + Copy> LazyFn<F> {
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
-						match loader::system_loader(lib_name, &str_name) {
+						match loader::system_loader(Path::new(lib_name), &str_name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!

@@ -4,8 +4,7 @@ use std::{ffi::{self, OsStr}, mem, sync::RwLock, path::{Path, PathBuf}};
 
 use crate::{error::*, vulkan, FnPtr, Result};
 
-pub unsafe fn vulkan_loader<P: AsRef<OsStr>>(fn_name: P) -> Result<FnPtr> {
-	let fn_name = fn_name.as_ref().to_str().unwrap();
+pub(crate) unsafe fn vulkan_loader(fn_name: &str) -> Result<FnPtr> {
 	let mut maybe_fn = match fn_name {
 		"vkGetInstanceProcAddr" => Some(mem::transmute::<
 			vulkan::PFN_vkGetInstanceProcAddr,
@@ -51,7 +50,7 @@ pub unsafe fn vulkan_loader<P: AsRef<OsStr>>(fn_name: P) -> Result<FnPtr> {
 }
 
 /// `loader` is a generalization for all other dlls.
-pub fn system_loader<PL: AsRef<Path>, PF: AsRef<OsStr>>(lib_path: PL, fn_name: PF) -> Result<FnPtr> {
+pub(crate) fn system_loader(lib_path: &Path, fn_name: &OsStr) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -63,15 +62,13 @@ pub fn system_loader<PL: AsRef<Path>, PF: AsRef<OsStr>>(lib_path: PL, fn_name: P
 	static DLL_DATA: RwLock<Lazy<HashMap<PathBuf, isize>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
-	let lib_path_ref = lib_path.as_ref();
-	let path_str = lib_path_ref.to_str().unwrap();
-
-	let fn_name_ref = fn_name.as_ref();
-	let fn_str = fn_name_ref.to_str().unwrap();
+	let path_str = lib_path.to_str().unwrap();
+	
+	let fn_str = fn_name.to_str().unwrap();
 
 	let read_lock = DLL_DATA.read().unwrap();
 
-	let handle: isize = if let Some(handle) = read_lock.get(lib_path_ref) {
+	let handle: isize = if let Some(handle) = read_lock.get(lib_path) {
 		*handle
 	} else {
 		mem::drop(read_lock);
@@ -80,7 +77,7 @@ pub fn system_loader<PL: AsRef<Path>, PF: AsRef<OsStr>>(lib_path: PL, fn_name: P
 			#[cfg(windows)]
 			{
 				use std::os::windows::ffi::OsStrExt;
-				let os_str = lib_path_ref.as_os_str();
+				let os_str = lib_path.as_os_str();
 				let mut wide_str: Vec<u16> = os_str.encode_wide().collect();
 				wide_str.push(0);
 				// miri hates this function, but it works fine.
@@ -103,7 +100,7 @@ pub fn system_loader<PL: AsRef<Path>, PF: AsRef<OsStr>>(lib_path: PL, fn_name: P
 		if lib_handle == 0 {
 			return Err(DylinkError::new(Some(path_str.to_owned()), ErrorKind::LibNotFound));
 		} else {
-			DLL_DATA.write().unwrap().insert(lib_path_ref.to_owned(), lib_handle);
+			DLL_DATA.write().unwrap().insert(lib_path.to_owned(), lib_handle);
 		}
 		lib_handle
 	};
