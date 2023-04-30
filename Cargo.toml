@@ -1,6 +1,6 @@
 [package]
 name = "dylink"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Jonathan Thomason"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -11,7 +11,7 @@ repository = "https://github.com/Razordor/dylink.git"
 
 [dependencies]
 once_cell = "1.16"
-dylink_macro = "0.3"
+dylink_macro = "0.4"
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.48"

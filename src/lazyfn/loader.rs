@@ -50,7 +50,7 @@ pub unsafe fn vulkan_loader(fn_name: &'static str) -> Result<FnPtr> {
 }
 
 /// `loader` is a generalization for all other dlls.
-pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Result<FnPtr> {
+pub fn system_loader(lib_name: &'static str, fn_name: &'static str) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -59,7 +59,7 @@ pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Re
 		GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 	};
 
-	static DLL_DATA: RwLock<Lazy<HashMap<&'static ffi::OsStr, isize>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<&'static str, isize>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
 	let read_lock = DLL_DATA.read().unwrap();
@@ -73,7 +73,9 @@ pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Re
 			#[cfg(windows)]
 			{
 				use std::os::windows::ffi::OsStrExt;
-				let wide_str: Vec<u16> = lib_name.encode_wide().collect();
+				let os_str = std::ffi::OsStr::new(lib_name);
+				let mut wide_str: Vec<u16> = os_str.encode_wide().collect();
+				wide_str.push(0);
 				// miri hates this function, but it works fine.
 				LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
@@ -83,15 +85,16 @@ pub fn system_loader(lib_name: &'static ffi::OsStr, fn_name: &'static str) -> Re
 			}
 			#[cfg(unix)]
 			{
-				use std::os::unix::ffi::OsStrExt;
+				let c_str = std::ffi::CString::new(lib_name).unwrap();
+				let filename = c_str.into_bytes_with_nul();
 				libc::dlopen(
-					lib_name.as_bytes().as_ptr() as *const _,
+					filename.as_ptr() as *const _,
 					libc::RTLD_NOW | libc::RTLD_LOCAL,
 				) as isize
 			}
 		};
 		if lib_handle == 0 {
-			return Err(DylinkError::new(lib_name.to_str(), ErrorKind::LibNotFound));
+			return Err(DylinkError::new(Some(lib_name), ErrorKind::LibNotFound));
 		} else {
 			DLL_DATA.write().unwrap().insert(lib_name, lib_handle);
 		}

@@ -10,8 +10,6 @@ mod loader;
 pub enum LinkType {
 	/// Specialization for loading vulkan functions
 	Vulkan,
-	// FIXME: &str isn't intuitive since it requires a null terminator.
-	// 		  This should change to use some other data type or handle the code without null term.
 	/// Generalization for loading functions using system loaders.
 	System(&'static [&'static str]),
 }
@@ -64,7 +62,7 @@ impl<F: 'static + Copy> LazyFn<F> {
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
-						match loader::system_loader(ffi::OsStr::new(lib_name), str_name) {
+						match loader::system_loader(lib_name, str_name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!
