@@ -8,9 +8,9 @@ mod loader;
 /// Determines what library to look up when [LazyFn::load] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType {
-	/// Specialization for loading vulkan functions
+	/// Specifies a specialization for loading vulkan functions using vulkan loaders.
 	Vulkan,
-	/// Generalization for loading functions using system loaders.
+	/// Specifies a generalization for loading functions using native system loaders.
 	System(&'static [&'static str]),
 }
 
