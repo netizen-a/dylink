@@ -43,6 +43,31 @@
 //!     fn my_function();
 //! }
 //! ```
+//! 
+//! # Checking for Libraries
+//! The greatest strength in dynamically linking at run-time is the ability to recover when libraries are missing.
+//! This can even include when all libraries in the configuration predicate mentioned above fails. To handle this
+//! error dylink provides a `strip=true` option that you can use to strip the abstraction and leverage the underlying
+//! static variable's member functions.
+//! ```rust
+//! # use dylink::dylink;
+//! #[dylink(name = "libc.so", strip=true)]
+//! extern "C" {
+//!     fn my_function();
+//! }
+//! 
+//! fn main() {
+//! 	match my_function.try_link() {
+//! 		Ok(function) => unsafe {function()},
+//! 		Err(reason) => println!("{reason}"),
+//! 	}
+//! 	// Although, the abstraction is stripped it can still be used like a normal function.
+//! 	unsafe {
+//! 		my_function();
+//! 	}
+//! }
+//! ```
+
 
 use std::{collections::HashSet, sync};
 

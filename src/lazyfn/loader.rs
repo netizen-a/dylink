@@ -1,8 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use std::{
-	ffi::{self, OsStr},
-	iter, mem,
+	ffi::{self, OsStr, CStr}, mem,
 	path::{Path, PathBuf},
 	sync::RwLock,
 };
@@ -77,11 +76,10 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &OsStr) -> Result<FnPtr> {
 		mem::drop(read_lock);
 
 		let lib_handle = unsafe {
-			#[cfg(windows)]
-			{
+			#[cfg(windows)] {
 				use std::os::windows::ffi::OsStrExt;
 				let os_str = lib_path.as_os_str();
-				let wide_str: Vec<u16> = os_str.encode_wide().chain(iter::once(0u16)).collect();
+				let wide_str: Vec<u16> = os_str.encode_wide().chain(std::iter::once(0u16)).collect();
 				// miri hates this function, but it works fine.
 				LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
@@ -89,20 +87,33 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &OsStr) -> Result<FnPtr> {
 					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 				)
 			}
-			#[cfg(unix)]
-			{
+			#[cfg(unix)] {
 				let c_str = std::ffi::CString::new(path_str).unwrap();
-				let filename = c_str.into_bytes_with_nul();
+				let b_str = c_str.into_bytes_with_nul();
 				libc::dlopen(
-					filename.as_ptr() as *const _,
+					b_str.as_ptr() as *const _,
 					libc::RTLD_NOW | libc::RTLD_LOCAL,
 				) as isize
 			}
 		};
 		if lib_handle == 0 {
+			let err: String = {
+				#[cfg(windows)] {
+					String::new()
+				}
+				#[cfg(unix)] unsafe {
+					let p = libc::dlerror();
+					if !p.is_null() {
+						CStr::from_ptr(p).to_str().unwrap().to_owned()
+					} else {
+						String::new()
+					}
+				}
+			};
+
 			return Err(DylinkError::new(
 				Some(path_str.to_owned()),
-				ErrorKind::LibNotFound,
+				ErrorKind::LibNotLoaded(err),
 			));
 		} else {
 			DLL_DATA

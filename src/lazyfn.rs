@@ -87,9 +87,9 @@ impl<F: 'static + Copy> LazyFn<F> {
 
 					let default_error = {
 						let (subject, kind) = if lib_list.len() > 1 {
-							(None, ErrorKind::ListNotFound)
+							(None, ErrorKind::ListNotLoaded(vec![]))
 						} else {
-							(Some(lib_list[0].to_owned()), ErrorKind::LibNotFound)
+							(Some(lib_list[0].to_owned()), ErrorKind::LibNotLoaded(String::new()))
 						};
 						error::DylinkError::new(subject, kind)
 					};

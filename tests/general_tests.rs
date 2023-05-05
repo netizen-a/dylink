@@ -50,3 +50,23 @@ fn test_win32_lifetimes() {
 	assert_ne!(new_addr, foo as PfnTy);
 	assert_ne!(lazyfn.deref(), old_ref);
 }
+
+#[cfg(unix)]
+#[test]
+fn test_linux_libc() {
+	use std::ffi::c_double;
+	use dylink::dylink;
+	#[dylink(any(name = "libc.so.6", name = "/lib/x86_64-linux-gnu/libc.so", name = "libc.so"))]
+	extern "C" {
+		fn floor(_: c_double) -> c_double;
+	}
+
+	//#[dylink(name = "/lib/x86_64-linux-gnu/libc.so")]
+	//extern {
+	//	fn ceil(_: c_double) -> c_double;
+	//}
+	unsafe {
+		assert!(floor(10.6) == 10.);
+		//assert!(ceil(10.6) == 11.);
+	}
+}

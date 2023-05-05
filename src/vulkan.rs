@@ -42,6 +42,8 @@ unsafe impl Send for VkDevice {}
 // Windows and Linux are fully tested and useable as of this comment.
 // MacOS should theoretically work, but it's untested.
 // This function is in itself an axiom of the vulkan specialization.
+//
+// Do not add `strip` here since loader::lazyfn::vulkan_loader needs it as a function pointer.
 #[cfg_attr(windows, crate::dylink(name = "vulkan-1.dll"))]
 #[cfg_attr(
 	all(unix, not(target_os = "macos")),
