@@ -1,14 +1,14 @@
-use std::sync::atomic::{Ordering, AtomicPtr};
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use std::{ffi, mem};
-use crate::FnPtr;
+
 use crate::lazyfn;
+use crate::{FnPtr, LinkType};
+use std::sync::atomic::Ordering;
+use std::{ffi, mem};
 
 // dylink_macro internally uses dylink as it's root namespace,
 // but since we are in dylink the namespace is actually named `self`.
 // this is just here to resolve the missing namespace issue.
 extern crate self as dylink;
-
 
 // FIXME: when extern types are stablized they must replace the `c_void` variation
 
@@ -39,8 +39,6 @@ pub struct VkDevice(pub(crate) *const ffi::c_void);
 unsafe impl Sync for VkDevice {}
 unsafe impl Send for VkDevice {}
 
-
-
 // Windows and Linux are fully tested and useable as of this comment.
 // MacOS should theoretically work, but it's untested.
 // This function is in itself an axiom of the vulkan specialization.
@@ -65,10 +63,11 @@ extern "system" {
 }
 
 #[allow(non_camel_case_types)]
-pub(crate) type PFN_vkGetDeviceProcAddr = unsafe extern "system" fn(VkDevice, *const ffi::c_char) -> Option<FnPtr>;
+pub(crate) type PFN_vkGetDeviceProcAddr =
+	unsafe extern "system" fn(VkDevice, *const ffi::c_char) -> Option<FnPtr>;
 #[allow(non_camel_case_types)]
-pub(crate) type PFN_vkGetInstanceProcAddr = unsafe extern "system" fn(VkInstance, *const ffi::c_char,) -> Option<FnPtr>;
-
+pub(crate) type PFN_vkGetInstanceProcAddr =
+	unsafe extern "system" fn(VkInstance, *const ffi::c_char) -> Option<FnPtr>;
 
 // vkGetDeviceProcAddr must be implemented manually to avoid recursion
 #[allow(non_snake_case)]
@@ -81,26 +80,36 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 		name: *const ffi::c_char,
 	) -> Option<FnPtr> {
 		DEVICE_PROC_ADDR.once.call_once(|| {
-			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");			
+			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");
 			// check other instances if fails in case one has a higher available version number
 			let fn_ptr = read_lock
 				.iter()
 				.find_map(|instance| {
 					vkGetInstanceProcAddr(
-						*instance, 
-						b"vkGetDeviceProcAddr\0".as_ptr() as *const ffi::c_char
+						*instance,
+						b"vkGetDeviceProcAddr\0".as_ptr() as *const ffi::c_char,
 					)
-				}).unwrap();
+				})
+				.unwrap();
 
 			let addr_ptr = DEVICE_PROC_ADDR.addr.get();
 			addr_ptr.write(Some(mem::transmute_copy(&fn_ptr)));
-			DEVICE_PROC_ADDR.addr_ptr.store(mem::transmute(addr_ptr), Ordering::Relaxed);
+			DEVICE_PROC_ADDR
+				.addr_ptr
+				.store(mem::transmute(addr_ptr), Ordering::Relaxed);
 		});
 		DEVICE_PROC_ADDR(device, name)
 	}
-	
-	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> = lazyfn::LazyFn::new(		
-		AtomicPtr::new(&(initial_fn as PFN_vkGetDeviceProcAddr) as *const PFN_vkGetDeviceProcAddr as *mut PFN_vkGetDeviceProcAddr)
-	);
+
+	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> =
+		lazyfn::LazyFn::new(
+			unsafe {
+				std::ptr::NonNull::new_unchecked(
+					&(initial_fn as PFN_vkGetDeviceProcAddr) as *const _ as *mut _,
+				)
+			},
+			"vkGetDeviceProcAddr",
+			LinkType::System(&[]),
+		);
 	DEVICE_PROC_ADDR(device, name)
 }

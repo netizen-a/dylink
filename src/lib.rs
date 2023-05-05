@@ -36,9 +36,6 @@
 //! # Configuration Predicates
 //! Dylink can also accept predicated disjunctions in an idiomatic manner by making use of the `any` function.
 //! `any()` uses short-circuit logic to check for the existance of shared libraries.
-//!
-//! Note: `any()` only handles the library predicate, and not the function predicate.
-//! This means that if the library is found, but the function is not, a panic will occur.
 //! ```rust
 //! # use dylink::dylink;
 //! #[dylink(any(name = "example_lib.so", name = "example_lib.so.1"))]
