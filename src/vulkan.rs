@@ -95,7 +95,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 				.unwrap();
 
 			let addr_ptr = DEVICE_PROC_ADDR.addr.get();
-			addr_ptr.write(Some(mem::transmute_copy(&fn_ptr)));
+			addr_ptr.write(mem::transmute_copy(&fn_ptr));
 			DEVICE_PROC_ADDR
 				.addr_ptr
 				.store(mem::transmute(addr_ptr), Ordering::Relaxed);

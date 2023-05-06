@@ -35,7 +35,7 @@ pub struct LazyFn<F: 'static + Sync + Send> {
 	pub(crate) addr_ptr: AtomicPtr<F>,
 	// This may look like a large type, but UnsafeCell is transparent, and Option can use NPO,
 	// so when LazyFn is used properly `addr` is only the size of a pointer.
-	pub(crate) addr: cell::UnsafeCell<Option<F>>,
+	pub(crate) addr: cell::UnsafeCell<F>,
 	fn_name: &'static str,
 	link_ty: LinkType,
 }
@@ -56,7 +56,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
 			once: sync::Once::new(),
 			status: cell::RefCell::new(None),
-			addr: cell::UnsafeCell::new(None),
+			addr: cell::UnsafeCell::new(*thunk),
 			fn_name,
 			link_ty,
 		}
@@ -114,7 +114,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 				Ok(addr) => {
 					let addr_ptr = self.addr.get();
 					unsafe {
-						addr_ptr.write(Some(mem::transmute_copy(&addr)));
+						addr_ptr.write(mem::transmute_copy(&addr));
 					}
 					self.addr_ptr.store(addr_ptr as *mut F, Ordering::Release);
 				}
