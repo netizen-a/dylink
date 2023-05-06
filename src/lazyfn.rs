@@ -12,7 +12,7 @@ use crate::*;
 
 mod loader;
 
-/// Determines what library to look up when [LazyFn::load] is called.
+/// Determines what library to look up when [LazyFn::try_link] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType {
 	/// Specifies a specialization for loading vulkan functions using vulkan loaders.

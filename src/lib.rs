@@ -47,11 +47,13 @@
 //! # Checking for Libraries
 //! The greatest strength in dynamically linking at run-time is the ability to recover when libraries are missing.
 //! This can even include when all libraries in the configuration predicate mentioned above fails. To handle this
-//! error dylink provides a `strip=true` option that you can use to strip the abstraction and leverage the underlying
-//! static variable's member functions.
-//! ```no_run
+//! problem dylink provides a `strip` argument that you can use with the macro to strip the abstraction and 
+//! leverage the underlying static variable's member functions.
+//! 
+//! *Note: Stripping the abstraction does not necessarily make it cheaper, because dylink is designed to inline the abstraction for you.*
+//! ```rust
 //! # use dylink::dylink;
-//! #[dylink(name = "libc.so", strip=true)]
+//! #[dylink(name = "example.so", strip=true)]
 //! extern "C" {
 //!     fn my_function();
 //! }
@@ -59,12 +61,25 @@
 //! fn main() {
 //!     match my_function.try_link() {
 //!         Ok(function) => unsafe {function()},
-//!         Err(reason) => panic!("{reason}"),
+//!         Err(reason) => println!("{reason}"),
 //!     }
-//!     // Although, the abstraction is stripped it can still be used like a normal function.
-//!     unsafe {
-//!         my_function();
-//!     }
+//! }
+//! ```
+//! 
+//! The `strip` argument as mentioned above has an unfortunate caveat of not being documentation friendly and cannot be freely
+//! passed around as a function pointer since the function will use the `LazyFn` wrapper, which is the fundemental type of the
+//! dylink crate. Although stripped abstractions cannot be passed around like `fn` pointers they can still be called like one.
+//! However, without explicitly checking if the library exists at any point, it may still panic with an appropriate error 
+//! message if the library is really missing.
+//! ```should_panic
+//! # use dylink::dylink;
+//! #[dylink(name = "missing_library.dll", strip=true)]
+//! extern "C" {
+//!     fn my_function();
+//! }
+//! 
+//! fn main() {
+//!     unsafe { my_function() } // panics since the library is missing
 //! }
 //! ```
 
@@ -100,10 +115,11 @@ pub use vulkan::{VkDevice, VkInstance};
 ///     ) -> VkResult;
 /// }
 /// ```
-pub use dylink_macro::dylink;
+
+pub use dylink_macro::dylink as dylink;
 
 #[doc = include_str!("../README.md")]
-#[cfg(doctest)]
+#[cfg(all(doctest, windows))]
 pub struct ReadmeDoctests;
 
 // I don't know how to implement wasm, so I'll just drop this here...
