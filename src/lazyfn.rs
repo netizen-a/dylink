@@ -26,9 +26,9 @@ pub enum LinkType {
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
 pub struct LazyFn<F: 'static + Sync + Send> {
-	// It's imperative that LazyFn manages once, so that `LazyFn::load` is sound.
+	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
-	// this is here to track the state of the instance during `LazyFn::load`.
+	// this is here to track the state of the instance during `LazyFn::try_link`.
 	status: cell::RefCell<Option<error::DylinkError>>,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
@@ -61,21 +61,9 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 			link_ty,
 		}
 	}
-
-	/// If successful, stores address in current instance and returns a copy of the stored value.
-	#[deprecated(since="0.4.0", note="deprecated in favor of `try_link`, this function will be removed in the next release")]
-	pub fn load<P: AsRef<std::ffi::OsStr>>(
-		&self,
-		fn_name: P,
-    	link_ty: LinkType
-	) -> Result<F> {
-		let _ = fn_name;
-		let _ = link_ty;
-		self.try_link()
-	}
 	
 	/// If successful, stores address in current instance and returns a copy of the stored value.
-	pub fn try_link(&self) -> Result<F> {
+	pub fn try_link(&self) -> Result<&F> {
 		self.once.call_once(|| {
 			let mut str_name: String = self.fn_name.to_owned();
 			str_name.push('\0');
@@ -126,7 +114,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
 		match (*self.status.borrow()).clone() {
-			None => Ok(*self.as_ref()),
+			None => Ok(self.as_ref()),
 			Some(err) => Err(err),
 		}
 	}

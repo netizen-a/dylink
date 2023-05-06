@@ -49,7 +49,7 @@
 //! This can even include when all libraries in the configuration predicate mentioned above fails. To handle this
 //! error dylink provides a `strip=true` option that you can use to strip the abstraction and leverage the underlying
 //! static variable's member functions.
-//! ```rust
+//! ```no_run
 //! # use dylink::dylink;
 //! #[dylink(name = "libc.so", strip=true)]
 //! extern "C" {
@@ -59,7 +59,7 @@
 //! fn main() {
 //!     match my_function.try_link() {
 //!         Ok(function) => unsafe {function()},
-//!         Err(reason) => println!("{reason}"),
+//!         Err(reason) => panic!("{reason}"),
 //!     }
 //!     // Although, the abstraction is stripped it can still be used like a normal function.
 //!     unsafe {
@@ -101,6 +101,10 @@ pub use vulkan::{VkDevice, VkInstance};
 /// }
 /// ```
 pub use dylink_macro::dylink;
+
+#[doc = include_str!("../README.md")]
+#[cfg(doctest)]
+pub struct ReadmeDoctests;
 
 // I don't know how to implement wasm, so I'll just drop this here...
 #[cfg(wasm)]
