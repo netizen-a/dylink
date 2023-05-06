@@ -16,6 +16,7 @@ dylink_macro = {path="../dylink_macro"}
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.48"
 features = ["Win32_Foundation", "Win32_System_LibraryLoader"]
+default-features=false
 
 [target.'cfg(unix)'.dependencies.libc]
 version = "0.2"

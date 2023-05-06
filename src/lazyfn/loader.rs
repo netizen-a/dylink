@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use std::{
-	ffi::{self, OsStr, CStr}, mem,
+	ffi::{self, OsStr}, mem,
 	path::{Path, PathBuf},
 	sync::RwLock,
 };
@@ -44,10 +44,7 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &str) -> Result<FnPtr> {
 			vulkan::VkInstance(std::ptr::null()),
 			fn_name.as_ptr() as *const ffi::c_char,
 		)
-		.ok_or(DylinkError::new(
-			Some(fn_name.to_owned()),
-			ErrorKind::FnNotFound,
-		)),
+		.ok_or(DylinkError::FnNotFound(fn_name.to_owned())),
 	}
 }
 
@@ -96,25 +93,25 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &OsStr) -> Result<FnPtr> {
 				) as isize
 			}
 		};
-		if lib_handle == 0 {
+		if lib_handle == 0 {			
 			let err: String = {
 				#[cfg(windows)] {
-					String::new()
+					std::io::Error::last_os_error().to_string()
 				}
 				#[cfg(unix)] unsafe {
 					let p = libc::dlerror();
 					if !p.is_null() {
-						CStr::from_ptr(p).to_str().unwrap().to_owned()
+						ffi::CStr::from_ptr(p)
+							.to_str()
+							.unwrap()
+							.to_owned()
 					} else {
 						String::new()
 					}
 				}
 			};
 
-			return Err(DylinkError::new(
-				Some(path_str.to_owned()),
-				ErrorKind::LibNotLoaded(err),
-			));
+			return Err(DylinkError::LibNotLoaded(err));
 		} else {
 			DLL_DATA
 				.write()
@@ -138,9 +135,6 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &OsStr) -> Result<FnPtr> {
 	};
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::new(
-			Some(path_str.to_owned()),
-			ErrorKind::FnNotFound,
-		)),
+		None => Err(DylinkError::FnNotFound(path_str.to_owned())),
 	}
 }

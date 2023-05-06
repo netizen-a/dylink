@@ -2,54 +2,34 @@
 
 use std::{error, fmt};
 
-/// An enumeration of the context of the error.
-///
-/// Used with [DylinkError].
-#[derive(Debug, Clone)]
-pub enum ErrorKind {
-	/// Declares the library was found, but the function was not.
-	FnNotFound,
-	/// Declares the library was not found.
-	LibNotLoaded(String),
-	/// Declares all the libraries were not found.
-	ListNotLoaded(Vec<String>),
-}
 
 // TODO: document to use unwind friendly ABI for dealing with panics
 
-/// The error structure dylink uses to define the error status.
+/// The error enumeration dylink uses to define the error status.
 ///
 /// This error structure may propagate from a dylink'd function generated from [dylink](crate::dylink).
 /// You can check if the function panicked through [catch_unwind](std::panic::catch_unwind), however,
 /// many [ABIs](https://doc.rust-lang.org/reference/items/external-blocks.html#abi) are not [UnwindSafe](std::panic::UnwindSafe).
 /// It's ideal not to rely on unwinding unless you know for sure that the ABI you are using can unwind safely like `extern "Rust"`.
 #[derive(Debug, Clone)]
-pub struct DylinkError {
-	subject: Option<String>,
-	pub(crate) kind: ErrorKind,
+pub enum DylinkError {
+	/// Declares the library was loaded, but the function was not.
+	FnNotFound(String),
+	/// Declares the library was not loaded.
+	LibNotLoaded(String),
+	/// Declares all the libraries were not loaded.
+	ListNotLoaded(Vec<String>),
 }
 
 impl error::Error for DylinkError {}
 
-impl DylinkError {
-	#[inline]
-	pub const fn new(subject: Option<String>, kind: ErrorKind) -> Self {
-		Self { subject, kind }
-	}
-}
-
 impl fmt::Display for DylinkError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		let err = match &self.kind {
-			ErrorKind::FnNotFound => match self.subject {
-				Some(ref name) => format!("function `{name}` not found"),
-				None => "function not found".to_owned(),
-			},
-			ErrorKind::LibNotLoaded(e) => match self.subject {
-				Some(ref name) => format!("could not load library `{name}`:{}", e),
-				None => "library not found".to_owned(),
-			},
-			ErrorKind::ListNotLoaded(_) => "libraries not found".to_owned(),
+		let err = match &self {
+			Self::FnNotFound(fn_name) => format!("function `{fn_name}` not found"),
+			Self::LibNotLoaded(err_msg) => format!("could not load library:{err_msg}"),
+			// todo: print all error messages
+			Self::ListNotLoaded(_) => "libraries not loaded".to_owned(),
 		};
 		write!(f, "Dylink Error: {err}")
 	}

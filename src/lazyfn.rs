@@ -86,12 +86,11 @@ impl<F: 'static + Copy> LazyFn<F> {
 					// FIXME: make this branch less painful to look at
 
 					let default_error = {
-						let (subject, kind) = if lib_list.len() > 1 {
-							(None, ErrorKind::ListNotLoaded(vec![]))
+						if lib_list.len() > 1 {
+							error::DylinkError::ListNotLoaded(vec![])
 						} else {
-							(Some(lib_list[0].to_owned()), ErrorKind::LibNotLoaded(String::new()))
-						};
-						error::DylinkError::new(subject, kind)
+							error::DylinkError::LibNotLoaded(String::new())
+						}
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
