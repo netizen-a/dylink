@@ -9,9 +9,12 @@ description = "Run-time dynamic linking utilities."
 repository = "https://github.com/Razordor/dylink.git"
 publish = false
 
+[workspace]
+members = ["dylink_macro"]
+
 [dependencies]
 once_cell = "1.16"
-dylink_macro = {path="../dylink_macro"}
+dylink_macro = {path="./dylink_macro"}
 
 [target.'cfg(windows)'.dependencies.windows-sys]
 version = "0.48"
