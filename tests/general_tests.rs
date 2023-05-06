@@ -5,15 +5,15 @@ fn test_win32_kernel32() {
 	// macro output: static variable
 	#[dylink(name = "Kernel32.dll", strip = true)]
 	extern "stdcall" {
-		fn SetLastError(_: u32);		
+		fn SetLastError(_: u32);
 	}
 
 	// macro output: function
 	#[dylink(name = "Kernel32.dll", strip = false)]
-	extern {
+	extern "C" {
 		fn GetLastError() -> u32;
 	}
-	
+
 	unsafe {
 		// static variable has crappy documentation, but can be use for library induction.
 		match SetLastError.try_link() {
@@ -50,7 +50,6 @@ fn test_win32_lifetimes() {
 	assert_ne!(*new_addr, foo as PfnTy);
 	assert_ne!(lazyfn.deref(), old_ref);
 }
-
 
 //#[cfg(unix)]
 //#[test]

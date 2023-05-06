@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use std::{
-	ffi::{self, OsStr}, mem,
+	ffi, mem,
 	path::{Path, PathBuf},
 	sync::RwLock,
 };
@@ -49,7 +49,7 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &str) -> Result<FnPtr> {
 }
 
 /// `loader` is a generalization for all other dlls.
-pub(crate) fn system_loader(lib_path: &Path, fn_name: &OsStr) -> Result<FnPtr> {
+pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -63,7 +63,7 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &OsStr) -> Result<FnPtr> {
 
 	let path_str = lib_path.to_str().unwrap();
 
-	let fn_str = fn_name.to_str().unwrap();
+	let fn_str = fn_name.as_bytes();
 
 	let read_lock = DLL_DATA.read().unwrap();
 

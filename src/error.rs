@@ -2,9 +2,6 @@
 
 use std::{error, fmt};
 
-
-// TODO: document to use unwind friendly ABI for dealing with panics
-
 /// The error enumeration dylink uses to define the error status.
 ///
 /// This error structure may propagate from a dylink'd function generated from [dylink](crate::dylink).
@@ -13,11 +10,11 @@ use std::{error, fmt};
 /// It's ideal not to rely on unwinding unless you know for sure that the ABI you are using can unwind safely like `extern "Rust"`.
 #[derive(Debug, Clone)]
 pub enum DylinkError {
-	/// Declares the library was loaded, but the function was not.
+	/// The library was loaded, but the function was not.
 	FnNotFound(String),
-	/// Declares the library was not loaded.
+	/// The library was not loaded.
 	LibNotLoaded(String),
-	/// Declares all the libraries were not loaded.
+	/// All the libraries were not loaded.
 	ListNotLoaded(Vec<String>),
 }
 

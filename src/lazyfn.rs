@@ -82,7 +82,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
-						match loader::system_loader(Path::new(lib_name), str_name.as_ref()) {
+						match loader::system_loader(Path::new(lib_name), &str_name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!
