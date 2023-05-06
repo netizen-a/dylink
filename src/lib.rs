@@ -57,14 +57,14 @@
 //! }
 //! 
 //! fn main() {
-//! 	match my_function.try_link() {
-//! 		Ok(function) => unsafe {function()},
-//! 		Err(reason) => println!("{reason}"),
-//! 	}
-//! 	// Although, the abstraction is stripped it can still be used like a normal function.
-//! 	unsafe {
-//! 		my_function();
-//! 	}
+//!     match my_function.try_link() {
+//!         Ok(function) => unsafe {function()},
+//!         Err(reason) => println!("{reason}"),
+//!     }
+//!     // Although, the abstraction is stripped it can still be used like a normal function.
+//!     unsafe {
+//!         my_function();
+//!     }
 //! }
 //! ```
 

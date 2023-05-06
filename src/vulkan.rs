@@ -105,11 +105,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 
 	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> =
 		lazyfn::LazyFn::new(
-			unsafe {
-				std::ptr::NonNull::new_unchecked(
-					&(initial_fn as PFN_vkGetDeviceProcAddr) as *const _ as *mut _,
-				)
-			},
+			&(initial_fn as PFN_vkGetDeviceProcAddr),
 			"vkGetDeviceProcAddr",
 			LinkType::System(&[]),
 		);

@@ -29,7 +29,7 @@ fn test_win32_kernel32() {
 #[test]
 fn test_win32_lifetimes() {
 	use dylink::LazyFn;
-	use std::{ptr::NonNull, ops::Deref};
+	use std::ops::Deref;
 
 	extern "stdcall" fn foo() -> u32 {
 		0
@@ -37,7 +37,7 @@ fn test_win32_lifetimes() {
 	type PfnTy = extern "stdcall" fn() -> u32;
 
 	let lazyfn = LazyFn::<PfnTy>::new(
-		unsafe { NonNull::new_unchecked(&mut (foo as PfnTy)) },
+		&(foo as PfnTy),
 		"SetLastError",
 		dylink::LinkType::System(&["Kernel32.dll"]),
 	);

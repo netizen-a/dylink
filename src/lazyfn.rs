@@ -25,7 +25,7 @@ pub enum LinkType {
 ///
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
-pub struct LazyFn<F: 'static> {
+pub struct LazyFn<F: 'static + Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::load` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::load`.
@@ -40,20 +40,20 @@ pub struct LazyFn<F: 'static> {
 	link_ty: LinkType,
 }
 
-impl<F: 'static + Copy> LazyFn<F> {
+impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
 	#[inline]
 	pub const fn new(
-		thunk: std::ptr::NonNull<F>,
+		thunk: &'static F,
 		fn_name: &'static str,
 		link_ty: LinkType,
 	) -> Self {
 		// In a const context this assert will be optimized out.
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		Self {
-			addr_ptr: AtomicPtr::new(thunk.as_ptr()),
+			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
 			once: sync::Once::new(),
 			status: cell::RefCell::new(None),
 			addr: cell::UnsafeCell::new(None),
@@ -143,10 +143,10 @@ impl<F: 'static + Copy> LazyFn<F> {
 	}
 }
 
-unsafe impl<F: 'static> Send for LazyFn<F> {}
-unsafe impl<F: 'static> Sync for LazyFn<F> {}
+unsafe impl<F: 'static + Sync + Send> Send for LazyFn<F> {}
+unsafe impl<F: 'static + Sync + Send> Sync for LazyFn<F> {}
 
-impl<F: 'static + Copy> std::ops::Deref for LazyFn<F> {
+impl<F: 'static + Copy + Sync + Send> std::ops::Deref for LazyFn<F> {
 	type Target = F;
 
 	fn deref(&self) -> &Self::Target {
