@@ -93,25 +93,8 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
 				) as isize
 			}
 		};
-		if lib_handle == 0 {			
-			let err: String = {
-				#[cfg(windows)] {
-					std::io::Error::last_os_error().to_string()
-				}
-				#[cfg(unix)] unsafe {
-					let p = libc::dlerror();
-					if !p.is_null() {
-						ffi::CStr::from_ptr(p)
-							.to_str()
-							.unwrap()
-							.to_owned()
-					} else {
-						String::new()
-					}
-				}
-			};
-
-			return Err(DylinkError::LibNotLoaded(err));
+		if lib_handle == 0 {
+			return Err(DylinkError::LibNotLoaded(std::io::Error::last_os_error().to_string()));
 		} else {
 			DLL_DATA
 				.write()
