@@ -1,7 +1,8 @@
+use dylink::*;
+
 #[cfg(windows)]
 #[test]
 fn test_win32_kernel32() {
-	use dylink::dylink;
 	// macro output: static variable
 	#[dylink(name = "Kernel32.dll", strip = true)]
 	extern "stdcall" {
@@ -28,7 +29,6 @@ fn test_win32_kernel32() {
 #[cfg(windows)]
 #[test]
 fn test_win32_lifetimes() {
-	use dylink::LazyFn;
 	use std::ffi::CStr;
 	use std::ops::Deref;
 
@@ -50,6 +50,22 @@ fn test_win32_lifetimes() {
 	assert_eq!(*old_ref, foo as PfnTy);
 	assert_ne!(*new_addr, foo as PfnTy);
 	assert_ne!(lazyfn.deref(), old_ref);
+}
+
+#[cfg(windows)]
+#[test]
+fn test_fn_not_found() {
+	#[dylink(name = "Kernel32.dll", strip = true)]
+	extern "C" {
+		fn foo();
+	}
+
+	match foo.try_link() {
+		Ok(_) => (),
+		Err(err) => {
+			println!("{err}")
+		}
+	}
 }
 
 //#[cfg(unix)]

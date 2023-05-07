@@ -152,6 +152,6 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 	};
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::FnNotFound(lib_path.to_owned())),
+		None => Err(DylinkError::FnNotFound(fn_name.to_str().unwrap().to_owned())),
 	}
 }
