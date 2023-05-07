@@ -129,8 +129,7 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 		}
 		#[cfg(unix)]
 		{
-			let addr: *const ffi::c_void = os::unix::dlsym(raw_handle, fn_name.as_ptr().cast());
-			std::mem::transmute(addr)
+			os::unix::dlsym(raw_handle, fn_name.as_ptr().cast())
 		}
 	};
 	match maybe_fn {
