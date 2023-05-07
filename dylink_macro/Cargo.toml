@@ -7,8 +7,7 @@ readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["ffi", "macro", "attribute"]
 description = "Dynamic function loading attribute."
-repository = "https://github.com/Razordor/dylink_macro.git"
-publish = false
+repository = "https://github.com/Razordor/dylink.git"
 
 [lib]
 proc-macro = true
