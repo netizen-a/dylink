@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["ffi"]
 description = "Run-time dynamic linking utilities."
 repository = "https://github.com/Razordor/dylink.git"
-publish = false
+publish = true
 
 [workspace]
 members = ["dylink_macro"]
