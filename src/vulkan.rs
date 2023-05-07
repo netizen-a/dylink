@@ -97,9 +97,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 
 			let addr_ptr = DEVICE_PROC_ADDR.addr.get();
 			addr_ptr.write(mem::transmute_copy(&fn_ptr));
-			DEVICE_PROC_ADDR
-				.addr_ptr
-				.store(addr_ptr, Ordering::Relaxed);
+			DEVICE_PROC_ADDR.addr_ptr.store(addr_ptr, Ordering::Relaxed);
 		});
 		DEVICE_PROC_ADDR(device, name)
 	}
@@ -107,7 +105,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> =
 		lazyfn::LazyFn::new(
 			&(initial_fn as PFN_vkGetDeviceProcAddr),
-			unsafe {CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0")},
+			unsafe { CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") },
 			LinkType::System(&[]),
 		);
 	DEVICE_PROC_ADDR(device, name)

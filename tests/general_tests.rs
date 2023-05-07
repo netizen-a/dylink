@@ -29,8 +29,8 @@ fn test_win32_kernel32() {
 #[test]
 fn test_win32_lifetimes() {
 	use dylink::LazyFn;
-	use std::ops::Deref;
 	use std::ffi::CStr;
+	use std::ops::Deref;
 
 	extern "stdcall" fn foo() -> u32 {
 		0
@@ -39,7 +39,7 @@ fn test_win32_lifetimes() {
 
 	let lazyfn = LazyFn::<PfnTy>::new(
 		&(foo as PfnTy),
-		unsafe {CStr::from_bytes_with_nul_unchecked(b"SetLastError\0")},
+		unsafe { CStr::from_bytes_with_nul_unchecked(b"SetLastError\0") },
 		dylink::LinkType::System(&["Kernel32.dll"]),
 	);
 	// `deref` isn't suppose to be used this way, but if

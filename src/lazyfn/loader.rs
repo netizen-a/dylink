@@ -1,7 +1,8 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use std::{
-	ffi::{self, CStr}, mem,
+	ffi::{self, CStr},
+	mem,
 	sync::RwLock,
 };
 
@@ -46,7 +47,9 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &CStr) -> Result<FnPtr> {
 			vulkan::VkInstance(std::ptr::null()),
 			fn_name.as_ptr() as *const ffi::c_char,
 		)
-		.ok_or(DylinkError::FnNotFound(fn_name.to_str().unwrap().to_owned())),
+		.ok_or(DylinkError::FnNotFound(
+			fn_name.to_str().unwrap().to_owned(),
+		)),
 	}
 }
 
@@ -58,10 +61,12 @@ struct LibHandle(isize);
 
 impl LibHandle {
 	fn is_invalid(&self) -> bool {
-		#[cfg(unix)] {
+		#[cfg(unix)]
+		{
 			self.0.load(Ordering::Acquire).is_null()
 		}
-		#[cfg(windows)] {
+		#[cfg(windows)]
+		{
 			self.0 == 0
 		}
 	}
@@ -70,10 +75,9 @@ impl LibHandle {
 #[cfg(unix)]
 impl Clone for LibHandle {
 	fn clone(&self) -> Self {
-		Self(AtomicPtr::new(self.0.load(Ordering::Acquire)))		
+		Self(AtomicPtr::new(self.0.load(Ordering::Acquire)))
 	}
 }
-
 
 /// `loader` is a generalization for all other dlls.
 pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
@@ -86,7 +90,7 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 	};
 
 	static DLL_DATA: RwLock<Lazy<HashMap<String, LibHandle>>> =
-		RwLock::new(Lazy::new(HashMap::default));	
+		RwLock::new(Lazy::new(HashMap::default));
 
 	let read_lock = DLL_DATA.read().unwrap();
 
@@ -96,8 +100,12 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 		mem::drop(read_lock);
 
 		let lib_handle = unsafe {
-			#[cfg(windows)] {
-				let wide_str: Vec<u16> = lib_path.encode_utf16().chain(std::iter::once(0u16)).collect();
+			#[cfg(windows)]
+			{
+				let wide_str: Vec<u16> = lib_path
+					.encode_utf16()
+					.chain(std::iter::once(0u16))
+					.collect();
 				// miri hates this function, but it works fine.
 				LibHandle(LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
@@ -105,7 +113,8 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 				))
 			}
-			#[cfg(unix)] {
+			#[cfg(unix)]
+			{
 				let c_str = std::ffi::CString::new(lib_path).unwrap();
 				let b_str = c_str.into_bytes_with_nul();
 				LibHandle(AtomicPtr::new(libc::dlopen(
@@ -115,7 +124,9 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 			}
 		};
 		if lib_handle.is_invalid() {
-			return Err(DylinkError::LibNotLoaded(std::io::Error::last_os_error().to_string()));
+			return Err(DylinkError::LibNotLoaded(
+				std::io::Error::last_os_error().to_string(),
+			));
 		} else {
 			DLL_DATA
 				.write()
@@ -132,8 +143,10 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 		}
 		#[cfg(unix)]
 		{
-			let addr: *const libc::c_void =
-				libc::dlsym(handle.0.load(Ordering::Acquire) as *mut libc::c_void, fn_name.as_ptr() as *const _);
+			let addr: *const libc::c_void = libc::dlsym(
+				handle.0.load(Ordering::Acquire) as *mut libc::c_void,
+				fn_name.as_ptr() as *const _,
+			);
 			std::mem::transmute(addr)
 		}
 	};

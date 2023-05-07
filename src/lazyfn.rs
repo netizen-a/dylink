@@ -1,10 +1,12 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use std::{
-	cell, mem,
+	cell,
+	ffi::CStr,
+	mem,
 	sync::{
 		self,
 		atomic::{AtomicPtr, Ordering},
-	}, ffi::CStr,
+	},
 };
 
 use crate::*;
@@ -44,11 +46,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
 	#[inline]
-	pub const fn new(
-		thunk: &'static F,
-		fn_name: &'static CStr,
-		link_ty: LinkType,
-	) -> Self {
+	pub const fn new(thunk: &'static F, fn_name: &'static CStr, link_ty: LinkType) -> Self {
 		// In a const context this assert will be optimized out.
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		Self {
@@ -60,7 +58,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 			link_ty,
 		}
 	}
-	
+
 	/// If successful, stores address in current instance and returns a copy of the stored value.
 	pub fn try_link(&self) -> Result<&F> {
 		self.once.call_once(|| {
