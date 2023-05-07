@@ -6,10 +6,11 @@ use std::{
 	sync::RwLock,
 };
 
-#[cfg(unix)]
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 use crate::{error::*, vulkan, FnPtr, Result};
+
+use super::os;
 
 pub(crate) unsafe fn vulkan_loader(fn_name: &CStr) -> Result<FnPtr> {
 	let mut maybe_fn = match fn_name.to_bytes() {
@@ -53,26 +54,14 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &CStr) -> Result<FnPtr> {
 	}
 }
 
-#[cfg(unix)]
 struct LibHandle(AtomicPtr<ffi::c_void>);
-#[cfg(windows)]
-#[derive(Clone)]
-struct LibHandle(isize);
 
 impl LibHandle {
 	fn is_invalid(&self) -> bool {
-		#[cfg(unix)]
-		{
-			self.0.load(Ordering::Acquire).is_null()
-		}
-		#[cfg(windows)]
-		{
-			self.0 == 0
-		}
+		self.0.load(Ordering::Acquire).is_null()
 	}
 }
 
-#[cfg(unix)]
 impl Clone for LibHandle {
 	fn clone(&self) -> Self {
 		Self(AtomicPtr::new(self.0.load(Ordering::Acquire)))
@@ -84,10 +73,6 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
-	#[cfg(windows)]
-	use windows_sys::Win32::System::LibraryLoader::{
-		GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
-	};
 
 	static DLL_DATA: RwLock<Lazy<HashMap<String, LibHandle>>> =
 		RwLock::new(Lazy::new(HashMap::default));
@@ -107,19 +92,19 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 					.chain(std::iter::once(0u16))
 					.collect();
 				// miri hates this function, but it works fine.
-				LibHandle(LoadLibraryExW(
+				LibHandle(AtomicPtr::new(os::win32::LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
-					0,
-					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
-				))
+					std::ptr::null_mut(),
+					os::win32::LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
+				)))
 			}
 			#[cfg(unix)]
 			{
 				let c_str = std::ffi::CString::new(lib_path).unwrap();
 				let b_str = c_str.into_bytes_with_nul();
-				LibHandle(AtomicPtr::new(libc::dlopen(
-					b_str.as_ptr() as *const _,
-					libc::RTLD_NOW | libc::RTLD_LOCAL,
+				LibHandle(AtomicPtr::new(os::unix::dlopen(
+					b_str.as_ptr().cast(),
+					os::unix::RTLD_NOW | os::unix::RTLD_LOCAL,
 				)))
 			}
 		};
@@ -137,21 +122,21 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 	};
 
 	let maybe_fn: Option<FnPtr> = unsafe {
+		let raw_handle = handle.0.load(Ordering::Acquire);
 		#[cfg(windows)]
 		{
-			GetProcAddress(handle.0, fn_name.as_ptr() as *const _)
+			os::win32::GetProcAddress(raw_handle, fn_name.as_ptr().cast())
 		}
 		#[cfg(unix)]
 		{
-			let addr: *const libc::c_void = libc::dlsym(
-				handle.0.load(Ordering::Acquire) as *mut libc::c_void,
-				fn_name.as_ptr() as *const _,
-			);
+			let addr: *const ffi::c_void = os::unix::dlsym(raw_handle, fn_name.as_ptr().cast());
 			std::mem::transmute(addr)
 		}
 	};
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::FnNotFound(fn_name.to_str().unwrap().to_owned())),
+		None => Err(DylinkError::FnNotFound(
+			fn_name.to_str().unwrap().to_owned(),
+		)),
 	}
 }

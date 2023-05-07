@@ -12,6 +12,7 @@ use std::{
 use crate::*;
 
 mod loader;
+mod os;
 
 /// Determines what library to look up when [LazyFn::try_link] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]

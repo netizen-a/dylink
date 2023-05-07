@@ -82,9 +82,9 @@ fn parse_fn(
 	}
 	// this is sure to obfuscate things, but this is needed here because `strip` screws with call context.
 	let caller_name = if strip {
-		quote!{function}
+		quote! {function}
 	} else {
-		quote!{DYN_FUNC}
+		quote! {DYN_FUNC}
 	};
 	let is_checked = *link_type == LinkType::Vulkan;
 	let call_dyn_func = if is_checked && fn_name.to_string() == "vkCreateInstance" {

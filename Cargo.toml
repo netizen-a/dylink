@@ -18,12 +18,3 @@ once_cell = "1.16"
 [dependencies.dylink_macro]
 version = "0.5.1"
 path="./dylink_macro"
-
-[target.'cfg(windows)'.dependencies.windows-sys]
-version = "0.48"
-features = ["Win32_Foundation", "Win32_System_LibraryLoader"]
-default-features=false
-
-[target.'cfg(unix)'.dependencies.libc]
-version = "0.2"
-default-features = false
