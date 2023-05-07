@@ -1,3 +1,5 @@
+// apparently lacking unix tests...
+#[cfg(windows)]
 use dylink::*;
 
 #[cfg(windows)]

@@ -15,18 +15,18 @@ mod loader;
 
 /// Determines what library to look up when [LazyFn::try_link] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
-pub enum LinkType {
+pub enum LinkType<'a> {
 	/// Specifies a specialization for loading vulkan functions using vulkan loaders.
 	Vulkan,
 	/// Specifies a generalization for loading functions using native system loaders.
-	System(&'static [&'static str]),
+	System(&'a [&'a str]),
 }
 
 /// Fundamental data type of dylink.
 ///
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
-pub struct LazyFn<F: 'static + Sync + Send> {
+pub struct LazyFn<'a, F: 'static + Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
@@ -37,16 +37,16 @@ pub struct LazyFn<F: 'static + Sync + Send> {
 	// This may look like a large type, but UnsafeCell is transparent, and Option can use NPO,
 	// so when LazyFn is used properly `addr` is only the size of a pointer.
 	pub(crate) addr: cell::UnsafeCell<F>,
-	fn_name: &'static CStr,
-	link_ty: LinkType,
+	fn_name: &'a CStr,
+	link_ty: LinkType<'a>,
 }
 
-impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
+impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
 	#[inline]
-	pub const fn new(thunk: &'static F, fn_name: &'static CStr, link_ty: LinkType) -> Self {
+	pub const fn new(thunk: &'a F, fn_name: &'a CStr, link_ty: LinkType<'a>) -> Self {
 		// In a const context this assert will be optimized out.
 		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
 		Self {
@@ -60,7 +60,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 	}
 
 	/// If successful, stores address in current instance and returns a reference of the stored value.
-	pub fn try_link(&self) -> Result<&F> {
+	pub fn try_link(&'a self) -> Result<&'a F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
@@ -126,10 +126,10 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 	}
 }
 
-unsafe impl<F: 'static + Sync + Send> Send for LazyFn<F> {}
-unsafe impl<F: 'static + Sync + Send> Sync for LazyFn<F> {}
+unsafe impl<F: 'static + Sync + Send> Send for LazyFn<'_, F> {}
+unsafe impl<F: 'static + Sync + Send> Sync for LazyFn<'_, F> {}
 
-impl<F: 'static + Copy + Sync + Send> std::ops::Deref for LazyFn<F> {
+impl<F: 'static + Copy + Sync + Send> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
 
 	fn deref(&self) -> &Self::Target {
