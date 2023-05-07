@@ -3,7 +3,7 @@
 use std::{
 	ffi, mem,
 	path::{Path, PathBuf},
-	sync::RwLock,
+	sync::{RwLock, atomic::{AtomicPtr, Ordering}},
 };
 
 use crate::{error::*, vulkan, FnPtr, Result};
@@ -48,6 +48,31 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &str) -> Result<FnPtr> {
 	}
 }
 
+#[cfg(unix)]
+struct LibHandle(AtomicPtr<ffi::c_void>);
+#[cfg(windows)]
+#[derive(Clone)]
+struct LibHandle(isize);
+
+impl LibHandle {
+	fn is_invalid(&self) -> bool {
+		#[cfg(unix)] {
+			self.0.load(Ordering::Acquire).is_null()
+		}
+		#[cfg(windows)] {
+			self.0 == 0
+		}
+	}
+}
+
+#[cfg(unix)]
+impl Clone for LibHandle {
+	fn clone(&self) -> Self {
+		Self(AtomicPtr::new(self.0.load(Ordering::Acquire)))		
+	}
+}
+
+
 /// `loader` is a generalization for all other dlls.
 pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
 	use std::collections::HashMap;
@@ -58,7 +83,7 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
 		GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 	};
 
-	static DLL_DATA: RwLock<Lazy<HashMap<PathBuf, isize>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<PathBuf, LibHandle>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
 	let path_str = lib_path.to_str().unwrap();
@@ -67,8 +92,8 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
 
 	let read_lock = DLL_DATA.read().unwrap();
 
-	let handle: isize = if let Some(handle) = read_lock.get(lib_path) {
-		*handle
+	let handle: LibHandle = if let Some(handle) = read_lock.get(lib_path) {
+		handle.clone()
 	} else {
 		mem::drop(read_lock);
 
@@ -78,28 +103,28 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
 				let os_str = lib_path.as_os_str();
 				let wide_str: Vec<u16> = os_str.encode_wide().chain(std::iter::once(0u16)).collect();
 				// miri hates this function, but it works fine.
-				LoadLibraryExW(
+				LibHandle(LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
 					0,
 					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
-				)
+				))
 			}
 			#[cfg(unix)] {
 				let c_str = std::ffi::CString::new(path_str).unwrap();
 				let b_str = c_str.into_bytes_with_nul();
-				libc::dlopen(
+				LibHandle(AtomicPtr::new(libc::dlopen(
 					b_str.as_ptr() as *const _,
 					libc::RTLD_NOW | libc::RTLD_LOCAL,
-				) as isize
+				)))
 			}
 		};
-		if lib_handle == 0 {
+		if lib_handle.is_invalid() {
 			return Err(DylinkError::LibNotLoaded(std::io::Error::last_os_error().to_string()));
 		} else {
 			DLL_DATA
 				.write()
 				.unwrap()
-				.insert(lib_path.to_owned(), lib_handle);
+				.insert(lib_path.to_owned(), lib_handle.clone());
 		}
 		lib_handle
 	};
@@ -107,12 +132,12 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
 	let maybe_fn: Option<FnPtr> = unsafe {
 		#[cfg(windows)]
 		{
-			GetProcAddress(handle, fn_str.as_ptr() as *const _)
+			GetProcAddress(handle.0, fn_str.as_ptr() as *const _)
 		}
 		#[cfg(unix)]
 		{
 			let addr: *const libc::c_void =
-				libc::dlsym(handle as *mut libc::c_void, fn_str.as_ptr() as *const _);
+				libc::dlsym(handle.0.load(Ordering::Acquire) as *mut libc::c_void, fn_str.as_ptr() as *const _);
 			std::mem::transmute(addr)
 		}
 	};
