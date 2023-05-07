@@ -80,11 +80,17 @@ fn parse_fn(
 			}
 		}
 	}
-	let is_checked = *link_type == LinkType::Vulkan && !cfg!(feature = "no_lifetimes");
+	// this is sure to obfuscate things, but this is needed here because `strip` screws with call context.
+	let caller_name = if strip {
+		quote!{function}
+	} else {
+		quote!{DYN_FUNC}
+	};
+	let is_checked = *link_type == LinkType::Vulkan;
 	let call_dyn_func = if is_checked && fn_name.to_string() == "vkCreateInstance" {
 		let inst_param = &param_list[2];
 		quote! {
-			let result = DYN_FUNC(#(#param_list),*);
+			let result = #caller_name(#(#param_list),*);
 			unsafe {
 				dylink::Global.insert_instance(
 					*std::mem::transmute::<_, *mut dylink::VkInstance>(#inst_param)
@@ -95,7 +101,7 @@ fn parse_fn(
 	} else if is_checked && fn_name.to_string() == "vkDestroyInstance" {
 		let inst_param = &param_list[0];
 		quote! {
-			let result = DYN_FUNC(#(#param_list),*);
+			let result = #caller_name(#(#param_list),*);
 			unsafe {
 				dylink::Global.remove_instance(&std::mem::transmute::<_, dylink::VkInstance>(#inst_param));
 			}
@@ -104,7 +110,7 @@ fn parse_fn(
 	} else if is_checked && fn_name.to_string() == "vkCreateDevice" {
 		let inst_param = &param_list[3];
 		quote! {
-			let result = DYN_FUNC(#(#param_list),*);
+			let result = #caller_name(#(#param_list),*);
 			unsafe {
 				dylink::Global.insert_device(*std::mem::transmute::<_, *mut dylink::VkDevice>(#inst_param));
 			}
@@ -113,14 +119,14 @@ fn parse_fn(
 	} else if is_checked && fn_name.to_string() == "vkDestroyDevice" {
 		let inst_param = &param_list[0];
 		quote! {
-			let result = DYN_FUNC(#(#param_list),*);
+			let result = #caller_name(#(#param_list),*);
 			unsafe {
 				dylink::Global.remove_device(&std::mem::transmute::<_, dylink::VkDevice>(#inst_param));
 			}
 			result
 		}
 	} else {
-		quote!(DYN_FUNC(#(#param_list),*))
+		quote!(#caller_name(#(#param_list),*))
 	};
 
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
@@ -137,7 +143,7 @@ fn parse_fn(
 					unsafe #abi fn initial_fn (#(#param_ty_list),*) #output {
 						use std::ffi::CStr;
 						match #fn_name.try_link() {
-							Ok(function) => {function(#(#param_list),*)},
+							Ok(function) => {#call_dyn_func},
 							Err(err) => panic!("{}", err),
 						}
 					}

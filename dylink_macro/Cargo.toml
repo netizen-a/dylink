@@ -29,4 +29,3 @@ default-features=false
 
 [features]
 warnings = []
-no_lifetimes = []

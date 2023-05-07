@@ -59,7 +59,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 		}
 	}
 
-	/// If successful, stores address in current instance and returns a copy of the stored value.
+	/// If successful, stores address in current instance and returns a reference of the stored value.
 	pub fn try_link(&self) -> Result<&F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {

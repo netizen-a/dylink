@@ -15,7 +15,9 @@
 //!
 //! # Vulkan Specialization
 //! There is also a builtin vulkan loader option in the macro as well, which automatically looks for the shared library where expected.
-//! The appropriate ABI to use with the vulkan loader is `extern "system"`.
+//! The appropriate ABI to use with the vulkan loader is `extern "system"`. Unlike generalized loading, the vulkan specialization loads
+//! functions indirectly through `vkGetInstanceProcAddr`, and when applicable `vkGetDeviceProcAddr`, to retrieve vulkan addresses properly.
+//! The internal copies of the instance and device handles are only stored until destroyed through a dylink generated vulkan function. 
 //! ```rust
 //! use dylink::dylink;
 //!
