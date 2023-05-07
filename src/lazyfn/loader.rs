@@ -2,7 +2,6 @@
 
 use std::{
 	ffi::{self, CStr}, mem,
-	path::{Path, PathBuf},
 	sync::RwLock,
 };
 
@@ -77,7 +76,7 @@ impl Clone for LibHandle {
 
 
 /// `loader` is a generalization for all other dlls.
-pub(crate) fn system_loader(lib_path: &Path, fn_name: &CStr) -> Result<FnPtr> {
+pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -86,12 +85,8 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &CStr) -> Result<FnPtr> {
 		GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 	};
 
-	static DLL_DATA: RwLock<Lazy<HashMap<PathBuf, LibHandle>>> =
-		RwLock::new(Lazy::new(HashMap::default));
-
-	let path_str = lib_path.to_str().unwrap();
-
-	
+	static DLL_DATA: RwLock<Lazy<HashMap<String, LibHandle>>> =
+		RwLock::new(Lazy::new(HashMap::default));	
 
 	let read_lock = DLL_DATA.read().unwrap();
 
@@ -102,9 +97,7 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &CStr) -> Result<FnPtr> {
 
 		let lib_handle = unsafe {
 			#[cfg(windows)] {
-				use std::os::windows::ffi::OsStrExt;
-				let os_str = lib_path.as_os_str();
-				let wide_str: Vec<u16> = os_str.encode_wide().chain(std::iter::once(0u16)).collect();
+				let wide_str: Vec<u16> = lib_path.encode_utf16().chain(std::iter::once(0u16)).collect();
 				// miri hates this function, but it works fine.
 				LibHandle(LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
@@ -113,7 +106,7 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &CStr) -> Result<FnPtr> {
 				))
 			}
 			#[cfg(unix)] {
-				let c_str = std::ffi::CString::new(path_str).unwrap();
+				let c_str = std::ffi::CString::new(lib_path).unwrap();
 				let b_str = c_str.into_bytes_with_nul();
 				LibHandle(AtomicPtr::new(libc::dlopen(
 					b_str.as_ptr() as *const _,
@@ -146,6 +139,6 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &CStr) -> Result<FnPtr> {
 	};
 	match maybe_fn {
 		Some(addr) => Ok(addr),
-		None => Err(DylinkError::FnNotFound(path_str.to_owned())),
+		None => Err(DylinkError::FnNotFound(lib_path.to_owned())),
 	}
 }

@@ -1,7 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use std::{
 	cell, mem,
-	path::Path,
 	sync::{
 		self,
 		atomic::{AtomicPtr, Ordering},
@@ -80,7 +79,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
-						match loader::system_loader(Path::new(lib_name), self.fn_name) {
+						match loader::system_loader(lib_name, self.fn_name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!
