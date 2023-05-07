@@ -36,9 +36,6 @@
 //! # Configuration Predicates
 //! Dylink can also accept predicated disjunctions in an idiomatic manner by making use of the `any` function.
 //! `any()` uses short-circuit logic to check for the existance of shared libraries.
-//!
-//! Note: `any()` only handles the library predicate, and not the function predicate.
-//! This means that if the library is found, but the function is not, a panic will occur.
 //! ```rust
 //! # use dylink::dylink;
 //! #[dylink(any(name = "example_lib.so", name = "example_lib.so.1"))]
@@ -46,6 +43,50 @@
 //!     fn my_function();
 //! }
 //! ```
+//!
+//! # Checking for Libraries
+//! The greatest strength in dynamically linking at run-time is the ability to recover when libraries are missing.
+//! This can even include when all libraries in the configuration predicate mentioned above fails. To handle this
+//! problem dylink provides a `strip` argument that you can use with the macro to strip the abstraction and
+//! leverage the underlying static variable's member functions.
+//!
+//! *Note: Stripping the abstraction does not necessarily make it cheaper, because dylink is designed to inline the abstraction for you.*
+//! ```rust
+//! # use dylink::dylink;
+//! #[dylink(name = "example.so", strip=true)]
+//! extern "C" {
+//!     fn my_function();
+//! }
+//!
+//! fn main() {
+//!     match my_function.try_link() {
+//!         Ok(function) => unsafe {function()},
+//!         Err(reason) => println!("{reason}"),
+//!     }
+//! }
+//! ```
+//!
+//! The `strip` argument as mentioned above has an unfortunate caveat of not being documentation friendly and cannot be freely
+//! passed around as a function pointer since the function will use the `LazyFn` wrapper, which is the fundemental type of the
+//! dylink crate. Although stripped abstractions cannot be passed around like `fn` pointers they can still be called like one.
+//! However, without explicitly checking if the library exists at any point, it may still panic with an appropriate error
+//! message if the library is really missing.
+//! ```should_panic
+//! # use dylink::dylink;
+//! #[dylink(name = "missing_library.dll", strip=true)]
+//! extern "C" {
+//!     fn my_function();
+//! }
+//!
+//! fn main() {
+//!     unsafe { my_function() } // panics since the library is missing
+//! }
+//! ```
+//!
+//! # About Library Unloading
+//! Shared library unloading is extremely cursed, always unsafe, and we don't even try to support it.
+//! Unloading a library means not only are all loaded dylink functions invalidated, but functions loaded from **ALL**
+//! crates in the project are also invalidated, which will immediately lead to segfaults... a lot of them.
 
 use std::{collections::HashSet, sync};
 
@@ -61,24 +102,12 @@ pub use vulkan::{VkDevice, VkInstance};
 
 /// Macro for generating dynamically linked functions procedurally.
 ///
-/// This macro supports all ABI strings that rust natively supports.
-/// # Example
-/// ```rust
-/// # use dylink::dylink;
-/// # type VkInstanceCreateInfo = std::ffi::c_void;
-/// # type VkAllocationCallbacks = std::ffi::c_void;
-/// # type VkInstance = std::ffi::c_void;
-/// # type VkResult = i32;
-/// #[dylink(vulkan)]
-/// extern "system" {
-///     fn vkCreateInstance(
-///         pCreateInfo: *const VkInstanceCreateInfo,
-///         pAllocator: *const VkAllocationCallbacks,
-///         pInstance: *mut VkInstance,
-///     ) -> VkResult;
-/// }
-/// ```
+/// Refer to crate level documentation for more information.
 pub use dylink_macro::dylink;
+
+#[doc = include_str!("../README.md")]
+#[cfg(all(doctest, windows))]
+pub struct ReadmeDoctests;
 
 // I don't know how to implement wasm, so I'll just drop this here...
 #[cfg(wasm)]

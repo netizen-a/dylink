@@ -9,6 +9,9 @@ and `.so` files for unix. When functions are loaded they are evaluated through a
 function from it's respective library. Proceeding calls after initialization have no overhead or additional branching checks,
 as the thunk is replaced by the loaded function.
 
+* Thread-safe API
+* No unloading
+
 ## Supported platforms
 
 Dylink has been implemented for all major platforms, but has only been locally tested on Windows and Linux.
@@ -23,7 +26,7 @@ Add this to your `Cargo.toml`
 
 ```toml
 [dependencies]
-dylink = "0.3"
+dylink = "0.4"
 ```
 
 ## Example
