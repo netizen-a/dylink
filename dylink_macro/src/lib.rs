@@ -151,7 +151,8 @@ fn parse_fn(
                     const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
                     DYN_FUNC_REF
                 },
-                stringify!(#fn_name), dylink::#link_type
+                unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
+                dylink::#link_type
             );
         }
     } else {
@@ -174,7 +175,8 @@ fn parse_fn(
                 : dylink::LazyFn<InstFnPtr>
                 = dylink::LazyFn::new(
                     DYN_FUNC_REF,
-                    stringify!(#fn_name), dylink::#link_type
+                    unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
+                    dylink::#link_type
                 );
 
                 #call_dyn_func

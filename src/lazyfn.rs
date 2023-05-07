@@ -5,7 +5,7 @@ use std::{
 	sync::{
 		self,
 		atomic::{AtomicPtr, Ordering},
-	},
+	}, ffi::CStr,
 };
 
 use crate::*;
@@ -36,7 +36,7 @@ pub struct LazyFn<F: 'static + Sync + Send> {
 	// This may look like a large type, but UnsafeCell is transparent, and Option can use NPO,
 	// so when LazyFn is used properly `addr` is only the size of a pointer.
 	pub(crate) addr: cell::UnsafeCell<F>,
-	fn_name: &'static str,
+	fn_name: &'static CStr,
 	link_ty: LinkType,
 }
 
@@ -47,7 +47,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 	#[inline]
 	pub const fn new(
 		thunk: &'static F,
-		fn_name: &'static str,
+		fn_name: &'static CStr,
 		link_ty: LinkType,
 	) -> Self {
 		// In a const context this assert will be optimized out.
@@ -65,10 +65,8 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 	/// If successful, stores address in current instance and returns a copy of the stored value.
 	pub fn try_link(&self) -> Result<&F> {
 		self.once.call_once(|| {
-			let mut str_name: String = self.fn_name.to_owned();
-			str_name.push('\0');
 			let maybe = match self.link_ty {
-				LinkType::Vulkan => unsafe { loader::vulkan_loader(&str_name) },
+				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
 				LinkType::System(lib_list) => {
 					// why is this branch so painful when I just want to call system_loader?
 					// FIXME: make this branch less painful to look at
@@ -82,7 +80,7 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 					};
 					let mut result = Err(default_error);
 					for lib_name in lib_list {
-						match loader::system_loader(Path::new(lib_name), &str_name) {
+						match loader::system_loader(Path::new(lib_name), self.fn_name) {
 							Ok(addr) => {
 								result = Ok(addr);
 								// success! lib and function retrieved!

@@ -2,6 +2,7 @@
 
 use crate::lazyfn;
 use crate::{FnPtr, LinkType};
+use std::ffi::CStr;
 use std::sync::atomic::Ordering;
 use std::{ffi, mem};
 
@@ -106,7 +107,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> =
 		lazyfn::LazyFn::new(
 			&(initial_fn as PFN_vkGetDeviceProcAddr),
-			"vkGetDeviceProcAddr",
+			unsafe {CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0")},
 			LinkType::System(&[]),
 		);
 	DEVICE_PROC_ADDR(device, name)

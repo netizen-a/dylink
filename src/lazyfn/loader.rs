@@ -1,21 +1,24 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use std::{
-	ffi, mem,
+	ffi::{self, CStr}, mem,
 	path::{Path, PathBuf},
-	sync::{RwLock, atomic::{AtomicPtr, Ordering}},
+	sync::RwLock,
 };
+
+#[cfg(unix)]
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 use crate::{error::*, vulkan, FnPtr, Result};
 
-pub(crate) unsafe fn vulkan_loader(fn_name: &str) -> Result<FnPtr> {
-	let mut maybe_fn = match fn_name {
-		"vkGetInstanceProcAddr" => {
+pub(crate) unsafe fn vulkan_loader(fn_name: &CStr) -> Result<FnPtr> {
+	let mut maybe_fn = match fn_name.to_bytes() {
+		b"vkGetInstanceProcAddr" => {
 			Some(mem::transmute::<vulkan::PFN_vkGetInstanceProcAddr, FnPtr>(
 				vulkan::vkGetInstanceProcAddr,
 			))
 		}
-		"vkGetDeviceProcAddr" => Some(mem::transmute::<vulkan::PFN_vkGetDeviceProcAddr, FnPtr>(
+		b"vkGetDeviceProcAddr" => Some(mem::transmute::<vulkan::PFN_vkGetDeviceProcAddr, FnPtr>(
 			vulkan::vkGetDeviceProcAddr,
 		)),
 		_ => None,
@@ -44,7 +47,7 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &str) -> Result<FnPtr> {
 			vulkan::VkInstance(std::ptr::null()),
 			fn_name.as_ptr() as *const ffi::c_char,
 		)
-		.ok_or(DylinkError::FnNotFound(fn_name.to_owned())),
+		.ok_or(DylinkError::FnNotFound(fn_name.to_str().unwrap().to_owned())),
 	}
 }
 
@@ -74,7 +77,7 @@ impl Clone for LibHandle {
 
 
 /// `loader` is a generalization for all other dlls.
-pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
+pub(crate) fn system_loader(lib_path: &Path, fn_name: &CStr) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
@@ -88,7 +91,7 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
 
 	let path_str = lib_path.to_str().unwrap();
 
-	let fn_str = fn_name.as_bytes();
+	
 
 	let read_lock = DLL_DATA.read().unwrap();
 
@@ -132,12 +135,12 @@ pub(crate) fn system_loader(lib_path: &Path, fn_name: &str) -> Result<FnPtr> {
 	let maybe_fn: Option<FnPtr> = unsafe {
 		#[cfg(windows)]
 		{
-			GetProcAddress(handle.0, fn_str.as_ptr() as *const _)
+			GetProcAddress(handle.0, fn_name.as_ptr() as *const _)
 		}
 		#[cfg(unix)]
 		{
 			let addr: *const libc::c_void =
-				libc::dlsym(handle.0.load(Ordering::Acquire) as *mut libc::c_void, fn_str.as_ptr() as *const _);
+				libc::dlsym(handle.0.load(Ordering::Acquire) as *mut libc::c_void, fn_name.as_ptr() as *const _);
 			std::mem::transmute(addr)
 		}
 	};
