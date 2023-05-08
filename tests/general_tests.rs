@@ -39,10 +39,11 @@ fn test_win32_lifetimes() {
 	}
 	type PfnTy = extern "stdcall" fn() -> u32;
 
-	let lazyfn = LazyFn::<PfnTy>::new(
+	let list = unsafe {[CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")]};
+	let lazyfn: LazyFn::<PfnTy> = LazyFn::<PfnTy>::new(
 		&(foo as PfnTy),
 		unsafe { CStr::from_bytes_with_nul_unchecked(b"SetLastError\0") },
-		dylink::LinkType::System(&["Kernel32.dll"]),
+		dylink::LinkType::System(&list),
 	);
 	// `deref` isn't suppose to be used this way, but if
 	// it is used, this test will check if it's valid.

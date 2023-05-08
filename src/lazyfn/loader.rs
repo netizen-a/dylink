@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use std::{
-	ffi::{self, CStr},
+	ffi::{self, CStr, CString},
 	mem,
 	sync::RwLock,
 };
@@ -69,12 +69,12 @@ impl Clone for LibHandle {
 }
 
 /// `loader` is a generalization for all other dlls.
-pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
+pub(crate) fn system_loader(lib_path: &CStr, fn_name: &CStr) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
 
-	static DLL_DATA: RwLock<Lazy<HashMap<String, LibHandle>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<CString, LibHandle>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
 	let read_lock = DLL_DATA.read().unwrap();
@@ -88,6 +88,7 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 			#[cfg(windows)]
 			{
 				let wide_str: Vec<u16> = lib_path
+					.to_string_lossy()
 					.encode_utf16()
 					.chain(std::iter::once(0u16))
 					.collect();
@@ -100,10 +101,8 @@ pub(crate) fn system_loader(lib_path: &str, fn_name: &CStr) -> Result<FnPtr> {
 			}
 			#[cfg(unix)]
 			{
-				let c_str = std::ffi::CString::new(lib_path).unwrap();
-				let b_str = c_str.into_bytes_with_nul();
 				LibHandle(AtomicPtr::new(os::unix::dlopen(
-					b_str.as_ptr().cast(),
+					lib_path.as_ptr().cast(),
 					os::unix::RTLD_NOW | os::unix::RTLD_LOCAL,
 				)))
 			}

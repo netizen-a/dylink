@@ -20,7 +20,7 @@ pub enum LinkType<'a> {
 	/// Specifies a specialization for loading vulkan functions using vulkan loaders.
 	Vulkan,
 	/// Specifies a generalization for loading functions using native system loaders.
-	System(&'a [&'a str]),
+	System(&'a [&'a CStr]),
 }
 
 /// Fundamental data type of dylink.

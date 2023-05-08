@@ -169,11 +169,13 @@ impl quote::ToTokens for LinkType {
 					tokens.extend(TokenStream2::from_str("LinkType::Vulkan").unwrap_unchecked())
 				}
 				LinkType::System(lib_list) => {
-					let mut lib_array = String::from("&[");
+					let mut lib_array = String::from("&unsafe {{[");
 					for name in lib_list {
-						lib_array.push_str(&format!("\"{name}\","))
+						lib_array.push_str(&format!(
+							"std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{name}\\0\"),"
+						))
 					}
-					lib_array.push(']');
+					lib_array.push_str("]}}");
 					tokens.extend(
 						TokenStream2::from_str(&format!("LinkType::System({lib_array})"))
 							.unwrap_unchecked(),
