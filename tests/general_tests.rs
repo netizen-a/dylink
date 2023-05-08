@@ -64,7 +64,7 @@ fn test_fn_not_found() {
 	}
 
 	match foo.try_link() {
-		Ok(_) => (),
+		Ok(_) => unreachable!(),
 		Err(err) => {
 			println!("{err}")
 		}

@@ -31,10 +31,11 @@ fn test_win32_alloc_instrumentation() {
 		fn GetLastError() -> u32;
 	}
 
-	unsafe {		
-        // value doesn't really matter, but print it anyway.
-        let e = GetLastError();
-        let n = GLOBAL.0.load(Ordering::Acquire);
-        println!("GetLastError={e}\nallocations={n}");
+    // factor in any allocs that aren't mine, take the difference and print it.
+	unsafe {
+        let test_allocs = GLOBAL.0.load(Ordering::Acquire);
+        let _ = GetLastError();        
+        let dylink_allocs = GLOBAL.0.load(Ordering::Acquire) - test_allocs;
+        println!("dylink allocations={dylink_allocs}");
 	}
 }
