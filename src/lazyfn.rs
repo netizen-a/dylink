@@ -71,7 +71,7 @@ impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
 
 					let default_error = {
 						if lib_list.len() > 1 {
-							error::DylinkError::ListNotLoaded(vec![])
+							error::DylinkError::ListNotLoaded(Vec::new())
 						} else {
 							error::DylinkError::LibNotLoaded(String::new())
 						}
