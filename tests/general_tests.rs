@@ -71,17 +71,31 @@ fn test_fn_not_found() {
 	}
 }
 
-//#[cfg(unix)]
-//#[test]
-//fn test_linux_libc() {
-//	use std::ffi::c_double;
-//	use dylink::dylink;
-//	#[dylink(any(name = "libc.so.6", name = "/lib/x86_64-linux-gnu/libc.so", name = "libc.so"))]
-//	extern "C" {
-//		fn floor(_: c_double) -> c_double;
-//	}
-//
-//	unsafe {
-//		assert!(floor(10.6) == 10.);
-//	}
-//}
+#[cfg(target_os = "linux")]
+#[test]
+fn test_linux_x11() {
+	use std::ffi::{c_char, CStr};
+	use dylink::*;
+
+	extern "C" {
+		fn dlerror() -> *const c_char;
+	}
+
+	#[dylink(name = "libX11.so.6", strip=true)]
+	extern "C" {
+		fn foo();
+	}
+
+	unsafe {
+		match foo.try_link() {
+			Ok(func) => func(),
+			Err(DylinkError::FnNotFound(_)) => {
+				println!("library was found and successfully linked. dummy function `foo` was not loaded as expected")
+			}
+			Err(_) => {
+				let c_str = CStr::from_ptr(dlerror());
+				panic!("{}", c_str.to_string_lossy());
+			}
+		}		
+	}
+}
