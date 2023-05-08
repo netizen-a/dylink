@@ -1,16 +1,20 @@
 # Dylink
 
-![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink)
+![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink)
 
-## Overview
+
 
 Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries such as `.dll` files for windows
 and `.so` files for unix. When functions are loaded they are evaluated through a thunk for first time calls, which loads the
 function from it's respective library. Proceeding calls after initialization have no overhead or additional branching checks,
 as the thunk is replaced by the loaded function.
 
-* Thread-safe API
-* No unloading
+----
+
+Related links:
+
+* [API Documentation](https://docs.rs/dylink)
+* [Release notes](https://github.com/Razordor/dylink/releases)
 
 ## Supported platforms
 
@@ -31,7 +35,8 @@ dylink = "0.5"
 
 ## Example
 
-Below is a basic working example on how to use the macro. For windows, the `.dll` file extension is *optional*, but still recommended.
+Below is a basic working example on how to use the macro on windows.
+For windows, the `.dll` file extension is *optional*, but still recommended.
 
 ```rust
 use dylink::dylink;
@@ -45,15 +50,9 @@ extern "stdcall" {
 fn main() {
    unsafe {
       SetLastError(52);
-      println!("{}", GetLastError());
+      assert_eq!(52, GetLastError());
    }
 }
-```
-
-Output:
-
-```text
-52
 ```
 
 ### License
