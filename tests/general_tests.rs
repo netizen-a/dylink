@@ -39,8 +39,8 @@ fn test_win32_lifetimes() {
 	}
 	type PfnTy = extern "stdcall" fn() -> u32;
 
-	let list = unsafe {[CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")]};
-	let lazyfn: LazyFn::<PfnTy> = LazyFn::<PfnTy>::new(
+	let list = unsafe { [CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")] };
+	let lazyfn: LazyFn<PfnTy> = LazyFn::<PfnTy>::new(
 		&(foo as PfnTy),
 		unsafe { CStr::from_bytes_with_nul_unchecked(b"SetLastError\0") },
 		dylink::LinkType::System(&list),
@@ -74,14 +74,14 @@ fn test_fn_not_found() {
 #[cfg(target_os = "linux")]
 #[test]
 fn test_linux_x11() {
-	use std::ffi::{c_char, CStr};
 	use dylink::*;
+	use std::ffi::{c_char, CStr};
 
 	extern "C" {
 		fn dlerror() -> *const c_char;
 	}
 
-	#[dylink(name = "libX11.so.6", strip=true)]
+	#[dylink(name = "libX11.so.6", strip = true)]
 	extern "C" {
 		fn foo();
 	}
@@ -96,6 +96,29 @@ fn test_linux_x11() {
 				let c_str = CStr::from_ptr(dlerror());
 				panic!("{}", c_str.to_string_lossy());
 			}
-		}		
+		}
+	}
+}
+
+#[test]
+#[should_panic]
+fn test_multiple_lib_panic() {
+	use dylink::*;
+
+	#[dylink(
+		any(name = "test_lib0", name = "test_lib1", name = "test_lib2"),
+		strip = true
+	)]
+	extern "C" {
+		fn foo();
+	}
+
+	unsafe {
+		match foo.try_link() {
+			Ok(func) => func(),
+			Err(e) => {
+				panic!("{e}");
+			}
+		}
 	}
 }

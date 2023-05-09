@@ -31,12 +31,12 @@ pub struct LazyFn<'a, F: 'static + Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
-	status: cell::RefCell<Option<error::DylinkError>>,	
+	status: cell::RefCell<Option<error::DylinkError>>,
 	// this exists so that `F` is considered thread-safe
 	pub(crate) addr_ptr: AtomicPtr<F>,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
-	// The atomic pointer will always point to this	
+	// The atomic pointer will always point to this
 	pub(crate) addr: cell::UnsafeCell<F>,
 	fn_name: &'a CStr,
 	link_ty: LinkType<'a>,
@@ -66,31 +66,24 @@ impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
 				LinkType::System(lib_list) => {
-					// why is this branch so painful when I just want to call system_loader?
-					// FIXME: make this branch less painful to look at
-
-					let default_error = {
-						if lib_list.len() > 1 {
-							error::DylinkError::ListNotLoaded(Vec::new())
-						} else {
-							error::DylinkError::LibNotLoaded(String::new())
-						}
-					};
-					let mut result = Err(default_error);
-					for lib_name in lib_list {
-						match loader::system_loader(lib_name, self.fn_name) {
-							Ok(addr) => {
-								result = Ok(addr);
-								// success! lib and function retrieved!
-								break;
+					let mut errors = vec![];
+					lib_list
+						.iter()
+						.find_map(|lib| {
+							loader::system_loader(lib, self.fn_name)
+								.or_else(|e| {
+									errors.push(e);
+									Err(())
+								})
+								.ok()
+						})
+						.ok_or_else(|| {
+							let mut err = vec![];
+							for e in errors {
+								err.push(e.to_string());
 							}
-							Err(err) => {
-								// lib detected, but function failed to load
-								result = Err(err);
-							}
-						}
-					}
-					result
+							DylinkError::ListNotLoaded(err)
+						})
 				}
 			};
 

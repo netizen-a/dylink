@@ -109,7 +109,7 @@ pub(crate) fn system_loader(lib_path: &CStr, fn_name: &CStr) -> Result<FnPtr> {
 		};
 		if lib_handle.is_invalid() {
 			return Err(DylinkError::LibNotLoaded(
-				String::from("library failed to load")
+				lib_path.to_string_lossy().into_owned(),
 			));
 		} else {
 			DLL_DATA

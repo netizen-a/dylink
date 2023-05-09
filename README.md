@@ -1,6 +1,6 @@
 # Dylink
 
-![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink) ![Shields.io](https://img.shields.io/badge/unsafe-yes-red)
+![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink) ![unsafe:yes](https://img.shields.io/badge/unsafe-yes-red)
 
 Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries such as `.dll` files for windows
 and `.so` files for unix. When functions are loaded they are evaluated through a thunk for first time calls, which loads the

@@ -22,9 +22,15 @@ impl fmt::Display for DylinkError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		let err = match &self {
 			Self::FnNotFound(fn_name) => format!("function `{fn_name}` not found"),
-			Self::LibNotLoaded(err_msg) => format!("could not load library:{err_msg}"),
-			// todo: print all error messages
-			Self::ListNotLoaded(_) => "libraries not loaded".to_owned(),
+			Self::LibNotLoaded(lib_name) => format!("library `{lib_name}` could not be loaded"),
+			Self::ListNotLoaded(msgs) => {
+				let mut message = String::new();
+				for m in msgs.iter() {
+					message.push_str(&format!("{m}\n"));
+				}
+				// This makes the formatting slightly less recursive looking.
+				return write!(f, "Dylink Error(s):\n{message}");
+			}
 		};
 		write!(f, "Dylink Error: {err}")
 	}
