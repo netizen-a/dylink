@@ -109,7 +109,7 @@ pub(crate) fn system_loader(lib_path: &CStr, fn_name: &CStr) -> Result<FnPtr> {
 		};
 		if lib_handle.is_invalid() {
 			return Err(DylinkError::LibNotLoaded(
-				std::io::Error::last_os_error().to_string(),
+				String::from("library failed to load")
 			));
 		} else {
 			DLL_DATA

@@ -5,6 +5,7 @@ use std::{error, fmt};
 /// The error enumeration dylink uses to define the error status.
 ///
 /// This error structure may propagate from a dylink'd function generated from [dylink](crate::dylink).
+#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum DylinkError {
 	/// The library was loaded, but the function was not.

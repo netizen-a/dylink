@@ -31,12 +31,12 @@ pub struct LazyFn<'a, F: 'static + Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
-	status: cell::RefCell<Option<error::DylinkError>>,
+	status: cell::RefCell<Option<error::DylinkError>>,	
+	// this exists so that `F` is considered thread-safe
+	pub(crate) addr_ptr: AtomicPtr<F>,
 	// The function to be called.
 	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
-	pub(crate) addr_ptr: AtomicPtr<F>,
-	// This may look like a large type, but UnsafeCell is transparent, and Option can use NPO,
-	// so when LazyFn is used properly `addr` is only the size of a pointer.
+	// The atomic pointer will always point to this	
 	pub(crate) addr: cell::UnsafeCell<F>,
 	fn_name: &'a CStr,
 	link_ty: LinkType<'a>,
@@ -115,12 +115,11 @@ impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
 		}
 	}
 
-	// moved to private since loader should be used instead.
 	#[inline]
 	fn as_ref(&self) -> &F {
 		unsafe {
 			self.addr_ptr
-				.load(Ordering::Acquire)
+				.load(Ordering::Relaxed)
 				.as_ref()
 				.unwrap_unchecked()
 		}
