@@ -1,20 +1,18 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use alloc::ffi::CString;
-use core::{
-	ffi, mem,
-	sync::atomic::{AtomicPtr, Ordering},
+use std::{
+	ffi::{self, CStr, CString},
+	mem,
+	sync::RwLock,
 };
-use std::collections::HashMap;
-use std::sync::RwLock;
 
-use once_cell::sync::Lazy;
+use std::sync::atomic::{AtomicPtr, Ordering};
 
 use crate::{error::*, vulkan, FnPtr, Result};
 
 use super::os;
 
-pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> Result<FnPtr> {
+pub(crate) unsafe fn vulkan_loader(fn_name: &CStr) -> Result<FnPtr> {
 	let mut maybe_fn = match fn_name.to_bytes() {
 		b"vkGetInstanceProcAddr" => {
 			Some(mem::transmute::<vulkan::PFN_vkGetInstanceProcAddr, FnPtr>(
@@ -71,7 +69,11 @@ impl Clone for LibHandle {
 }
 
 /// `loader` is a generalization for all other dlls.
-pub(crate) fn system_loader(lib_path: &ffi::CStr, fn_name: &ffi::CStr) -> Result<FnPtr> {
+pub(crate) fn system_loader(lib_path: &CStr, fn_name: &CStr) -> Result<FnPtr> {
+	use std::collections::HashMap;
+
+	use once_cell::sync::Lazy;
+
 	static DLL_DATA: RwLock<Lazy<HashMap<CString, LibHandle>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
@@ -88,12 +90,12 @@ pub(crate) fn system_loader(lib_path: &ffi::CStr, fn_name: &ffi::CStr) -> Result
 				let wide_str: Vec<u16> = lib_path
 					.to_string_lossy()
 					.encode_utf16()
-					.chain(core::iter::once(0u16))
+					.chain(std::iter::once(0u16))
 					.collect();
 				// miri hates this function, but it works fine.
 				LibHandle(AtomicPtr::new(os::win32::LoadLibraryExW(
 					wide_str.as_ptr() as *const _,
-					core::ptr::null_mut(),
+					std::ptr::null_mut(),
 					os::win32::LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 				)))
 			}

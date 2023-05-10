@@ -1,8 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-//not yet no_std compatible
-//#![no_std]
-
 //! This macro is designed to make loading functions from `.dll`s, and `.so` files easy and convenient.
 //! `dylink` can make use of the configuration predicate `any`, which can be used to fallback to alternative shared libraries as needed.
 //!
@@ -100,8 +97,6 @@ use once_cell::sync::Lazy;
 mod error;
 mod lazyfn;
 mod vulkan;
-
-extern crate alloc;
 
 pub use error::*;
 pub use lazyfn::*;
