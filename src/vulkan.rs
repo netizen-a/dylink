@@ -82,7 +82,15 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 		device: VkDevice,
 		name: *const ffi::c_char,
 	) -> Option<FnPtr> {
-		DEVICE_PROC_ADDR.once.call_once(|| {
+		//lock spinlock
+		while DEVICE_PROC_ADDR.state.swap(
+			DEVICE_PROC_ADDR.is_init.load(Ordering::Acquire),
+			Ordering::SeqCst,
+		) {
+			core::hint::spin_loop()
+		}
+
+		if DEVICE_PROC_ADDR.is_init.load(Ordering::Acquire) {
 			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");
 			// check other instances if fails in case one has a higher available version number
 			let fn_ptr = read_lock
@@ -98,7 +106,9 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 			let addr_ptr = DEVICE_PROC_ADDR.addr.get();
 			addr_ptr.write(mem::transmute_copy(&fn_ptr));
 			DEVICE_PROC_ADDR.addr_ptr.store(addr_ptr, Ordering::Relaxed);
-		});
+			// unlock spinlock
+			DEVICE_PROC_ADDR.is_init.store(false, Ordering::Release);
+		}
 		DEVICE_PROC_ADDR(device, name)
 	}
 

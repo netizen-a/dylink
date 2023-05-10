@@ -93,7 +93,7 @@ fn parse_fn(
 			let result = #caller_name(#(#param_list),*);
 			unsafe {
 				dylink::Global.insert_instance(
-					*std::mem::transmute::<_, *mut dylink::VkInstance>(#inst_param)
+					*core::mem::transmute::<_, *mut dylink::VkInstance>(#inst_param)
 				);
 			}
 			result
@@ -103,7 +103,7 @@ fn parse_fn(
 		quote! {
 			let result = #caller_name(#(#param_list),*);
 			unsafe {
-				dylink::Global.remove_instance(&std::mem::transmute::<_, dylink::VkInstance>(#inst_param));
+				dylink::Global.remove_instance(&core::mem::transmute::<_, dylink::VkInstance>(#inst_param));
 			}
 			result
 		}
@@ -112,7 +112,7 @@ fn parse_fn(
 		quote! {
 			let result = #caller_name(#(#param_list),*);
 			unsafe {
-				dylink::Global.insert_device(*std::mem::transmute::<_, *mut dylink::VkDevice>(#inst_param));
+				dylink::Global.insert_device(*core::mem::transmute::<_, *mut dylink::VkDevice>(#inst_param));
 			}
 			result
 		}
@@ -121,7 +121,7 @@ fn parse_fn(
 		quote! {
 			let result = #caller_name(#(#param_list),*);
 			unsafe {
-				dylink::Global.remove_device(&std::mem::transmute::<_, dylink::VkDevice>(#inst_param));
+				dylink::Global.remove_device(&core::mem::transmute::<_, dylink::VkDevice>(#inst_param));
 			}
 			result
 		}
@@ -141,7 +141,7 @@ fn parse_fn(
 				{
 					type InstFnPtr = unsafe #abi fn (#params_default) #output;
 					unsafe #abi fn initial_fn (#(#param_ty_list),*) #output {
-						use std::ffi::CStr;
+						use core::ffi::CStr;
 						match #fn_name.try_link() {
 							Ok(function) => {#call_dyn_func},
 							Err(err) => panic!("{}", err),
@@ -150,7 +150,7 @@ fn parse_fn(
 					const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
 					DYN_FUNC_REF
 				},
-				unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
+				unsafe {core::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
 				dylink::#link_type
 			);
 		}
@@ -163,7 +163,7 @@ fn parse_fn(
 				// InstFnPtr: instance function pointer type
 				type InstFnPtr = #abi fn (#params_default) #output;
 				#abi fn initial_fn (#(#param_ty_list),*) #output {
-					use std::ffi::CStr;
+					use core::ffi::CStr;
 					match DYN_FUNC.try_link() {
 						Ok(function) => {function(#(#param_list),*)},
 						Err(err) => panic!("{}", err),
@@ -174,7 +174,7 @@ fn parse_fn(
 				: dylink::LazyFn<InstFnPtr>
 				= dylink::LazyFn::new(
 					DYN_FUNC_REF,
-					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
+					unsafe {core::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
 					dylink::#link_type
 				);
 
