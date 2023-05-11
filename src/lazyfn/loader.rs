@@ -6,11 +6,11 @@ use std::{
 	sync::RwLock,
 };
 
-use std::sync::atomic::{AtomicPtr, Ordering};
+//use std::sync::atomic::{AtomicPtr, Ordering};
 
 use crate::{error::*, vulkan, FnPtr, Result};
 
-use super::os;
+//use super::os;
 
 pub(crate) unsafe fn vulkan_loader(fn_name: &CStr) -> Result<FnPtr> {
 	let mut maybe_fn = match fn_name.to_bytes() {
@@ -54,83 +54,41 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &CStr) -> Result<FnPtr> {
 	}
 }
 
-struct LibHandle(AtomicPtr<ffi::c_void>);
-
-impl LibHandle {
-	fn is_invalid(&self) -> bool {
-		self.0.load(Ordering::Acquire).is_null()
-	}
-}
-
-impl Clone for LibHandle {
-	fn clone(&self) -> Self {
-		Self(AtomicPtr::new(self.0.load(Ordering::Acquire)))
-	}
-}
-
 /// `loader` is a generalization for all other dlls.
-pub(crate) fn system_loader(lib_path: &CStr, fn_name: &CStr) -> Result<FnPtr> {
+pub(crate) fn general_loader<L: crate::RTLinker + 'static>(
+	lib_name: &CStr,
+	fn_name: &CStr,
+) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
 
-	static DLL_DATA: RwLock<Lazy<HashMap<CString, LibHandle>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<CString, super::LibHandle>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
-	let read_lock = DLL_DATA.read().unwrap();
+	// somehow rust is smart enough to infer that maybe_fn is assigned to only once after branching.
+	let maybe_fn;
 
-	let handle: LibHandle = if let Some(handle) = read_lock.get(lib_path) {
-		handle.clone()
+	let read_lock = DLL_DATA.read().unwrap();
+	if let Some(handle) = read_lock.get(lib_name) {
+		maybe_fn = L::load_sym(&handle, fn_name);
 	} else {
 		mem::drop(read_lock);
 
-		let lib_handle = unsafe {
-			#[cfg(windows)]
-			{
-				let wide_str: Vec<u16> = lib_path
-					.to_string_lossy()
-					.encode_utf16()
-					.chain(std::iter::once(0u16))
-					.collect();
-				// miri hates this function, but it works fine.
-				LibHandle(AtomicPtr::new(os::win32::LoadLibraryExW(
-					wide_str.as_ptr() as *const _,
-					std::ptr::null_mut(),
-					os::win32::LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
-				)))
-			}
-			#[cfg(unix)]
-			{
-				LibHandle(AtomicPtr::new(os::unix::dlopen(
-					lib_path.as_ptr().cast(),
-					os::unix::RTLD_NOW | os::unix::RTLD_LOCAL,
-				)))
-			}
-		};
+		let lib_handle = L::load_lib(lib_name);
+
 		if lib_handle.is_invalid() {
 			return Err(DylinkError::LibNotLoaded(
-				lib_path.to_string_lossy().into_owned(),
+				lib_name.to_string_lossy().into_owned(),
 			));
 		} else {
+			maybe_fn = L::load_sym(&lib_handle, fn_name);
 			DLL_DATA
 				.write()
 				.unwrap()
-				.insert(lib_path.to_owned(), lib_handle.clone());
+				.insert(lib_name.to_owned(), lib_handle);
 		}
-		lib_handle
-	};
-
-	let maybe_fn: Option<FnPtr> = unsafe {
-		let raw_handle = handle.0.load(Ordering::Acquire);
-		#[cfg(windows)]
-		{
-			os::win32::GetProcAddress(raw_handle, fn_name.as_ptr().cast())
-		}
-		#[cfg(unix)]
-		{
-			os::unix::dlsym(raw_handle, fn_name.as_ptr().cast())
-		}
-	};
+	}
 	match maybe_fn {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::FnNotFound(

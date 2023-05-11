@@ -6,7 +6,7 @@ edition = "2021"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["ffi", "macro", "attribute"]
-description = "Run-time dynamic linking attribute"
+description = "Run-time dynamic linking loader attribute"
 repository = "https://github.com/Razordor/dylink.git"
 publish = false
 
@@ -23,9 +23,11 @@ default-features=false
 
 [dependencies.syn]
 version = "2.0"
-features = ["full", "parsing", "printing" ]
+features = ["full", "parsing", "printing"]
 default-features=false
 
 
-[features]
-warnings = []
+#[features]
+# I'd prefer for this to be default, but it needs to be disabled 
+# when the main crate also disables it.
+#std = []

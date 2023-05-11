@@ -188,3 +188,8 @@ impl Global {
 		write_lock.remove(device)
 	}
 }
+
+pub(crate) trait RTLinker {
+	fn load_lib(lib_name: &std::ffi::CStr) -> crate::lazyfn::LibHandle;
+	fn load_sym(lib_handle: &crate::lazyfn::LibHandle, fn_name: &std::ffi::CStr) -> Option<FnPtr>;
+}

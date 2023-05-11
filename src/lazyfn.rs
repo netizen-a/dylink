@@ -12,7 +12,26 @@ use std::{
 use crate::*;
 
 mod loader;
+
+#[cfg_attr(windows, path = "lazyfn/win32.rs")]
+#[cfg_attr(unix, path = "lazyfn/unix.rs")]
 mod os;
+
+// This should never be mutated.
+#[repr(transparent)]
+pub(crate) struct LibHandle(pub *mut std::ffi::c_void);
+unsafe impl Send for LibHandle {}
+unsafe impl Sync for LibHandle {}
+
+impl LibHandle {
+	#[inline]
+	fn is_invalid(&self) -> bool {
+		self.0.is_null()
+	}
+}
+
+
+struct DefaultLinker;
 
 /// Determines what library to look up when [LazyFn::try_link] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
@@ -27,7 +46,7 @@ pub enum LinkType<'a> {
 ///
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
-pub struct LazyFn<'a, F: 'static + Sync + Send> {
+pub struct LazyFn<'a, F: 'a + Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
@@ -59,9 +78,13 @@ impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
 			link_ty,
 		}
 	}
-
+	//#[cfg(feature="std")]
 	/// If successful, stores address in current instance and returns a reference of the stored value.
 	pub fn try_link(&'a self) -> Result<&'a F> {
+		self.try_with_linker::<DefaultLinker>()
+	}
+
+	fn try_with_linker<L: crate::RTLinker + 'static>(&'a self) -> Result<&'a F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
@@ -70,7 +93,7 @@ impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
 					lib_list
 						.iter()
 						.find_map(|lib| {
-							loader::system_loader(lib, self.fn_name)
+							loader::general_loader::<L>(lib, self.fn_name)
 								.or_else(|e| {
 									errors.push(e);
 									Err(())
