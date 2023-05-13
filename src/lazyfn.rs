@@ -32,6 +32,7 @@ pub enum LinkType<'a> {
 ///
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// The provided member functions can be used from the generated macro when `strip=true` is enabled.
+#[derive(Debug)]
 pub struct LazyFn<'a, F: Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
@@ -135,19 +136,25 @@ impl<F: Sync + Send> LazyFn<'_, F> {
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
 		match (*self.status.borrow()).clone() {
-			None => Ok(self.as_ref()),
+			None => Ok(self.load(Ordering::Acquire)),
 			Some(err) => Err(err),
 		}
 	}
 
 	#[inline]
-	fn as_ref(&self) -> &F {
+	fn load(&self, order: Ordering) -> &F {
 		unsafe {
 			self.addr_ptr
-				.load(Ordering::Relaxed)
+				.load(order)
 				.as_ref()
 				.unwrap_unchecked()
 		}
+	}
+	/// Consumes `LazyFn` and returns the contained value.
+	/// 
+	/// This is safe because passing self by value guarantees that no other threads are concurrently accessing `LazyFn`.
+	pub fn into_inner(self) -> F {
+		self.addr.into_inner()
 	}
 }
 
@@ -157,6 +164,6 @@ impl<F: Sync + Send> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
 	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {
-		self.as_ref()
+		self.load(Ordering::Relaxed)
 	}
 }
