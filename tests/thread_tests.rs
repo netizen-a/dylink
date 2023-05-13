@@ -1,6 +1,7 @@
 #[cfg(windows)]
 use dylink::*;
 
+// This isn't meant to be an all encompassing test, but just mere proof of concept.
 #[cfg(windows)]
 #[test]
 fn test_win32_scope() {
