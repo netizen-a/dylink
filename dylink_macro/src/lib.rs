@@ -85,12 +85,8 @@ fn parse_fn(
 		quote! {DYN_FUNC}
 	};
 
-	//let transmute_namespace = if cfg!(feature = "std") {
-	//	quote!{std::mem::transmute}
-	//} else {
-	//	quote!{core::mem::transmute}
-	//};
-	let transmute_namespace = quote! {std::mem::transmute};
+	
+	let std_transmute = quote! {std::mem::transmute};
 
 	let is_checked = *link_type == LinkType::Vulkan;
 	let call_dyn_func = if is_checked && fn_name.to_string() == "vkCreateInstance" {
@@ -99,7 +95,7 @@ fn parse_fn(
 			let result = #caller_name(#(#param_list),*);
 			unsafe {
 				dylink::Global.insert_instance(
-					*#transmute_namespace::<_, *mut dylink::VkInstance>(#inst_param)
+					*#std_transmute::<_, *mut dylink::VkInstance>(#inst_param)
 				);
 			}
 			result
@@ -109,7 +105,7 @@ fn parse_fn(
 		quote! {
 			let result = #caller_name(#(#param_list),*);
 			unsafe {
-				dylink::Global.remove_instance(&#transmute_namespace::<_, dylink::VkInstance>(#inst_param));
+				dylink::Global.remove_instance(&#std_transmute::<_, dylink::VkInstance>(#inst_param));
 			}
 			result
 		}
@@ -118,7 +114,7 @@ fn parse_fn(
 		quote! {
 			let result = #caller_name(#(#param_list),*);
 			unsafe {
-				dylink::Global.insert_device(*#transmute_namespace::<_, *mut dylink::VkDevice>(#inst_param));
+				dylink::Global.insert_device(*#std_transmute::<_, *mut dylink::VkDevice>(#inst_param));
 			}
 			result
 		}
@@ -127,7 +123,7 @@ fn parse_fn(
 		quote! {
 			let result = #caller_name(#(#param_list),*);
 			unsafe {
-				dylink::Global.remove_device(&#transmute_namespace::<_, dylink::VkDevice>(#inst_param));
+				dylink::Global.remove_device(&#std_transmute::<_, dylink::VkDevice>(#inst_param));
 			}
 			result
 		}

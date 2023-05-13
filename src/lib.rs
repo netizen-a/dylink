@@ -93,6 +93,7 @@
 use std::{collections::HashSet, sync};
 
 use once_cell::sync::Lazy;
+use std::ffi;
 
 mod error;
 mod lazyfn;
@@ -189,7 +190,21 @@ impl Global {
 	}
 }
 
-pub(crate) trait RTLinker {
-	fn load_lib(lib_name: &std::ffi::CStr) -> crate::lazyfn::LibHandle;
-	fn load_sym(lib_handle: &crate::lazyfn::LibHandle, fn_name: &std::ffi::CStr) -> Option<FnPtr>;
+
+/// Opaque pointer sized library handle
+#[repr(transparent)]
+pub struct LibHandle(*const ffi::c_void);
+unsafe impl Send for LibHandle {}
+unsafe impl Sync for LibHandle {}
+
+impl LibHandle {
+	#[inline]
+	fn is_invalid(&self) -> bool {
+		self.0.is_null()
+	}
+}
+
+pub trait RTLinker {
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle;
+	fn load_sym(lib_handle: &LibHandle, fn_name: &ffi::CStr) -> Option<FnPtr>;
 }

@@ -75,26 +75,29 @@ fn test_fn_not_found() {
 #[test]
 fn test_linux_x11() {
 	use dylink::*;
-	use std::ffi::{c_char, CStr};
+	use std::ffi::{c_char, CStr, c_void};
 
-	extern "C" {
-		fn dlerror() -> *const c_char;
-	}
+	#[repr(transparent)]
+	struct Display(*const c_void);
 
 	#[dylink(name = "libX11.so.6", strip = true)]
 	extern "C" {
-		fn foo();
+		fn XOpenDisplay(display_name: *const c_char) -> *mut Display;
+		fn XCloseDisplay(display: *mut Display);
 	}
 
 	unsafe {
-		match foo.try_link() {
-			Ok(func) => func(),
-			Err(DylinkError::FnNotFound(_)) => {
-				println!("library was found and successfully linked. dummy function `foo` was not loaded as expected")
+		match XOpenDisplay.try_link() {
+			Ok(func) => {
+				let display_name = CStr::from_bytes_until_nul(b"foo\0").unwrap();
+				let disp = func(display_name.as_ptr());
+				if !disp.is_null() {
+					println!("display created successfully.\nnow destroying...");
+					XCloseDisplay(disp);
+				}
 			}
-			Err(_) => {
-				let c_str = CStr::from_ptr(dlerror());
-				panic!("{}", c_str.to_string_lossy());
+			Err(e) => {
+				panic!("{e}");
 			}
 		}
 	}

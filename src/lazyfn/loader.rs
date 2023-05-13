@@ -1,18 +1,14 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use std::{
-	ffi::{self, CStr, CString},
+	ffi,
 	mem,
 	sync::RwLock,
 };
 
-//use std::sync::atomic::{AtomicPtr, Ordering};
-
 use crate::{error::*, vulkan, FnPtr, Result};
 
-//use super::os;
-
-pub(crate) unsafe fn vulkan_loader(fn_name: &CStr) -> Result<FnPtr> {
+pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> Result<FnPtr> {
 	let mut maybe_fn = match fn_name.to_bytes() {
 		b"vkGetInstanceProcAddr" => {
 			Some(mem::transmute::<vulkan::PFN_vkGetInstanceProcAddr, FnPtr>(
@@ -55,15 +51,15 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &CStr) -> Result<FnPtr> {
 }
 
 /// `loader` is a generalization for all other dlls.
-pub(crate) fn general_loader<L: crate::RTLinker + 'static>(
-	lib_name: &CStr,
-	fn_name: &CStr,
+pub(crate) fn general_loader<L: crate::RTLinker>(
+	lib_name: &ffi::CStr,
+	fn_name: &ffi::CStr,
 ) -> Result<FnPtr> {
 	use std::collections::HashMap;
 
 	use once_cell::sync::Lazy;
 
-	static DLL_DATA: RwLock<Lazy<HashMap<CString, super::LibHandle>>> =
+	static DLL_DATA: RwLock<Lazy<HashMap<ffi::CString, crate::LibHandle>>> =
 		RwLock::new(Lazy::new(HashMap::default));
 
 	// somehow rust is smart enough to infer that maybe_fn is assigned to only once after branching.

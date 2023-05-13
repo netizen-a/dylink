@@ -1,4 +1,11 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
+
+#[cfg_attr(windows, path = "lazyfn/win32.rs")]
+#[cfg_attr(unix, path = "lazyfn/unix.rs")]
+mod os;
+
+mod loader;
+
 use std::{
 	cell,
 	ffi::CStr,
@@ -8,28 +15,7 @@ use std::{
 		atomic::{AtomicPtr, Ordering},
 	},
 };
-
-use crate::*;
-
-mod loader;
-
-#[cfg_attr(windows, path = "lazyfn/win32.rs")]
-#[cfg_attr(unix, path = "lazyfn/unix.rs")]
-mod os;
-
-// This should never be mutated.
-#[repr(transparent)]
-pub(crate) struct LibHandle(pub *mut std::ffi::c_void);
-unsafe impl Send for LibHandle {}
-unsafe impl Sync for LibHandle {}
-
-impl LibHandle {
-	#[inline]
-	fn is_invalid(&self) -> bool {
-		self.0.is_null()
-	}
-}
-
+use crate::error;
 
 struct DefaultLinker;
 
@@ -46,7 +32,7 @@ pub enum LinkType<'a> {
 ///
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
-pub struct LazyFn<'a, F: 'a + Sync + Send> {
+pub struct LazyFn<'a, F: Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
@@ -61,14 +47,14 @@ pub struct LazyFn<'a, F: 'a + Sync + Send> {
 	link_ty: LinkType<'a>,
 }
 
-impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
+impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
 	#[inline]
 	pub const fn new(thunk: &'a F, fn_name: &'a CStr, link_ty: LinkType<'a>) -> Self {
 		// In a const context this assert will be optimized out.
-		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
+		assert!(mem::size_of::<crate::FnPtr>() == mem::size_of::<F>());
 		Self {
 			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
 			once: sync::Once::new(),
@@ -78,13 +64,18 @@ impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
 			link_ty,
 		}
 	}
-	//#[cfg(feature="std")]
+}
+
+impl<F: Sync + Send> LazyFn<'_, F> {
 	/// If successful, stores address in current instance and returns a reference of the stored value.
-	pub fn try_link(&'a self) -> Result<&'a F> {
-		self.try_with_linker::<DefaultLinker>()
+	// Same as `try_with_linker::<DefaultLinker>()`
+	#[inline]
+	pub fn try_link(&self) -> crate::Result<&F> {
+		self.try_link_with::<DefaultLinker>()
 	}
 
-	fn try_with_linker<L: crate::RTLinker + 'static>(&'a self) -> Result<&'a F> {
+	/// If successful, stores address in current instance and returns a reference of the stored value.
+	pub fn try_link_with<L: crate::RTLinker>(&self) -> crate::Result<&F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
@@ -105,7 +96,7 @@ impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
 							for e in errors {
 								err.push(e.to_string());
 							}
-							DylinkError::ListNotLoaded(err)
+							error::DylinkError::ListNotLoaded(err)
 						})
 				}
 			};
@@ -142,12 +133,12 @@ impl<'a, F: 'static + Copy + Sync + Send> LazyFn<'a, F> {
 	}
 }
 
-unsafe impl<F: 'static + Sync + Send> Send for LazyFn<'_, F> {}
-unsafe impl<F: 'static + Sync + Send> Sync for LazyFn<'_, F> {}
+unsafe impl<F: Sync + Send> Send for LazyFn<'_, F> {}
+unsafe impl<F: Sync + Send> Sync for LazyFn<'_, F> {}
 
-impl<F: 'static + Copy + Sync + Send> std::ops::Deref for LazyFn<'_, F> {
+impl<F: Sync + Send> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
-
+	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {
 		self.as_ref()
 	}

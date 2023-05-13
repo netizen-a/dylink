@@ -25,9 +25,3 @@ default-features=false
 version = "2.0"
 features = ["full", "parsing", "printing"]
 default-features=false
-
-
-#[features]
-# I'd prefer for this to be default, but it needs to be disabled 
-# when the main crate also disables it.
-#std = []

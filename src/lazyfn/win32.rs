@@ -1,9 +1,12 @@
-use super::DefaultLinker;
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
+use super::DefaultLinker;
+use crate::LibHandle;
+use std::ffi;
 use std::os::windows::raw::HANDLE;
 
 pub type HMODULE = HANDLE;
-pub type PCSTR = *const std::ffi::c_char;
+pub type PCSTR = *const ffi::c_char;
 pub type PCWSTR = *const u16;
 pub const LOAD_LIBRARY_SEARCH_DEFAULT_DIRS: u32 = 4096u32;
 extern "system" {
@@ -12,7 +15,7 @@ extern "system" {
 }
 
 impl crate::RTLinker for DefaultLinker {
-	fn load_lib(lib_name: &std::ffi::CStr) -> super::LibHandle {
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle {
 		let wide_str: Vec<u16> = lib_name
 			.to_string_lossy()
 			.encode_utf16()
@@ -26,9 +29,9 @@ impl crate::RTLinker for DefaultLinker {
 				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 			)
 		};
-		super::LibHandle(result)
+		LibHandle(result)
 	}
-	fn load_sym(lib_handle: &super::LibHandle, fn_name: &std::ffi::CStr) -> Option<crate::FnPtr> {
-		unsafe { GetProcAddress(lib_handle.0, fn_name.as_ptr().cast()) }
-	}	
+	fn load_sym(lib_handle: &LibHandle, fn_name: &ffi::CStr) -> Option<crate::FnPtr> {
+		unsafe { GetProcAddress(lib_handle.0.cast_mut(), fn_name.as_ptr().cast()) }
+	}
 }
