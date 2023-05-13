@@ -67,7 +67,7 @@ pub(crate) fn general_loader<L: crate::RTLinker>(
 
 	let read_lock = DLL_DATA.read().unwrap();
 	if let Some(handle) = read_lock.get(lib_name) {
-		maybe_fn = L::load_sym(&handle, fn_name);
+		maybe_fn = L::load_sym(handle, fn_name);
 	} else {
 		mem::drop(read_lock);
 

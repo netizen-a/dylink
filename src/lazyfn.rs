@@ -31,7 +31,7 @@ pub enum LinkType<'a> {
 /// Fundamental data type of dylink.
 ///
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
-/// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
+/// The provided member functions can be used from the generated macro when `strip=true` is enabled.
 pub struct LazyFn<'a, F: Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
@@ -67,13 +67,32 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 }
 
 impl<F: Sync + Send> LazyFn<'_, F> {
+	
+	/// This is the same as [`try_link_with`](LazyFn::try_link_with), but implicitly calls system defined linker loader, such as
+	/// `GetProcAddress`, and `LoadLibraryExW` for windows, or `dlsym`, and `dlopen` for unix. This function is used by the
+	/// [dylink](dylink_macro::dylink) macro by default.
 	/// If successful, stores address in current instance and returns a reference of the stored value.
-	// Same as `try_with_linker::<DefaultLinker>()`
+	/// # Example
+	/// ```rust
+	/// # use dylink::dylink;
+	/// #[dylink(name = "MyDLL.dll", strip = true)]
+	/// extern "C" {
+	///     fn foo();
+	/// }
+	/// 
+	/// match foo.try_link() {
+	///     Ok(func) => unsafe {func()},
+	///     Err(err) => {
+	///         println!("{err}")
+	///     }
+	/// }
+	/// ```
 	#[inline]
 	pub fn try_link(&self) -> crate::Result<&F> {
 		self.try_link_with::<DefaultLinker>()
 	}
 
+	/// Provides a generic argument to supply a user defined linker loader to load the library.
 	/// If successful, stores address in current instance and returns a reference of the stored value.
 	pub fn try_link_with<L: crate::RTLinker>(&self) -> crate::Result<&F> {
 		self.once.call_once(|| {
@@ -85,9 +104,8 @@ impl<F: Sync + Send> LazyFn<'_, F> {
 						.iter()
 						.find_map(|lib| {
 							loader::general_loader::<L>(lib, self.fn_name)
-								.or_else(|e| {
+								.map_err(|e| {
 									errors.push(e);
-									Err(())
 								})
 								.ok()
 						})
