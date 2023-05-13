@@ -1,5 +1,3 @@
-// apparently lacking unix tests...
-#[cfg(windows)]
 use dylink::*;
 
 #[cfg(windows)]
@@ -74,7 +72,6 @@ fn test_fn_not_found() {
 #[cfg(target_os = "linux")]
 #[test]
 fn test_linux_x11() {
-	use dylink::*;
 	use std::ffi::{c_char, CStr, c_void};
 
 	#[repr(transparent)]
@@ -106,8 +103,6 @@ fn test_linux_x11() {
 #[test]
 #[should_panic]
 fn test_multiple_lib_panic() {
-	use dylink::*;
-
 	#[dylink(
 		any(name = "test_lib0", name = "test_lib1", name = "test_lib2"),
 		strip = true

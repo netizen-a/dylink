@@ -15,6 +15,7 @@ use std::{
 		atomic::{AtomicPtr, Ordering},
 	},
 };
+
 use crate::error;
 
 struct DefaultLinker;
@@ -33,7 +34,7 @@ pub enum LinkType<'a> {
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// The provided member functions can be used from the generated macro when `strip=true` is enabled.
 #[derive(Debug)]
-pub struct LazyFn<'a, F: Sync + Send> {
+pub struct LazyFn<'a, F: Sync + Send + Copy> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
@@ -41,12 +42,13 @@ pub struct LazyFn<'a, F: Sync + Send> {
 	// this exists so that `F` is considered thread-safe
 	pub(crate) addr_ptr: AtomicPtr<F>,
 	// The function to be called.
-	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
-	// The atomic pointer will always point to this
-	pub(crate) addr: cell::UnsafeCell<F>,
+	// mutating this data without locks is UB.
+	pub(crate) addr: cell::Cell<F>,
 	fn_name: &'a CStr,
 	link_ty: LinkType<'a>,
 }
+
+unsafe impl<F: Sync + Send + Copy> Sync for LazyFn<'_, F> {}
 
 impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
@@ -60,14 +62,11 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
 			once: sync::Once::new(),
 			status: cell::RefCell::new(None),
-			addr: cell::UnsafeCell::new(*thunk),
+			addr: cell::Cell::new(*thunk),
 			fn_name,
 			link_ty,
 		}
 	}
-}
-
-impl<F: Sync + Send> LazyFn<'_, F> {
 	
 	/// This is the same as [`try_link_with`](LazyFn::try_link_with), but implicitly calls system defined linker loader, such as
 	/// `GetProcAddress`, and `LoadLibraryExW` for windows, or `dlsym`, and `dlopen` for unix. This function is used by the
@@ -88,7 +87,6 @@ impl<F: Sync + Send> LazyFn<'_, F> {
 	///     }
 	/// }
 	/// ```
-	#[inline]
 	pub fn try_link(&self) -> crate::Result<&F> {
 		self.try_link_with::<DefaultLinker>()
 	}
@@ -122,11 +120,10 @@ impl<F: Sync + Send> LazyFn<'_, F> {
 
 			match maybe {
 				Ok(addr) => {
-					let addr_ptr = self.addr.get();
 					unsafe {
-						addr_ptr.write(mem::transmute_copy(&addr));
+						self.addr.set(mem::transmute_copy(&addr));
 					}
-					self.addr_ptr.store(addr_ptr as *mut F, Ordering::Release);
+					self.addr_ptr.store(self.addr.as_ptr(), Ordering::Release);
 				}
 				Err(err) => {
 					let _ = self.status.replace(Some(err));
@@ -158,9 +155,7 @@ impl<F: Sync + Send> LazyFn<'_, F> {
 	}
 }
 
-unsafe impl<F: Sync + Send> Sync for LazyFn<'_, F> {}
-
-impl<F: Sync + Send> std::ops::Deref for LazyFn<'_, F> {
+impl<F: Sync + Send + Copy> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
 	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {

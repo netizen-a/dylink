@@ -138,7 +138,7 @@ fn parse_fn(
 			#(#fn_attrs)*
 			#[allow(non_upper_case_globals)]
 			#vis static #fn_name
-			: dylink::LazyFn<unsafe #abi fn (#params_default) #output>
+			: dylink::LazyFn<'static, unsafe #abi fn (#params_default) #output>
 			= dylink::LazyFn::new(
 				{
 					type InstFnPtr = unsafe #abi fn (#params_default) #output;
@@ -173,7 +173,7 @@ fn parse_fn(
 				}
 				const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
 				static DYN_FUNC
-				: dylink::LazyFn<InstFnPtr>
+				: dylink::LazyFn<'static, InstFnPtr>
 				= dylink::LazyFn::new(
 					DYN_FUNC_REF,
 					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
