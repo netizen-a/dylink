@@ -105,7 +105,7 @@ impl<F: Sync + Send> LazyFn<'_, F> {
 						.find_map(|lib| {
 							loader::general_loader::<L>(lib, self.fn_name)
 								.map_err(|e| {
-									errors.push(e);
+									errors.push(e)
 								})
 								.ok()
 						})
@@ -151,7 +151,6 @@ impl<F: Sync + Send> LazyFn<'_, F> {
 	}
 }
 
-unsafe impl<F: Sync + Send> Send for LazyFn<'_, F> {}
 unsafe impl<F: Sync + Send> Sync for LazyFn<'_, F> {}
 
 impl<F: Sync + Send> std::ops::Deref for LazyFn<'_, F> {

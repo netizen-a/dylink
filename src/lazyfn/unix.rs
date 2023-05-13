@@ -13,10 +13,7 @@ extern "C" {
 }
 
 impl crate::RTLinker for DefaultLinker {
-	fn load_lib(lib_name: &CStr) -> LibHandle
-	where
-		Self: Sized,
-	{
+	fn load_lib(lib_name: &CStr) -> LibHandle {
 		unsafe { LibHandle(dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL)) }
 	}
 	fn load_sym(lib_handle: &LibHandle, fn_name: &CStr) -> Option<crate::FnPtr> {
