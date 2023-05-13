@@ -20,13 +20,13 @@ use crate::error;
 
 struct DefaultLinker;
 
-/// Determines what library to look up when [LazyFn::try_link] is called.
+/// Determines how to load the library when [LazyFn::try_link] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType<'a> {
 	/// Specifies a specialization for loading vulkan functions using vulkan loaders.
-	Vulkan,
-	/// Specifies a generalization for loading functions using native system loaders.
-	System(&'a [&'a CStr]),
+	Vulkan,	
+	/// Specifies a generalization for loading functions.
+	General(&'a [&'a CStr]),
 }
 
 /// Fundamental data type of dylink.
@@ -97,7 +97,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
-				LinkType::System(lib_list) => {
+				LinkType::General(lib_list) => {
 					let mut errors = vec![];
 					lib_list
 						.iter()

@@ -41,7 +41,7 @@ fn test_win32_lifetimes() {
 	let lazyfn: LazyFn<PfnTy> = LazyFn::<PfnTy>::new(
 		&(foo as PfnTy),
 		unsafe { CStr::from_bytes_with_nul_unchecked(b"SetLastError\0") },
-		dylink::LinkType::System(&list),
+		dylink::LinkType::General(&list),
 	);
 	// `deref` isn't suppose to be used this way, but if
 	// it is used, this test will check if it's valid.

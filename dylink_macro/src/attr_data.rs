@@ -13,7 +13,7 @@ pub struct AttrData {
 pub enum LinkType {
 	Vulkan,
 	// note: dylink_macro must use an owned string instead of `&'static [u8]` since it's reading from the source code.
-	System(Vec<String>),
+	General(Vec<String>),
 }
 
 impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
@@ -48,7 +48,7 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 								lit: Lit::Str(lib), ..
 							}) => {
 								if maybe_link_ty.is_none() {
-									maybe_link_ty = Some(LinkType::System(vec![lib.value()]))
+									maybe_link_ty = Some(LinkType::General(vec![lib.value()]))
 								} else {
 									errors.push(Error::new(
                                         assign.span(),
@@ -121,7 +121,7 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 						if lib_list.is_empty() {
 							errors.push(Error::new(call.span(), "No arguments detected."));
 						} else {
-							maybe_link_ty = Some(LinkType::System(lib_list));
+							maybe_link_ty = Some(LinkType::General(lib_list));
 						}
 					}
 				}
@@ -168,7 +168,7 @@ impl quote::ToTokens for LinkType {
 				LinkType::Vulkan => {
 					tokens.extend(TokenStream2::from_str("LinkType::Vulkan").unwrap_unchecked())
 				}
-				LinkType::System(lib_list) => {
+				LinkType::General(lib_list) => {
 					let mut lib_array = String::from("&unsafe {{[");
 					for name in lib_list {
 						lib_array.push_str(&format!(
@@ -177,7 +177,7 @@ impl quote::ToTokens for LinkType {
 					}
 					lib_array.push_str("]}}");
 					tokens.extend(
-						TokenStream2::from_str(&format!("LinkType::System({lib_array})"))
+						TokenStream2::from_str(&format!("LinkType::General({lib_array})"))
 							.unwrap_unchecked(),
 					)
 				}
