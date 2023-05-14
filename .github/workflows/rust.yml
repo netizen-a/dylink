@@ -1,0 +1,22 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+
+    runs-on: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo check --verbose --all
+    - name: Run tests
+      run: cargo test --verbose -- --skip test_vk_instance_layer_properties
