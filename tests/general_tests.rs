@@ -48,9 +48,10 @@ fn test_win32_lifetimes() {
 	let old_ref = lazyfn.deref();
 	let new_addr = lazyfn.try_link().unwrap();
 
-	assert_eq!(*old_ref, foo as PfnTy);
-	assert_ne!(*new_addr, foo as PfnTy);
-	assert_ne!(lazyfn.deref(), old_ref);
+	// This is verbose like this because GitHub Actions keeps giving me `error[E0369]`.
+	assert!(*old_ref as isize == foo as PfnTy as isize);
+	assert!(*new_addr as isize != foo as PfnTy as isize);
+	assert!(lazyfn.deref() as *const PfnTy as isize != old_ref as *const PfnTy as isize);
 }
 
 #[cfg(windows)]

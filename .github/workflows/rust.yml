@@ -1,0 +1,39 @@
+name: dylink-rs
+
+on:
+  pull_request:
+    branches: [ "main", "dev" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --verbose --all
+    - name: Run tests
+    # Skipping vulkan test because drivers are not guarenteed to be on the system.
+      run: cargo test --verbose -- --skip test_vk_instance_layer_properties
+  
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --verbose --all
+    - name: Run tests
+    # Skipping vulkan test because drivers are not guarenteed to be on the system.
+      run: cargo test --verbose -- --skip test_vk_instance_layer_properties
+  build-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --verbose --all
+# There are currently no tests for macos
+    #- name: Run tests
+    #  run: cargo test --verbose -- --skip test_vk_instance_layer_properties
