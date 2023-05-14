@@ -24,7 +24,7 @@ struct DefaultLinker;
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType<'a> {
 	/// Specifies a specialization for loading vulkan functions using vulkan loaders.
-	Vulkan,	
+	Vulkan,
 	/// Specifies a generalization for loading functions.
 	General(&'a [&'a CStr]),
 }
@@ -34,7 +34,7 @@ pub enum LinkType<'a> {
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// The provided member functions can be used from the generated macro when `strip=true` is enabled.
 #[derive(Debug)]
-pub struct LazyFn<'a, F: Sync + Send + Copy> {
+pub struct LazyFn<'a, F: Copy + Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
@@ -48,7 +48,7 @@ pub struct LazyFn<'a, F: Sync + Send + Copy> {
 	link_ty: LinkType<'a>,
 }
 
-unsafe impl<F: Sync + Send + Copy> Sync for LazyFn<'_, F> {}
+unsafe impl<F: Copy + Sync + Send> Sync for LazyFn<'_, F> {}
 
 impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
@@ -67,9 +67,9 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 			link_ty,
 		}
 	}
-	
-	/// This is the same as [`try_link_with`](LazyFn::try_link_with), but implicitly calls system defined linker loader, such as
-	/// `GetProcAddress`, and `LoadLibraryExW` for windows, or `dlsym`, and `dlopen` for unix. This function is used by the
+
+	/// Implicitly calls system defined linker loader, such as `GetProcAddress`, and `LoadLibraryExW`
+	/// for windows, or `dlsym`, and `dlopen` for unix. This function is used by the
 	/// [dylink](dylink_macro::dylink) macro by default.
 	/// If successful, stores address in current instance and returns a reference of the stored value.
 	/// # Example
@@ -79,7 +79,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	/// extern "C" {
 	///     fn foo();
 	/// }
-	/// 
+	///
 	/// match foo.try_link() {
 	///     Ok(func) => unsafe {func()},
 	///     Err(err) => {
@@ -93,7 +93,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 
 	/// Provides a generic argument to supply a user defined linker loader to load the library.
 	/// If successful, stores address in current instance and returns a reference of the stored value.
-	pub fn try_link_with<L: crate::RTLinker>(&self) -> crate::Result<&F> {
+	pub(crate) fn try_link_with<L: crate::RTLinker>(&self) -> crate::Result<&F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
@@ -103,9 +103,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 						.iter()
 						.find_map(|lib| {
 							loader::general_loader::<L>(lib, self.fn_name)
-								.map_err(|e| {
-									errors.push(e)
-								})
+								.map_err(|e| errors.push(e))
 								.ok()
 						})
 						.ok_or_else(|| {
@@ -140,22 +138,17 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 
 	#[inline]
 	fn load(&self, order: Ordering) -> &F {
-		unsafe {
-			self.addr_ptr
-				.load(order)
-				.as_ref()
-				.unwrap_unchecked()
-		}
+		unsafe { self.addr_ptr.load(order).as_ref().unwrap_unchecked() }
 	}
 	/// Consumes `LazyFn` and returns the contained value.
-	/// 
+	///
 	/// This is safe because passing self by value guarantees that no other threads are concurrently accessing `LazyFn`.
 	pub fn into_inner(self) -> F {
 		self.addr.into_inner()
 	}
 }
 
-impl<F: Sync + Send + Copy> std::ops::Deref for LazyFn<'_, F> {
+impl<F: Copy + Sync + Send> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
 	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {

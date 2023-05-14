@@ -18,6 +18,9 @@
 //! The appropriate ABI to use with the vulkan loader is `extern "system"`. Unlike generalized loading, the vulkan specialization loads
 //! functions indirectly through `vkGetInstanceProcAddr`, and when applicable `vkGetDeviceProcAddr`, to retrieve vulkan addresses properly.
 //! The internal copies of the instance and device handles are only stored until destroyed through a dylink generated vulkan function.
+//!
+//! *Note: Due to how dylink handles loading, `vkCreateInstance`, `vkDestroyInstance`, `vkCreateDevice`, and `vkDestroyDevice` are
+//! incompatible with the `strip=true` macro argument.*
 //! ```rust
 //! use dylink::dylink;
 //!
@@ -190,10 +193,9 @@ impl Global {
 	}
 }
 
-
 /// Opaque pointer sized library handle
 #[repr(transparent)]
-pub struct LibHandle(*const ffi::c_void);
+pub(crate) struct LibHandle(*const ffi::c_void);
 unsafe impl Send for LibHandle {}
 unsafe impl Sync for LibHandle {}
 
@@ -204,7 +206,7 @@ impl LibHandle {
 	}
 }
 
-pub trait RTLinker {
+pub(crate) trait RTLinker {
 	fn load_lib(lib_name: &ffi::CStr) -> LibHandle;
 	fn load_sym(lib_handle: &LibHandle, fn_name: &ffi::CStr) -> Option<FnPtr>;
 }

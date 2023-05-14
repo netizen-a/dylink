@@ -22,8 +22,8 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 	)
 	.expect("failed to parse");
 
-	let (link_type, strip) = match AttrData::try_from(punct) {
-		Ok(attr) => (attr.link_ty, attr.strip),
+	let attr_data = match AttrData::try_from(punct) {
+		Ok(attr) => attr,
 		Err(e) => {
 			return syn::Error::into_compile_error(e).into();
 		}
@@ -33,23 +33,20 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 		use syn::ForeignItem;
 		let abi = &foreign_mod.abi;
 		match item {
-			ForeignItem::Fn(fn_item) => ret.extend(parse_fn(abi, fn_item, &link_type, strip)),
+			ForeignItem::Fn(fn_item) => ret.extend(parse_fn(abi, fn_item, &attr_data)),
 			other => ret.extend(quote!(#abi {#other})),
 		}
 	}
 	TokenStream1::from(ret)
 }
 
-fn parse_fn(
-	abi: &syn::Abi,
-	fn_item: syn::ForeignItemFn,
-	link_type: &LinkType,
-	strip: bool,
-) -> TokenStream2 {
-	let fn_name = fn_item.sig.ident.into_token_stream();
+fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 {
+	let fn_name = fn_item.sig.ident.to_token_stream();
 	let abi = abi.into_token_stream();
-	let vis = fn_item.vis.into_token_stream();
-	let output = fn_item.sig.output.into_token_stream();
+	let vis = fn_item.vis.to_token_stream();
+	let output = fn_item.sig.output.to_token_stream();
+	let strip = attr_data.strip;
+	let link_ty = &attr_data.link_ty;
 
 	let fn_attrs: Vec<TokenStream2> = fn_item
 		.attrs
@@ -78,54 +75,89 @@ fn parse_fn(
 			}
 		}
 	}
+
 	// this is sure to obfuscate things, but this is needed here because `strip` screws with call context.
-	let caller_name = if strip {
+	let caller_name = if strip.is_some() {
 		quote! {function}
 	} else {
 		quote! {DYN_FUNC}
 	};
 
-	
 	let std_transmute = quote! {std::mem::transmute};
 
-	let is_checked = *link_type == LinkType::Vulkan;
-	let call_dyn_func = if is_checked && fn_name.to_string() == "vkCreateInstance" {
-		let inst_param = &param_list[2];
-		quote! {
-			let result = #caller_name(#(#param_list),*);
-			unsafe {
-				dylink::Global.insert_instance(
-					*#std_transmute::<_, *mut dylink::VkInstance>(#inst_param)
-				);
+	let call_dyn_func = if *link_ty == LinkType::Vulkan {
+		match fn_name.to_string().as_str() {
+			"vkCreateInstance" => {
+				if strip.is_some() {
+					return syn::Error::new(
+						fn_item.span(),
+						"`vkCreateInstance` is incompatible with `strip=true`",
+					)
+					.to_compile_error();
+				}
+				let inst_param = &param_list[2];
+				quote! {
+					let result = #caller_name(#(#param_list),*);
+					unsafe {
+						dylink::Global.insert_instance(
+							*#std_transmute::<_, *mut dylink::VkInstance>(#inst_param)
+						);
+					}
+					result
+				}
 			}
-			result
-		}
-	} else if is_checked && fn_name.to_string() == "vkDestroyInstance" {
-		let inst_param = &param_list[0];
-		quote! {
-			let result = #caller_name(#(#param_list),*);
-			unsafe {
-				dylink::Global.remove_instance(&#std_transmute::<_, dylink::VkInstance>(#inst_param));
+			"vkDestroyInstance" => {
+				if strip.is_some() {
+					return syn::Error::new(
+						fn_item.span(),
+						"`vkDestroyInstance` is incompatible with `strip=true`",
+					)
+					.to_compile_error();
+				}
+				let inst_param = &param_list[0];
+				quote! {
+					let result = #caller_name(#(#param_list),*);
+					unsafe {
+						dylink::Global.remove_instance(&#std_transmute::<_, dylink::VkInstance>(#inst_param));
+					}
+					result
+				}
 			}
-			result
-		}
-	} else if is_checked && fn_name.to_string() == "vkCreateDevice" {
-		let inst_param = &param_list[3];
-		quote! {
-			let result = #caller_name(#(#param_list),*);
-			unsafe {
-				dylink::Global.insert_device(*#std_transmute::<_, *mut dylink::VkDevice>(#inst_param));
+			"vkCreateDevice" => {
+				if strip.is_some() {
+					return syn::Error::new(
+						fn_item.span(),
+						"`vkCreateDevice` is incompatible with `strip=true`",
+					)
+					.to_compile_error();
+				}
+				let inst_param = &param_list[3];
+				quote! {
+					let result = #caller_name(#(#param_list),*);
+					unsafe {
+						dylink::Global.insert_device(*#std_transmute::<_, *mut dylink::VkDevice>(#inst_param));
+					}
+					result
+				}
 			}
-			result
-		}
-	} else if is_checked && fn_name.to_string() == "vkDestroyDevice" {
-		let inst_param = &param_list[0];
-		quote! {
-			let result = #caller_name(#(#param_list),*);
-			unsafe {
-				dylink::Global.remove_device(&#std_transmute::<_, dylink::VkDevice>(#inst_param));
+			"vkDestroyDevice" => {
+				if strip.is_some() {
+					return syn::Error::new(
+						fn_item.span(),
+						"`vkDestroyDevice` is incompatible with `strip=true`",
+					)
+					.to_compile_error();
+				}
+				let inst_param = &param_list[0];
+				quote! {
+					let result = #caller_name(#(#param_list),*);
+					unsafe {
+						dylink::Global.remove_device(&#std_transmute::<_, dylink::VkDevice>(#inst_param));
+					}
+					result
+				}
 			}
-			result
+			_ => quote!(#caller_name(#(#param_list),*)),
 		}
 	} else {
 		quote!(#caller_name(#(#param_list),*))
@@ -133,7 +165,7 @@ fn parse_fn(
 
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
-	if strip {
+	if strip.is_some() {
 		quote! {
 			#(#fn_attrs)*
 			#[allow(non_upper_case_globals)]
@@ -153,7 +185,7 @@ fn parse_fn(
 					DYN_FUNC_REF
 				},
 				unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
-				dylink::#link_type
+				dylink::#link_ty
 			);
 		}
 	} else {
@@ -177,7 +209,7 @@ fn parse_fn(
 				= dylink::LazyFn::new(
 					DYN_FUNC_REF,
 					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
-					dylink::#link_type
+					dylink::#link_ty
 				);
 
 				#call_dyn_func

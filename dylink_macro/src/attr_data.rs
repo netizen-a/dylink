@@ -1,11 +1,11 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Span as Span2, TokenStream as TokenStream2};
 use std::str::FromStr;
 use syn::punctuated::Punctuated;
 use syn::{spanned::Spanned, *};
 
 pub struct AttrData {
-	pub strip: bool,
+	pub strip: Option<Span2>,
 	pub link_ty: LinkType,
 }
 
@@ -19,7 +19,7 @@ pub enum LinkType {
 impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 	type Error = syn::Error;
 	fn try_from(value: Punctuated<Expr, Token!(,)>) -> Result<Self> {
-		let mut strip: Option<bool> = None;
+		let mut strip: Option<Span2> = None;
 		let mut maybe_link_ty: Option<LinkType> = None;
 		let mut errors = vec![];
 		const EXPECTED_KW: &str = "Expected `vulkan`, `any`, `strip`, or `name`.";
@@ -67,13 +67,15 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 								lit: Lit::Bool(val),
 								..
 							}) => {
-								if strip.is_none() {
-									strip = Some(val.value())
-								} else {
-									errors.push(Error::new(
-										assign.span(),
-										"strip is already defined",
-									));
+								if val.value() {
+									if strip.is_none() {
+										strip = Some(val.span())
+									} else {
+										errors.push(Error::new(
+											assign.span(),
+											"strip is already defined",
+										));
+									}
 								}
 							}
 							right => {
@@ -151,10 +153,10 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 		} else {
 			// strip is defaulted to false
 			if strip.is_none() {
-				strip = Some(false);
+				strip = None;
 			}
 			Ok(Self {
-				strip: strip.unwrap(),
+				strip,
 				link_ty: maybe_link_ty.unwrap(),
 			})
 		}

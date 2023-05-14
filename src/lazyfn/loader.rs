@@ -1,10 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::{
-	ffi,
-	mem,
-	sync::RwLock,
-};
+use std::{ffi, mem, sync::RwLock};
 
 use crate::{error::*, vulkan, FnPtr, Result};
 
@@ -41,7 +37,7 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> Result<FnPtr> {
 	match maybe_fn {
 		Some(addr) => Ok(addr),
 		None => vulkan::vkGetInstanceProcAddr(
-			vulkan::VkInstance(std::ptr::null()),
+			vulkan::VkInstance(std::ptr::null_mut()),
 			fn_name.as_ptr() as *const ffi::c_char,
 		)
 		.ok_or(DylinkError::FnNotFound(

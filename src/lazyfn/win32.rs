@@ -3,7 +3,6 @@
 // The windows API conventions are kept deliberately, so it's easier to refer to references.
 #![allow(clippy::upper_case_acronyms)]
 
-
 use super::DefaultLinker;
 use crate::LibHandle;
 use std::ffi;
