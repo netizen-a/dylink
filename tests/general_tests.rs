@@ -48,9 +48,9 @@ fn test_win32_lifetimes() {
 	let old_ref = lazyfn.deref();
 	let new_addr = lazyfn.try_link().unwrap();
 
-	assert_eq!(*old_ref, foo as PfnTy);
-	assert_ne!(*new_addr, foo as PfnTy);
-	assert_ne!(lazyfn.deref(), old_ref);
+	assert!(*old_ref == foo as PfnTy);
+	assert!(*new_addr != foo as PfnTy);
+	assert!(lazyfn.deref() != old_ref);
 }
 
 #[cfg(windows)]
