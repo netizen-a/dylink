@@ -106,12 +106,10 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 								.map_err(|e| errors.push(e))
 								.ok()
 						})
-						.ok_or_else(|| {							
-							let err: String = errors
-								.iter()
-								.map(|e| e.to_string() + "\n")
-								.collect();
-							error::DylinkError::ListNotLoaded(err)
+						.ok_or_else(|| {
+							error::DylinkError::ListNotLoaded(
+								errors.iter().map(|e| e.to_string() + "\n").collect(),
+							)
 						})
 				}
 			};
@@ -130,7 +128,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 		});
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
-		match (*self.status.borrow()).clone() {
+		match self.status.clone().take() {
 			None => Ok(self.load(Ordering::Acquire)),
 			Some(err) => Err(err),
 		}

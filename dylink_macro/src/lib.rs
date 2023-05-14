@@ -9,38 +9,36 @@ use quote::*;
 use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned, Expr, Token};
 
 use attr_data::*;
+use syn::ForeignItem;
 
 #[proc_macro_attribute]
 pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
-	let args = TokenStream2::from(args);
-	let input = TokenStream2::from(input);
-	let foreign_mod = syn::parse2::<syn::ItemForeignMod>(input).expect("failed to parse");
+	let foreign_mod = syn::parse2::<syn::ItemForeignMod>(input.into()).expect("failed to parse");
 
 	let punct = Parser::parse2(
 		Punctuated::<Expr, Token!(,)>::parse_separated_nonempty,
-		args,
+		args.into(),
 	)
 	.expect("failed to parse");
 
-	let attr_data = match AttrData::try_from(punct) {
-		Ok(attr) => attr,
-		Err(e) => {
-			return syn::Error::into_compile_error(e).into();
+	match AttrData::try_from(punct) {
+		Ok(attr_data) => {
+			let abi = &foreign_mod.abi;
+			foreign_mod
+				.items
+				.iter()
+				.map(|item| match item {
+					ForeignItem::Fn(fn_item) => parse_fn(abi, fn_item, &attr_data),
+					other => quote!(#abi {#other}),
+				})
+				.collect::<TokenStream2>()
+				.into()
 		}
-	};
-	let mut ret = TokenStream2::new();
-	for item in foreign_mod.items {
-		use syn::ForeignItem;
-		let abi = &foreign_mod.abi;
-		match item {
-			ForeignItem::Fn(fn_item) => ret.extend(parse_fn(abi, fn_item, &attr_data)),
-			other => ret.extend(quote!(#abi {#other})),
-		}
+		Err(e) => syn::Error::into_compile_error(e).into(),
 	}
-	TokenStream1::from(ret)
 }
 
-fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 {
+fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 {
 	let fn_name = fn_item.sig.ident.to_token_stream();
 	let abi = abi.into_token_stream();
 	let vis = fn_item.vis.to_token_stream();

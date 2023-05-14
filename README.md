@@ -18,9 +18,9 @@ Related links:
 
 Dylink has been implemented for all major platforms aside from WASM, but has only been locally tested on Windows and Linux.
 
-| Win64 | Linux | MacOS    | Unix(other) | WASM |
-|:-----:|:-----:|:--------:|:-----------:|------|
-| YES   | YES   | Untested | Untested    | NO   |
+| Windows | Linux | MacOS    | WASM |
+|:-------:|:-----:|:--------:|------|
+| YES     | YES   | Untested | NO   |
 
 ## Usage
 
