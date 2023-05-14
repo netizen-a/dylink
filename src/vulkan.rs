@@ -11,32 +11,17 @@ use std::{ffi, mem};
 // this is just here to resolve the missing namespace issue.
 extern crate self as dylink;
 
-// FIXME: when extern types are stablized they must replace the `c_void` variation
-
-// extern "C" {
-// 	type VkInstance_T;
-// 	type VkDevice_T;
-// }
-
-// #[repr(transparent)]
-// #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-// pub struct VkInstance(pub(crate) *const VkInstance_T);
-
 #[doc(hidden)]
 #[repr(transparent)]
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct VkInstance(pub(crate) *const ffi::c_void);
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+pub struct VkInstance(pub(crate) *mut ffi::c_void);
 unsafe impl Sync for VkInstance {}
 unsafe impl Send for VkInstance {}
 
-// #[repr(transparent)]
-// #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-// pub struct VkDevice(pub(crate) *const VkDevice_T);
-
 #[doc(hidden)]
 #[repr(transparent)]
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct VkDevice(pub(crate) *const ffi::c_void);
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+pub struct VkDevice(pub(crate) *mut ffi::c_void);
 unsafe impl Sync for VkDevice {}
 unsafe impl Send for VkDevice {}
 
@@ -74,6 +59,7 @@ pub(crate) type PFN_vkGetInstanceProcAddr =
 
 // vkGetDeviceProcAddr must be implemented manually to avoid recursion
 #[allow(non_snake_case)]
+#[inline]
 pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	device: VkDevice,
 	name: *const ffi::c_char,
@@ -95,11 +81,10 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 				})
 				.unwrap();
 
-			let addr_ptr = DEVICE_PROC_ADDR.addr.get();
-			addr_ptr.write(mem::transmute_copy(&fn_ptr));
+			DEVICE_PROC_ADDR.addr.set(mem::transmute_copy(&fn_ptr));
 			DEVICE_PROC_ADDR
 				.addr_ptr
-				.store(addr_ptr, Ordering::Relaxed);
+				.store(DEVICE_PROC_ADDR.addr.as_ptr(), Ordering::Relaxed);
 		});
 		DEVICE_PROC_ADDR(device, name)
 	}
@@ -107,8 +92,8 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> =
 		lazyfn::LazyFn::new(
 			&(initial_fn as PFN_vkGetDeviceProcAddr),
-			unsafe {CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0")},
-			LinkType::System(&[]),
+			unsafe { CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") },
+			LinkType::General(&[]),
 		);
 	DEVICE_PROC_ADDR(device, name)
 }

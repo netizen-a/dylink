@@ -5,6 +5,7 @@ use std::{error, fmt};
 /// The error enumeration dylink uses to define the error status.
 ///
 /// This error structure may propagate from a dylink'd function generated from [dylink](crate::dylink).
+#[non_exhaustive]
 #[derive(Debug, Clone)]
 pub enum DylinkError {
 	/// The library was loaded, but the function was not.
@@ -12,7 +13,7 @@ pub enum DylinkError {
 	/// The library was not loaded.
 	LibNotLoaded(String),
 	/// All the libraries were not loaded.
-	ListNotLoaded(Vec<String>),
+	ListNotLoaded(String),
 }
 
 impl error::Error for DylinkError {}
@@ -21,9 +22,11 @@ impl fmt::Display for DylinkError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		let err = match &self {
 			Self::FnNotFound(fn_name) => format!("function `{fn_name}` not found"),
-			Self::LibNotLoaded(err_msg) => format!("could not load library:{err_msg}"),
-			// todo: print all error messages
-			Self::ListNotLoaded(_) => "libraries not loaded".to_owned(),
+			Self::LibNotLoaded(lib_name) => format!("library `{lib_name}` could not be loaded"),
+			Self::ListNotLoaded(msgs) => {
+				// This makes the formatting slightly less recursive looking.
+				return write!(f, "Dylink Error(s):\n{msgs}");
+			}
 		};
 		write!(f, "Dylink Error: {err}")
 	}

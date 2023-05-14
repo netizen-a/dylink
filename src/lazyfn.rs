@@ -1,107 +1,127 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use std::{
-	cell, mem,
-	sync::{
-		self,
-		atomic::{AtomicPtr, Ordering},
-	}, ffi::CStr,
-};
 
-use crate::*;
+#[cfg_attr(windows, path = "lazyfn/win32.rs")]
+#[cfg_attr(unix, path = "lazyfn/unix.rs")]
+mod os;
 
 mod loader;
 
-/// Determines what library to look up when [LazyFn::try_link] is called.
+use std::{
+	cell,
+	ffi::CStr,
+	mem,
+	sync::{
+		self,
+		atomic::{AtomicPtr, Ordering},
+	},
+};
+
+use crate::error;
+
+struct DefaultLinker;
+
+/// Determines how to load the library when [LazyFn::try_link] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
-pub enum LinkType {
+pub enum LinkType<'a> {
 	/// Specifies a specialization for loading vulkan functions using vulkan loaders.
 	Vulkan,
-	/// Specifies a generalization for loading functions using native system loaders.
-	System(&'static [&'static str]),
+	/// Specifies a generalization for loading functions.
+	General(&'a [&'a CStr]),
 }
 
 /// Fundamental data type of dylink.
 ///
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
-/// This structure can be used seperate from the dylink macro to check if the libraries exist before calling a dylink generated function.
-pub struct LazyFn<F: 'static + Sync + Send> {
+/// The provided member functions can be used from the generated macro when `strip=true` is enabled.
+#[derive(Debug)]
+pub struct LazyFn<'a, F: Copy + Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
 	status: cell::RefCell<Option<error::DylinkError>>,
-	// The function to be called.
-	// Non-function types can be stored, but obviously can't be called (call ops aren't overloaded).
+	// this exists so that `F` is considered thread-safe
 	pub(crate) addr_ptr: AtomicPtr<F>,
-	// This may look like a large type, but UnsafeCell is transparent, and Option can use NPO,
-	// so when LazyFn is used properly `addr` is only the size of a pointer.
-	pub(crate) addr: cell::UnsafeCell<F>,
-	fn_name: &'static CStr,
-	link_ty: LinkType,
+	// The function to be called.
+	// mutating this data without locks is UB.
+	pub(crate) addr: cell::Cell<F>,
+	fn_name: &'a CStr,
+	link_ty: LinkType<'a>,
 }
 
-impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
+unsafe impl<F: Copy + Sync + Send> Sync for LazyFn<'_, F> {}
+
+impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
 	#[inline]
-	pub const fn new(
-		thunk: &'static F,
-		fn_name: &'static CStr,
-		link_ty: LinkType,
-	) -> Self {
+	pub const fn new(thunk: &'a F, fn_name: &'a CStr, link_ty: LinkType<'a>) -> Self {
 		// In a const context this assert will be optimized out.
-		assert!(mem::size_of::<FnPtr>() == mem::size_of::<F>());
+		assert!(mem::size_of::<crate::FnPtr>() == mem::size_of::<F>());
 		Self {
 			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
 			once: sync::Once::new(),
 			status: cell::RefCell::new(None),
-			addr: cell::UnsafeCell::new(*thunk),
+			addr: cell::Cell::new(*thunk),
 			fn_name,
 			link_ty,
 		}
 	}
-	
-	/// If successful, stores address in current instance and returns a copy of the stored value.
-	pub fn try_link(&self) -> Result<&F> {
+
+	/// Implicitly calls system defined linker loader, such as `GetProcAddress`, and `LoadLibraryExW`
+	/// for windows, or `dlsym`, and `dlopen` for unix. This function is used by the
+	/// [dylink](dylink_macro::dylink) macro by default.
+	/// If successful, stores address in current instance and returns a reference of the stored value.
+	/// # Example
+	/// ```rust
+	/// # use dylink::dylink;
+	/// #[dylink(name = "MyDLL.dll", strip = true)]
+	/// extern "C" {
+	///     fn foo();
+	/// }
+	///
+	/// match foo.try_link() {
+	///     Ok(func) => unsafe {func()},
+	///     Err(err) => {
+	///         println!("{err}")
+	///     }
+	/// }
+	/// ```
+	pub fn try_link(&self) -> crate::Result<&F> {
+		self.try_link_with::<DefaultLinker>()
+	}
+
+	/// Provides a generic argument to supply a user defined linker loader to load the library.
+	/// If successful, stores address in current instance and returns a reference of the stored value.
+	pub(crate) fn try_link_with<L: crate::RTLinker>(&self) -> crate::Result<&F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
-				LinkType::System(lib_list) => {
-					// why is this branch so painful when I just want to call system_loader?
-					// FIXME: make this branch less painful to look at
-
-					let default_error = {
-						if lib_list.len() > 1 {
-							error::DylinkError::ListNotLoaded(vec![])
-						} else {
-							error::DylinkError::LibNotLoaded(String::new())
-						}
-					};
-					let mut result = Err(default_error);
-					for lib_name in lib_list {
-						match loader::system_loader(lib_name, self.fn_name) {
-							Ok(addr) => {
-								result = Ok(addr);
-								// success! lib and function retrieved!
-								break;
-							}
-							Err(err) => {
-								// lib detected, but function failed to load
-								result = Err(err);
-							}
-						}
-					}
-					result
+				LinkType::General(lib_list) => {
+					let mut errors = vec![];
+					lib_list
+						.iter()
+						.find_map(|lib| {
+							loader::general_loader::<L>(lib, self.fn_name)
+								.map_err(|e| errors.push(e))
+								.ok()
+						})
+						.ok_or_else(|| {							
+							let err: String = errors
+								.iter()
+								.map(|e| e.to_string() + "\n")
+								.collect();
+							error::DylinkError::ListNotLoaded(err)
+						})
 				}
 			};
 
 			match maybe {
 				Ok(addr) => {
-					let addr_ptr = self.addr.get();
 					unsafe {
-						addr_ptr.write(mem::transmute_copy(&addr));
+						self.addr.set(mem::transmute_copy(&addr));
 					}
-					self.addr_ptr.store(addr_ptr as *mut F, Ordering::Release);
+					self.addr_ptr.store(self.addr.as_ptr(), Ordering::Release);
 				}
 				Err(err) => {
 					let _ = self.status.replace(Some(err));
@@ -111,30 +131,27 @@ impl<F: 'static + Copy + Sync + Send> LazyFn<F> {
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
 		match (*self.status.borrow()).clone() {
-			None => Ok(self.as_ref()),
+			None => Ok(self.load(Ordering::Acquire)),
 			Some(err) => Err(err),
 		}
 	}
 
-	// moved to private since loader should be used instead.
 	#[inline]
-	fn as_ref(&self) -> &F {
-		unsafe {
-			self.addr_ptr
-				.load(Ordering::Acquire)
-				.as_ref()
-				.unwrap_unchecked()
-		}
+	fn load(&self, order: Ordering) -> &F {
+		unsafe { self.addr_ptr.load(order).as_ref().unwrap_unchecked() }
+	}
+	/// Consumes `LazyFn` and returns the contained value.
+	///
+	/// This is safe because passing self by value guarantees that no other threads are concurrently accessing `LazyFn`.
+	pub fn into_inner(self) -> F {
+		self.addr.into_inner()
 	}
 }
 
-unsafe impl<F: 'static + Sync + Send> Send for LazyFn<F> {}
-unsafe impl<F: 'static + Sync + Send> Sync for LazyFn<F> {}
-
-impl<F: 'static + Copy + Sync + Send> std::ops::Deref for LazyFn<F> {
+impl<F: Copy + Sync + Send> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
-
+	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {
-		self.as_ref()
+		self.load(Ordering::Relaxed)
 	}
 }

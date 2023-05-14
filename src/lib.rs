@@ -15,7 +15,12 @@
 //!
 //! # Vulkan Specialization
 //! There is also a builtin vulkan loader option in the macro as well, which automatically looks for the shared library where expected.
-//! The appropriate ABI to use with the vulkan loader is `extern "system"`.
+//! The appropriate ABI to use with the vulkan loader is `extern "system"`. Unlike generalized loading, the vulkan specialization loads
+//! functions indirectly through `vkGetInstanceProcAddr`, and when applicable `vkGetDeviceProcAddr`, to retrieve vulkan addresses properly.
+//! The internal copies of the instance and device handles are only stored until destroyed through a dylink generated vulkan function.
+//!
+//! *Note: Due to how dylink handles loading, `vkCreateInstance`, `vkDestroyInstance`, `vkCreateDevice`, and `vkDestroyDevice` are
+//! incompatible with the `strip=true` macro argument.*
 //! ```rust
 //! use dylink::dylink;
 //!
@@ -91,6 +96,7 @@
 use std::{collections::HashSet, sync};
 
 use once_cell::sync::Lazy;
+use std::ffi;
 
 mod error;
 mod lazyfn;
@@ -185,4 +191,22 @@ impl Global {
 		let mut write_lock = VK_DEVICE.write().unwrap();
 		write_lock.remove(device)
 	}
+}
+
+/// Opaque pointer sized library handle
+#[repr(transparent)]
+pub(crate) struct LibHandle(*const ffi::c_void);
+unsafe impl Send for LibHandle {}
+unsafe impl Sync for LibHandle {}
+
+impl LibHandle {
+	#[inline]
+	fn is_invalid(&self) -> bool {
+		self.0.is_null()
+	}
+}
+
+pub(crate) trait RTLinker {
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle;
+	fn load_sym(lib_handle: &LibHandle, fn_name: &ffi::CStr) -> Option<FnPtr>;
 }

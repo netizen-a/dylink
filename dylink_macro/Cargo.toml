@@ -1,13 +1,14 @@
 [package]
 name = "dylink_macro"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["Jonathan Thomason"]
 edition = "2021"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["ffi", "macro", "attribute"]
-description = "Dynamic function loading attribute."
+description = "Run-time dynamic linking loader attribute"
 repository = "https://github.com/Razordor/dylink.git"
+publish = true
 
 [lib]
 proc-macro = true
@@ -22,10 +23,5 @@ default-features=false
 
 [dependencies.syn]
 version = "2.0"
-features = ["full", "parsing", "printing" ]
+features = ["full", "parsing", "printing"]
 default-features=false
-
-
-[features]
-warnings = []
-no_lifetimes = []
