@@ -106,11 +106,11 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 								.map_err(|e| errors.push(e))
 								.ok()
 						})
-						.ok_or_else(|| {
-							let mut err = vec![];
-							for e in errors {
-								err.push(e.to_string());
-							}
+						.ok_or_else(|| {							
+							let err: String = errors
+								.iter()
+								.map(|e| e.to_string() + "\n")
+								.collect();
 							error::DylinkError::ListNotLoaded(err)
 						})
 				}

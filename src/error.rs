@@ -13,7 +13,7 @@ pub enum DylinkError {
 	/// The library was not loaded.
 	LibNotLoaded(String),
 	/// All the libraries were not loaded.
-	ListNotLoaded(Vec<String>),
+	ListNotLoaded(String),
 }
 
 impl error::Error for DylinkError {}
@@ -24,12 +24,8 @@ impl fmt::Display for DylinkError {
 			Self::FnNotFound(fn_name) => format!("function `{fn_name}` not found"),
 			Self::LibNotLoaded(lib_name) => format!("library `{lib_name}` could not be loaded"),
 			Self::ListNotLoaded(msgs) => {
-				let mut message = String::new();
-				for m in msgs.iter() {
-					message.push_str(&format!("{m}\n"));
-				}
 				// This makes the formatting slightly less recursive looking.
-				return write!(f, "Dylink Error(s):\n{message}");
+				return write!(f, "Dylink Error(s):\n{msgs}");
 			}
 		};
 		write!(f, "Dylink Error: {err}")

@@ -151,10 +151,6 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 				Err(Error::new(value.span(), EXPECTED_KW))
 			}
 		} else {
-			// strip is defaulted to false
-			if strip.is_none() {
-				strip = None;
-			}
 			Ok(Self {
 				strip,
 				link_ty: maybe_link_ty.unwrap(),
@@ -165,24 +161,20 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 
 impl quote::ToTokens for LinkType {
 	fn to_tokens(&self, tokens: &mut TokenStream2) {
-		unsafe {
-			match self {
-				LinkType::Vulkan => {
-					tokens.extend(TokenStream2::from_str("LinkType::Vulkan").unwrap_unchecked())
+		match self {
+			LinkType::Vulkan => tokens
+				.extend(unsafe { TokenStream2::from_str("LinkType::Vulkan").unwrap_unchecked() }),
+			LinkType::General(lib_list) => {
+				let mut lib_array = String::from("&unsafe {{[");
+				for name in lib_list {
+					lib_array.push_str(&format!(
+						"std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{name}\\0\"),"
+					))
 				}
-				LinkType::General(lib_list) => {
-					let mut lib_array = String::from("&unsafe {{[");
-					for name in lib_list {
-						lib_array.push_str(&format!(
-							"std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{name}\\0\"),"
-						))
-					}
-					lib_array.push_str("]}}");
-					tokens.extend(
-						TokenStream2::from_str(&format!("LinkType::General({lib_array})"))
-							.unwrap_unchecked(),
-					)
-				}
+				lib_array.push_str("]}}");
+				tokens.extend(
+					TokenStream2::from_str(&format!("LinkType::General({lib_array})")).unwrap(),
+				)
 			}
 		}
 	}

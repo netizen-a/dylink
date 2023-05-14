@@ -73,7 +73,7 @@ fn test_fn_not_found() {
 #[cfg(target_os = "linux")]
 #[test]
 fn test_linux_x11() {
-	use std::ffi::{c_char, CStr, c_void};
+	use std::ffi::{c_char, c_void, CStr};
 
 	#[repr(transparent)]
 	struct Display(*const c_void);
