@@ -93,9 +93,8 @@
 //! Unloading a library means not only are all loaded dylink functions invalidated, but functions loaded from **ALL**
 //! crates in the project are also invalidated, which will immediately lead to segfaults... a lot of them.
 
-use std::{collections::HashSet, sync};
+use std::sync;
 
-use once_cell::sync::Lazy;
 use std::ffi;
 
 mod error;
@@ -121,11 +120,11 @@ compile_error!("Dylink Error: Wasm is unsupported.");
 
 // These globals are read every time a vulkan function is called for the first time,
 // which occurs through `LazyFn::link`.
-static VK_INSTANCE: sync::RwLock<Lazy<HashSet<vulkan::VkInstance>>> =
-	sync::RwLock::new(Lazy::new(HashSet::new));
+static VK_INSTANCE: sync::RwLock<Vec<vulkan::VkInstance>> =
+	sync::RwLock::new(Vec::new());
 
-static VK_DEVICE: sync::RwLock<Lazy<HashSet<vulkan::VkDevice>>> =
-	sync::RwLock::new(Lazy::new(HashSet::new));
+static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> =
+	sync::RwLock::new(Vec::new());
 
 // Used as a placeholder function pointer. This should **NEVER** be called directly,
 // and promptly cast into the correct function pointer type.
@@ -145,7 +144,7 @@ pub(crate) type Result<T> = std::result::Result<T, error::DylinkError>;
 pub struct Global;
 impl Global {
 	// This is safe since vulkan will just discard garbage values
-	/// Adds an instance to the internal HashSet.
+	/// Adds an instance to the internal Vec.
 	///
 	/// Returns whether the instance was newly inserted. That is:
 	///
@@ -156,7 +155,13 @@ impl Global {
 	pub fn insert_instance(&self, instance: vulkan::VkInstance) -> bool {
 		//println!("insert_instance called!");
 		let mut write_lock = VK_INSTANCE.write().unwrap();
-		write_lock.insert(instance)
+		match write_lock.binary_search(&instance) {
+			Ok(_) => false,
+			Err(index) => {
+				write_lock.insert(index, instance);
+				true
+			}
+		}
 	}
 
 	/// Removes an instance from the set. Returns whether the instance was present in the set.
@@ -165,11 +170,17 @@ impl Global {
 	pub unsafe fn remove_instance(&self, instance: &vulkan::VkInstance) -> bool {
 		//println!("remove_instance called!");
 		let mut write_lock = VK_INSTANCE.write().unwrap();
-		write_lock.remove(instance)
+		match write_lock.binary_search(&instance) {
+			Ok(index) => {
+				write_lock.remove(index);
+				true
+			}
+			Err(_) => false,
+		}
 	}
 
 	// This is safe since vulkan will just discard garbage values
-	/// Adds a device to the internal HashSet.
+	/// Adds a device to the internal Vec.
 	///
 	/// Returns whether the device was newly inserted. That is:
 	///
@@ -179,8 +190,14 @@ impl Global {
 	/// *note: This function returns `false` if the device is valid and defined through dylink.*
 	pub fn insert_device(&self, device: vulkan::VkDevice) -> bool {
 		//println!("insert_device called!");
-		let mut write_lock = VK_DEVICE.write().unwrap();
-		write_lock.insert(device)
+		let mut write_lock = VK_DEVICE.write().unwrap();		
+		match write_lock.binary_search(&device) {
+			Ok(_) => false,
+			Err(index) => {
+				write_lock.insert(index, device);
+				true
+			}
+		}
 	}
 
 	/// Removes a device from the set. Returns whether the value was present in the set.
@@ -189,7 +206,13 @@ impl Global {
 	pub unsafe fn remove_device(&self, device: &vulkan::VkDevice) -> bool {
 		//println!("remove_device called!");
 		let mut write_lock = VK_DEVICE.write().unwrap();
-		write_lock.remove(device)
+		match write_lock.binary_search(&device) {
+			Ok(index) => {
+				write_lock.remove(index);
+				true
+			}
+			Err(_) => false,
+		}
 	}
 }
 

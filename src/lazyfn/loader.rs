@@ -37,20 +37,18 @@ pub(crate) fn general_loader<L: crate::RTLinker>(
 	lib_name: &ffi::CStr,
 	fn_name: &ffi::CStr,
 ) -> Result<FnPtr> {
-	use std::collections::HashMap;
-
-	use once_cell::sync::Lazy;
-
-	static DLL_DATA: RwLock<Lazy<HashMap<ffi::CString, crate::LibHandle>>> =
-		RwLock::new(Lazy::new(HashMap::default));
+	static DLL_DATA: RwLock<Vec<(ffi::CString, crate::LibHandle)>> =
+		RwLock::new(Vec::new());
 
 	// somehow rust is smart enough to infer that maybe_fn is assigned to only once after branching.
 	let maybe_fn;
 
 	let read_lock = DLL_DATA.read().unwrap();
-	if let Some(handle) = read_lock.get(lib_name) {
-		maybe_fn = L::load_sym(handle, fn_name);
-	} else {
+	match read_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
+		Ok(index) => {
+			maybe_fn = L::load_sym(&read_lock[index].1, fn_name)
+		}
+	Err(index) => {
 		mem::drop(read_lock);
 
 		let lib_handle = L::load_lib(lib_name);
@@ -64,9 +62,10 @@ pub(crate) fn general_loader<L: crate::RTLinker>(
 			DLL_DATA
 				.write()
 				.unwrap()
-				.insert(lib_name.to_owned(), lib_handle);
+				.insert(index, (lib_name.to_owned(), lib_handle));
 		}
 	}
+}
 	match maybe_fn {
 		Some(addr) => Ok(addr),
 		None => Err(DylinkError::FnNotFound(
