@@ -16,7 +16,7 @@ Related links:
 
 ## Supported platforms
 
-Dylink has been implemented for all major platforms aside from WASM, but has only been locally tested on Windows and Linux.
+Dylink has been implemented for all major platforms aside from WASM, but has only been tested on Windows and Linux.
 
 | Windows | Linux | MacOS    | WASM |
 |:-------:|:-----:|:--------:|------|

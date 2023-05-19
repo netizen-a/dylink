@@ -5,25 +5,11 @@ use std::{ffi, mem, sync::RwLock};
 use crate::{error::*, vulkan, FnPtr, Result};
 
 pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> Result<FnPtr> {
-	let mut maybe_fn = match fn_name.to_bytes() {
-		b"vkGetInstanceProcAddr" => {
-			Some(mem::transmute::<vulkan::PFN_vkGetInstanceProcAddr, FnPtr>(
-				vulkan::vkGetInstanceProcAddr,
-			))
-		}
-		b"vkGetDeviceProcAddr" => Some(mem::transmute::<vulkan::PFN_vkGetDeviceProcAddr, FnPtr>(
-			vulkan::vkGetDeviceProcAddr,
-		)),
-		_ => None,
-	};
-	maybe_fn = match maybe_fn {
-		Some(addr) => return Ok(addr),
-		None => crate::VK_DEVICE
-			.read()
-			.expect("failed to get read lock")
-			.iter()
-			.find_map(|device| vulkan::vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const _)),
-	};
+	let mut maybe_fn = crate::VK_DEVICE
+		.read()
+		.expect("failed to get read lock")
+		.iter()
+		.find_map(|device| vulkan::vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const _));
 	maybe_fn = match maybe_fn {
 		Some(addr) => return Ok(addr),
 		None => crate::VK_INSTANCE

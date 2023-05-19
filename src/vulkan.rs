@@ -53,9 +53,6 @@ extern "system" {
 #[allow(non_camel_case_types)]
 pub(crate) type PFN_vkGetDeviceProcAddr =
 	unsafe extern "system" fn(VkDevice, *const ffi::c_char) -> Option<FnPtr>;
-#[allow(non_camel_case_types)]
-pub(crate) type PFN_vkGetInstanceProcAddr =
-	unsafe extern "system" fn(VkInstance, *const ffi::c_char) -> Option<FnPtr>;
 
 // vkGetDeviceProcAddr must be implemented manually to avoid recursion
 #[allow(non_snake_case)]
