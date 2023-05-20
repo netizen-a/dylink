@@ -120,11 +120,9 @@ compile_error!("Dylink Error: Wasm is unsupported.");
 
 // These globals are read every time a vulkan function is called for the first time,
 // which occurs through `LazyFn::link`.
-static VK_INSTANCE: sync::RwLock<Vec<vulkan::VkInstance>> =
-	sync::RwLock::new(Vec::new());
+static VK_INSTANCE: sync::RwLock<Vec<vulkan::VkInstance>> = sync::RwLock::new(Vec::new());
 
-static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> =
-	sync::RwLock::new(Vec::new());
+static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> = sync::RwLock::new(Vec::new());
 
 // Used as a placeholder function pointer. This should **NEVER** be called directly,
 // and promptly cast into the correct function pointer type.
@@ -132,8 +130,7 @@ pub(crate) type FnPtr = unsafe extern "system" fn() -> isize;
 // The result of a dylink function
 pub(crate) type Result<T> = std::result::Result<T, error::DylinkError>;
 
-// TODO: Make the `Global` struct below public when extern types are stable.
-//		 The name `Global` is still TBD.
+// TODO: Make the `Global` struct below public when name is picked out
 
 /// The global context for specializations.
 ///
@@ -170,7 +167,7 @@ impl Global {
 	pub unsafe fn remove_instance(&self, instance: &vulkan::VkInstance) -> bool {
 		//println!("remove_instance called!");
 		let mut write_lock = VK_INSTANCE.write().unwrap();
-		match write_lock.binary_search(&instance) {
+		match write_lock.binary_search(instance) {
 			Ok(index) => {
 				write_lock.remove(index);
 				true
@@ -190,7 +187,7 @@ impl Global {
 	/// *note: This function returns `false` if the device is valid and defined through dylink.*
 	pub fn insert_device(&self, device: vulkan::VkDevice) -> bool {
 		//println!("insert_device called!");
-		let mut write_lock = VK_DEVICE.write().unwrap();		
+		let mut write_lock = VK_DEVICE.write().unwrap();
 		match write_lock.binary_search(&device) {
 			Ok(_) => false,
 			Err(index) => {
@@ -206,7 +203,7 @@ impl Global {
 	pub unsafe fn remove_device(&self, device: &vulkan::VkDevice) -> bool {
 		//println!("remove_device called!");
 		let mut write_lock = VK_DEVICE.write().unwrap();
-		match write_lock.binary_search(&device) {
+		match write_lock.binary_search(device) {
 			Ok(index) => {
 				write_lock.remove(index);
 				true

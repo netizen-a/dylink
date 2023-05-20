@@ -96,7 +96,11 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	pub(crate) fn try_link_with<L: crate::RTLinker>(&self) -> crate::Result<&F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
-				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
+				LinkType::Vulkan => unsafe {
+					loader::vulkan_loader(self.fn_name).ok_or(error::DylinkError::FnNotFound(
+						self.fn_name.to_str().unwrap().to_owned(),
+					))
+				},
 				LinkType::General(lib_list) => {
 					let mut errors = vec![];
 					lib_list

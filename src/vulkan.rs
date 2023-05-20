@@ -13,15 +13,20 @@ extern crate self as dylink;
 
 #[doc(hidden)]
 #[repr(transparent)]
-#[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct VkInstance(pub(crate) *mut ffi::c_void);
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct VkInstance(*mut ffi::c_void);
 unsafe impl Sync for VkInstance {}
 unsafe impl Send for VkInstance {}
+impl VkInstance {
+	pub const fn null() -> Self {
+		Self(std::ptr::null_mut())
+	}
+}
 
 #[doc(hidden)]
 #[repr(transparent)]
-#[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct VkDevice(pub(crate) *mut ffi::c_void);
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct VkDevice(*mut ffi::c_void);
 unsafe impl Sync for VkDevice {}
 unsafe impl Send for VkDevice {}
 
