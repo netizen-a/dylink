@@ -19,7 +19,7 @@ extern "system" {
 
 impl crate::RTLinker for DefaultLinker {
 	type Data = ffi::c_void;
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle {
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<Self::Data> {
 		let wide_str: Vec<u16> = lib_name
 			.to_string_lossy()
 			.encode_utf16()
@@ -35,7 +35,7 @@ impl crate::RTLinker for DefaultLinker {
 		};
 		LibHandle::from(unsafe { result.as_ref() })
 	}
-	fn load_sym(lib_handle: &LibHandle, fn_name: &ffi::CStr) -> Option<crate::FnPtr> {
+	fn load_sym(lib_handle: &LibHandle<Self::Data>, fn_name: &ffi::CStr) -> Option<crate::FnPtr> {
 		unsafe {
 			GetProcAddress(
 				lib_handle

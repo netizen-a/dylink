@@ -217,9 +217,9 @@ impl Global {
 /// Opaque pointer sized library handle
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct LibHandle<T = ffi::c_void>(*const T);
-unsafe impl Send for LibHandle {}
-unsafe impl Sync for LibHandle {}
+pub struct LibHandle<T>(*const T);
+unsafe impl <T> Send for LibHandle<T> {}
+unsafe impl <T> Sync for LibHandle<T> {}
 
 impl<T> LibHandle<T> {
 	#[inline]
