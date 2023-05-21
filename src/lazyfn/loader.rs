@@ -35,7 +35,10 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> Option<FnPtr> {
 pub(crate) fn general_loader<L: crate::RTLinker>(
 	lib_name: &ffi::CStr,
 	fn_name: &ffi::CStr,
-) -> DylinkResult<FnPtr> {
+) -> DylinkResult<FnPtr>
+where
+	L::Data: Send + Sync,
+{
 	static DLL_DATA: RwLock<Vec<(ffi::CString, crate::LibHandle<ffi::c_void>)>> = RwLock::new(Vec::new());
 
 	// somehow rust is smart enough to infer that maybe_fn is assigned to only once after branching.

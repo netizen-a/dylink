@@ -214,12 +214,13 @@ impl Global {
 	}
 }
 
+// LibHandle is thread-safe because it's inherently immutable, therefore don't add mutable accessors.
+
 /// Opaque pointer sized library handle
-#[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct LibHandle<T>(*const T);
-unsafe impl <T> Send for LibHandle<T> {}
-unsafe impl <T> Sync for LibHandle<T> {}
+unsafe impl<T> Send for LibHandle<T> where T: Send {}
+unsafe impl<T> Sync for LibHandle<T> where T: Sync {}
 
 impl<T> LibHandle<T> {
 	#[inline]
@@ -245,6 +246,10 @@ impl<T> From<Option<&T>> for LibHandle<T> {
 /// Used to specify a custom linker loader for `LazyFn`
 pub trait RTLinker {
 	type Data;
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<Self::Data>;
-	fn load_sym(lib_handle: &LibHandle<Self::Data>, fn_name: &ffi::CStr) -> Option<FnPtr>;
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<Self::Data>
+	where
+		LibHandle<Self::Data>: Send + Sync;
+	fn load_sym(lib_handle: &LibHandle<Self::Data>, fn_name: &ffi::CStr) -> Option<FnPtr>
+	where
+		LibHandle<Self::Data>: Send + Sync;
 }
