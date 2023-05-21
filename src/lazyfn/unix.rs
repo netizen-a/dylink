@@ -14,13 +14,13 @@ extern "C" {
 
 impl crate::RTLinker for DefaultLinker {
 	type Data = c_void;
-	fn load_lib(lib_name: &CStr) -> LibHandle<Self::Data> {
+	fn load_lib(lib_name: &CStr) -> LibHandle<'static, Self::Data> {
 		unsafe {
 			let result = dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL);
 			LibHandle::from(result.as_ref())
 		}
 	}
-	fn load_sym(lib_handle: &LibHandle<Self::Data>, fn_name: &CStr) -> Option<crate::FnPtr> {
+	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &CStr) -> Option<crate::FnPtr> {
 		unsafe {
 			dlsym(
 				lib_handle

@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::{ffi, mem, sync::RwLock};
+use std::{ffi, mem, sync::RwLock, marker::PhantomData};
 
 use crate::{error::*, vulkan, DylinkResult, FnPtr};
 
@@ -47,7 +47,7 @@ where
 	let read_lock = DLL_DATA.read().unwrap();
 	match read_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
 		Ok(index) => {
-			let handle = crate::LibHandle::<L::Data>(read_lock[index].1 .0.cast());
+			let handle = crate::LibHandle::<L::Data>(read_lock[index].1 .0.cast(), PhantomData);
 			maybe_fn = L::load_sym(&handle, fn_name)
 		}
 		Err(index) => {

@@ -95,6 +95,7 @@
 //! 
 //! *An unloader may be considered in future revisions, but the current abstraction is unsuitable for RAII unloading.*
 
+use std::marker::PhantomData;
 use std::sync;
 
 use std::ffi;
@@ -218,40 +219,40 @@ impl Global {
 
 // LibHandle is thread-safe because it's inherently immutable, therefore don't add mutable accessors.
 
-/// Opaque pointer sized library handle
-#[repr(transparent)]
-pub struct LibHandle<T>(*const T);
-unsafe impl<T> Send for LibHandle<T> where T: Send {}
-unsafe impl<T> Sync for LibHandle<T> where T: Sync {}
+/// Library handle for [RTLinker]
+pub struct LibHandle<'a, T>(*const T, PhantomData<&'a()>);
+unsafe impl<T> Send for LibHandle<'_, T> where T: Send {}
+unsafe impl<T> Sync for LibHandle<'_, T> where T: Sync {}
 
-impl<T> LibHandle<T> {
+impl<'a, T> LibHandle<'a, T> {
 	#[inline]
 	pub fn is_invalid(&self) -> bool {
 		self.0.is_null()
 	}
-	pub(crate) fn as_opaque(&self) -> LibHandle<ffi::c_void> {
-		LibHandle(self.0.cast())
+	// This is basically a clone to an opaque handle
+	pub(crate) fn as_opaque<'b>(&'a self) -> LibHandle<'b, ffi::c_void> {
+		LibHandle(self.0.cast(), PhantomData)
 	}
 	pub fn as_ref(&self) -> Option<&T> {
 		unsafe { self.0.as_ref() }
 	}
 }
 
-impl<T> From<Option<&T>> for LibHandle<T> {
+impl<'a, T> From<Option<&'a T>> for LibHandle<'a, T> {
 	fn from(value: Option<&T>) -> Self {
 		value
-			.map(|r| Self((r as *const T).cast()))
-			.unwrap_or(Self(std::ptr::null()))
+			.map(|r| Self((r as *const T).cast(), PhantomData))
+			.unwrap_or(Self(std::ptr::null(), PhantomData))
 	}
 }
 
 /// Used to specify a custom run-time linker loader for [LazyFn]
 pub trait RTLinker {
 	type Data;
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<Self::Data>
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
 	where
-		LibHandle<Self::Data>: Send + Sync;
-	fn load_sym(lib_handle: &LibHandle<Self::Data>, fn_name: &ffi::CStr) -> Option<FnPtr>
+		Self::Data: Send + Sync;
+	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> Option<FnPtr>
 	where
-		LibHandle<Self::Data>: Send + Sync;
+		Self::Data: Send + Sync;
 }
