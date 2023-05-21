@@ -127,8 +127,9 @@ static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> = sync::RwLock::new(Vec::n
 // Used as a placeholder function pointer. This should **NEVER** be called directly,
 // and promptly cast into the correct function pointer type.
 pub(crate) type FnPtr = unsafe extern "system" fn() -> isize;
+
 // The result of a dylink function
-pub(crate) type Result<T> = std::result::Result<T, error::DylinkError>;
+pub(crate) type DylinkResult<T> = Result<T, error::DylinkError>;
 
 // TODO: Make the `Global` struct below public when name is picked out
 
@@ -214,19 +215,36 @@ impl Global {
 }
 
 /// Opaque pointer sized library handle
+#[derive(Clone, Copy)]
 #[repr(transparent)]
-pub(crate) struct LibHandle(*const ffi::c_void);
+pub struct LibHandle<T = ffi::c_void>(*const T);
 unsafe impl Send for LibHandle {}
 unsafe impl Sync for LibHandle {}
 
-impl LibHandle {
+impl<T> LibHandle<T> {
 	#[inline]
-	fn is_invalid(&self) -> bool {
+	pub fn is_invalid(&self) -> bool {
 		self.0.is_null()
+	}
+	pub(crate) fn as_opaque(&self) -> LibHandle<ffi::c_void> {
+		LibHandle(self.0.cast())
+	}
+	pub fn as_ref(&self) -> Option<&T> {
+		unsafe { self.0.as_ref() }
 	}
 }
 
-pub(crate) trait RTLinker {
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle;
-	fn load_sym(lib_handle: &LibHandle, fn_name: &ffi::CStr) -> Option<FnPtr>;
+impl<T> From<Option<&T>> for LibHandle<T> {
+	fn from(value: Option<&T>) -> Self {
+		value
+			.map(|r| Self((r as *const T).cast()))
+			.unwrap_or(Self(std::ptr::null()))
+	}
+}
+
+/// Used to specify a custom linker loader for `LazyFn`
+pub trait RTLinker {
+	type Data;
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<Self::Data>;
+	fn load_sym(lib_handle: &LibHandle<Self::Data>, fn_name: &ffi::CStr) -> Option<FnPtr>;
 }

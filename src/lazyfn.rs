@@ -16,7 +16,7 @@ use std::{
 	},
 };
 
-use crate::error;
+use crate::{error, DylinkResult};
 
 struct DefaultLinker;
 
@@ -87,13 +87,13 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	///     }
 	/// }
 	/// ```
-	pub fn try_link(&self) -> crate::Result<&F> {
+	pub fn try_link(&self) -> DylinkResult<&F> {
 		self.try_link_with::<DefaultLinker>()
 	}
 
 	/// Provides a generic argument to supply a user defined linker loader to load the library.
 	/// If successful, stores address in current instance and returns a reference of the stored value.
-	pub(crate) fn try_link_with<L: crate::RTLinker>(&self) -> crate::Result<&F> {
+	pub fn try_link_with<L: crate::RTLinker>(&self) -> DylinkResult<&F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe {

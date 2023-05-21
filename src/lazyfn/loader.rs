@@ -2,7 +2,7 @@
 
 use std::{ffi, mem, sync::RwLock};
 
-use crate::{error::*, vulkan, FnPtr, Result};
+use crate::{error::*, vulkan, DylinkResult, FnPtr};
 
 pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> Option<FnPtr> {
 	let mut maybe_fn = crate::VK_DEVICE
@@ -35,7 +35,7 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> Option<FnPtr> {
 pub(crate) fn general_loader<L: crate::RTLinker>(
 	lib_name: &ffi::CStr,
 	fn_name: &ffi::CStr,
-) -> Result<FnPtr> {
+) -> DylinkResult<FnPtr> {
 	static DLL_DATA: RwLock<Vec<(ffi::CString, crate::LibHandle)>> = RwLock::new(Vec::new());
 
 	// somehow rust is smart enough to infer that maybe_fn is assigned to only once after branching.
@@ -43,7 +43,10 @@ pub(crate) fn general_loader<L: crate::RTLinker>(
 
 	let read_lock = DLL_DATA.read().unwrap();
 	match read_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
-		Ok(index) => maybe_fn = L::load_sym(&read_lock[index].1, fn_name),
+		Ok(index) => {
+			let handle = crate::LibHandle::<L::Data>(read_lock[index].1 .0.cast());
+			maybe_fn = L::load_sym(&handle, fn_name)
+		}
 		Err(index) => {
 			mem::drop(read_lock);
 
@@ -58,7 +61,7 @@ pub(crate) fn general_loader<L: crate::RTLinker>(
 				DLL_DATA
 					.write()
 					.unwrap()
-					.insert(index, (lib_name.to_owned(), lib_handle));
+					.insert(index, (lib_name.to_owned(), lib_handle.as_opaque()));
 			}
 		}
 	}
