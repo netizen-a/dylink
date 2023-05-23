@@ -153,6 +153,8 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	}
 }
 
+// should this be removed in favor of just calling load?
+
 impl<F: Copy + Sync + Send> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
 	/// Dereferences the value atomically.

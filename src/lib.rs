@@ -220,7 +220,7 @@ impl Global {
 // LibHandle is thread-safe because it's inherently immutable, therefore don't add mutable accessors.
 
 /// Library handle for [RTLinker]
-pub struct LibHandle<'a, T>(*const T, PhantomData<&'a()>);
+pub struct LibHandle<'a, T: ?Sized>(*const T, PhantomData<&'a()>);
 unsafe impl<T> Send for LibHandle<'_, T> where T: Send {}
 unsafe impl<T> Sync for LibHandle<'_, T> where T: Sync {}
 
@@ -239,10 +239,16 @@ impl<'a, T> LibHandle<'a, T> {
 }
 
 impl<'a, T> From<Option<&'a T>> for LibHandle<'a, T> {
-	fn from(value: Option<&T>) -> Self {
+	fn from(value: Option<&'a T>) -> Self {
 		value
 			.map(|r| Self((r as *const T).cast(), PhantomData))
 			.unwrap_or(Self(std::ptr::null(), PhantomData))
+	}
+}
+
+impl<'a, T> From<&'a T> for LibHandle<'a, T> {
+	fn from(value: &'a T) -> Self {
+		Self((value as *const T).cast(), PhantomData)
 	}
 }
 
