@@ -50,3 +50,27 @@ impl crate::RTLinker for DefaultLinker {
 		}
 	}
 }
+
+#[test]
+fn test_win32_macro_linker() {
+	extern crate self as dylink;
+	#[dylink::dylink(name = "Kernel32.dll", strip = true, linker=DefaultLinker)]
+	extern "stdcall" {
+		fn SetLastError(_: u32);
+	}
+
+	// macro output: function
+	#[dylink::dylink(name = "Kernel32.dll", strip = false, linker=DefaultLinker)]
+	extern "C" {
+		fn GetLastError() -> u32;
+	}
+
+	unsafe {
+		// static variable has crappy documentation, but can be use for library induction.
+		match SetLastError.try_link() {
+			Ok(f) => f(53),
+			Err(e) => panic!("{}", e),
+		}
+		assert_eq!(GetLastError(), 53);
+	}
+}

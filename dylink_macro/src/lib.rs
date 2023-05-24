@@ -45,6 +45,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 	let output = fn_item.sig.output.to_token_stream();
 	let strip = attr_data.strip;
 	let link_ty = &attr_data.link_ty;
+	let linker = &attr_data.linker;
 
 	let fn_attrs: Vec<TokenStream2> = fn_item
 		.attrs
@@ -161,9 +162,19 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 		quote!(#caller_name(#(#param_list),*))
 	};
 
+	let try_link_call = match linker {
+		None => quote!{
+			try_link
+		},
+		Some(linker_name) => quote!{
+			try_link_with::<#linker_name>
+		},
+	};
+
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
 	if strip {
+		
 		quote! {
 			#(#fn_attrs)*
 			#[allow(non_upper_case_globals)]
@@ -174,7 +185,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 					type InstFnPtr = unsafe #abi fn (#params_default) #output;
 					unsafe #abi fn initial_fn (#(#param_ty_list),*) #output {
 						use std::ffi::CStr;
-						match #fn_name.try_link() {
+						match #fn_name.#try_link_call() {
 							Ok(function) => {#call_dyn_func},
 							Err(err) => panic!("{}", err),
 						}
@@ -196,7 +207,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 				type InstFnPtr = #abi fn (#params_default) #output;
 				#abi fn initial_fn (#(#param_ty_list),*) #output {
 					use std::ffi::CStr;
-					match DYN_FUNC.try_link() {
+					match DYN_FUNC.#try_link_call() {
 						Ok(function) => {function(#(#param_list),*)},
 						Err(err) => panic!("{}", err),
 					}
