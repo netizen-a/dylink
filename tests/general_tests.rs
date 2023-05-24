@@ -11,7 +11,7 @@ fn test_win32_kernel32() {
 
 	// macro output: function
 	#[dylink(name = "Kernel32.dll", strip = false)]
-	fn GetLastError() -> u32;	
+	extern "system" fn GetLastError() -> u32;	
 
 	unsafe {
 		// static variable has crappy documentation, but can be use for library induction.
@@ -20,6 +20,28 @@ fn test_win32_kernel32() {
 			Err(e) => panic!("{}", e),
 		}
 		assert_eq!(GetLastError(), 53);
+	}
+}
+
+#[cfg(windows)]
+#[test]
+fn test_win32_impl() {
+
+	#[repr(transparent)]
+	struct Foo(u32);
+
+	impl Foo {
+		#[dylink(name = "Kernel32.dll")]
+		extern "stdcall" fn SetLastError(self: Foo);
+
+		#[dylink(name = "Kernel32.dll")]
+		extern "system" fn GetLastError() -> u32;
+	}
+
+	let foo = Foo(23);
+	unsafe {
+		foo.SetLastError();
+		assert!(Foo::GetLastError() == 23)
 	}
 }
 

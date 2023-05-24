@@ -27,13 +27,13 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 					.items
 					.iter()
 					.map(|item| match item {
-						ForeignItem::Fn(fn_item) => parse_fn(fn_item, &attr_data),
+						ForeignItem::Fn(fn_item) => parse_fn::<true>(fn_item, &attr_data),
 						other => quote!(#abi {#other}),
 					})
 					.collect::<TokenStream2>()
 					.into()
 			} else if let Ok(foreign_fn) = syn::parse2::<syn::ForeignItemFn>(input.into()) {
-				parse_fn(&foreign_fn, &attr_data)
+				parse_fn::<false>(&foreign_fn, &attr_data)
 					.into()
 			} else {
 				panic!("failed to parse");
@@ -43,7 +43,7 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 	}
 }
 
-fn parse_fn(fn_item: &syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 {
+fn parse_fn<const IS_MOD_ITEM: bool>(fn_item: &syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 {
 	let fn_name = fn_item.sig.ident.to_token_stream();
 	let abi = fn_item.sig.abi.to_token_stream();
 	let vis = fn_item.vis.to_token_stream();
@@ -60,6 +60,8 @@ fn parse_fn(fn_item: &syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 
 
 	let mut param_list = Vec::new();
 	let mut param_ty_list = Vec::new();
+	let mut internal_param_ty_list = Vec::new();
+	let mut internal_param_list = Vec::new();
 	let params_default = fn_item.sig.inputs.to_token_stream();
 	for (i, arg) in fn_item.sig.inputs.iter().enumerate() {
 		match arg {
@@ -71,11 +73,23 @@ fn parse_fn(fn_item: &syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 
 					_ => unreachable!(),
 				};
 				param_list.push(param_name.clone());
+				internal_param_list.push(param_name.clone());
 				param_ty_list.push(quote!(#param_name : #ty));
+				internal_param_ty_list.push(quote!(#param_name : #ty));
 			}
 			syn::FnArg::Receiver(rec) => {
-				return syn::Error::new(rec.span(), "`self` arguments are unsupported")
-					.into_compile_error();
+				if IS_MOD_ITEM || strip {
+					// TODO: fix error message
+					return syn::Error::new(rec.span(), "`self` arguments are unsupported in this context")
+						.into_compile_error();
+				} else {
+					let ty = rec.ty.to_token_stream();
+					let param_name = format!("p{i}").parse::<TokenStream2>().unwrap();
+					param_list.push(quote!{self});
+					internal_param_list.push(param_name.clone());
+					param_ty_list.push(quote!(self : #ty));
+					internal_param_ty_list.push(quote!(#param_name : #ty));
+				}
 			}
 		}
 	}
@@ -178,8 +192,7 @@ fn parse_fn(fn_item: &syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 
 
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
-	if strip {
-		
+	if strip {		
 		quote! {
 			#(#fn_attrs)*
 			#[allow(non_upper_case_globals)]
@@ -209,11 +222,11 @@ fn parse_fn(fn_item: &syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 
 			#[inline]
 			#vis unsafe #abi fn #fn_name (#(#param_ty_list),*) #output {
 				// InstFnPtr: instance function pointer type
-				type InstFnPtr = #abi fn (#params_default) #output;
-				#abi fn initial_fn (#(#param_ty_list),*) #output {
+				type InstFnPtr = #abi fn (#(#internal_param_ty_list),*) #output;
+				#abi fn initial_fn (#(#internal_param_ty_list),*) #output {
 					use std::ffi::CStr;
 					match DYN_FUNC.#try_link_call() {
-						Ok(function) => {function(#(#param_list),*)},
+						Ok(function) => {function(#(#internal_param_list),*)},
 						Err(err) => panic!("{}", err),
 					}
 				}
