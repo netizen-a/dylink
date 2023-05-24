@@ -11,9 +11,7 @@ fn test_win32_kernel32() {
 
 	// macro output: function
 	#[dylink(name = "Kernel32.dll", strip = false)]
-	extern "C" {
-		fn GetLastError() -> u32;
-	}
+	fn GetLastError() -> u32;	
 
 	unsafe {
 		// static variable has crappy documentation, but can be use for library induction.
