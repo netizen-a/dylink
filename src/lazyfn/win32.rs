@@ -35,7 +35,10 @@ impl crate::RTLinker for DefaultLinker {
 		};
 		LibHandle::from(unsafe { result.as_ref() })
 	}
-	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> Option<crate::FnPtr> {
+	fn load_sym(
+		lib_handle: &LibHandle<'static, Self::Data>,
+		fn_name: &ffi::CStr,
+	) -> Option<crate::FnPtr> {
 		unsafe {
 			GetProcAddress(
 				lib_handle

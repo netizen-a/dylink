@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::{ffi, mem, sync::RwLock, marker::PhantomData};
+use std::{ffi, marker::PhantomData, mem, sync::RwLock};
 
 use crate::{error::*, vulkan, DylinkResult, FnPtr};
 
@@ -39,7 +39,8 @@ pub(crate) fn general_loader<L: crate::RTLinker>(
 where
 	L::Data: Send + Sync,
 {
-	static DLL_DATA: RwLock<Vec<(ffi::CString, crate::LibHandle<ffi::c_void>)>> = RwLock::new(Vec::new());
+	static DLL_DATA: RwLock<Vec<(ffi::CString, crate::LibHandle<ffi::c_void>)>> =
+		RwLock::new(Vec::new());
 
 	// somehow rust is smart enough to infer that maybe_fn is assigned to only once after branching.
 	let maybe_fn;

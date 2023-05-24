@@ -75,7 +75,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 	}
 
 	// this is sure to obfuscate things, but this is needed here because `strip` screws with call context.
-	let caller_name = if strip.is_some() {
+	let caller_name = if strip {
 		quote! {function}
 	} else {
 		quote! {DYN_FUNC}
@@ -86,7 +86,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 	let call_dyn_func = if *link_ty == LinkType::Vulkan {
 		match fn_name.to_string().as_str() {
 			"vkCreateInstance" => {
-				if strip.is_some() {
+				if strip {
 					return syn::Error::new(
 						fn_item.span(),
 						"`vkCreateInstance` is incompatible with `strip=true`",
@@ -105,7 +105,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 				}
 			}
 			"vkDestroyInstance" => {
-				if strip.is_some() {
+				if strip {
 					return syn::Error::new(
 						fn_item.span(),
 						"`vkDestroyInstance` is incompatible with `strip=true`",
@@ -122,7 +122,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 				}
 			}
 			"vkCreateDevice" => {
-				if strip.is_some() {
+				if strip {
 					return syn::Error::new(
 						fn_item.span(),
 						"`vkCreateDevice` is incompatible with `strip=true`",
@@ -139,7 +139,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 				}
 			}
 			"vkDestroyDevice" => {
-				if strip.is_some() {
+				if strip {
 					return syn::Error::new(
 						fn_item.span(),
 						"`vkDestroyDevice` is incompatible with `strip=true`",
@@ -163,7 +163,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: &syn::ForeignItemFn, attr_data: &AttrData) 
 
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
-	if strip.is_some() {
+	if strip {
 		quote! {
 			#(#fn_attrs)*
 			#[allow(non_upper_case_globals)]

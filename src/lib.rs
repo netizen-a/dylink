@@ -92,7 +92,7 @@
 //! Shared library unloading is extremely cursed, always unsafe, and we don't even try to support it.
 //! Unloading a library means not only are all loaded dylink functions invalidated, but functions loaded from **ALL**
 //! crates in the project are also invalidated, which will immediately lead to segfaults... a lot of them.
-//! 
+//!
 //! *An unloader may be considered in future revisions, but the current abstraction is unsuitable for RAII unloading.*
 
 use std::marker::PhantomData;
@@ -220,7 +220,7 @@ impl Global {
 // LibHandle is thread-safe because it's inherently immutable, therefore don't add mutable accessors.
 
 /// Library handle for [RTLinker]
-pub struct LibHandle<'a, T: ?Sized>(*const T, PhantomData<&'a()>);
+pub struct LibHandle<'a, T: ?Sized>(*const T, PhantomData<&'a ()>);
 unsafe impl<T> Send for LibHandle<'_, T> where T: Send {}
 unsafe impl<T> Sync for LibHandle<'_, T> where T: Sync {}
 

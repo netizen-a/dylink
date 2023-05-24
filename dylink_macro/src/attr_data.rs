@@ -1,11 +1,11 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use proc_macro2::{Span as Span2, TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 use std::str::FromStr;
 use syn::punctuated::Punctuated;
 use syn::{spanned::Spanned, *};
 
 pub struct AttrData {
-	pub strip: Option<Span2>,
+	pub strip: bool,
 	pub link_ty: LinkType,
 }
 
@@ -19,7 +19,7 @@ pub enum LinkType {
 impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 	type Error = syn::Error;
 	fn try_from(value: Punctuated<Expr, Token!(,)>) -> Result<Self> {
-		let mut strip: Option<Span2> = None;
+		let mut strip = false;
 		let mut maybe_link_ty: Option<LinkType> = None;
 		let mut errors = vec![];
 		const EXPECTED_KW: &str = "Expected `vulkan`, `any`, `strip`, or `name`.";
@@ -41,8 +41,11 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 				// Branch for syntax: #[dylink(name = "")]
 				Expr::Assign(assign) => {
 					let (assign_left, assign_right) = (assign.left.as_ref(), assign.right.as_ref());
-					if matches!(assign_left, Expr::Path(ExprPath { path, .. }) if path.is_ident("name"))
-					{
+
+					let Expr::Path(ExprPath { path, .. }) = assign_left else {
+						unreachable!("internal error when parsing Expr::Assign");
+					};
+					if path.is_ident("name") {
 						match assign_right {
 							Expr::Lit(ExprLit {
 								lit: Lit::Str(lib), ..
@@ -60,16 +63,17 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 								errors.push(Error::new(right.span(), "Expected string literal."))
 							}
 						}
-					} else if matches!(assign_left, Expr::Path(ExprPath { path, .. }) if path.is_ident("strip"))
-					{
+					} else if path.is_ident("strip") {
+						// Branch for syntax: #[dylink(strip = <bool>)]
+
 						match assign_right {
 							Expr::Lit(ExprLit {
 								lit: Lit::Bool(val),
 								..
 							}) => {
 								if val.value() {
-									if strip.is_none() {
-										strip = Some(val.span())
+									if strip == false {
+										strip = true;
 									} else {
 										errors.push(Error::new(
 											assign.span(),

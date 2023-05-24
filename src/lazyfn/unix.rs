@@ -20,7 +20,10 @@ impl crate::RTLinker for DefaultLinker {
 			LibHandle::from(result.as_ref())
 		}
 	}
-	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &CStr) -> Option<crate::FnPtr> {
+	fn load_sym(
+		lib_handle: &LibHandle<'static, Self::Data>,
+		fn_name: &CStr,
+	) -> Option<crate::FnPtr> {
 		unsafe {
 			dlsym(
 				lib_handle
