@@ -114,9 +114,15 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 								.ok()
 						})
 						.ok_or_else(|| {
-							error::DylinkError::ListNotLoaded(
-								errors.iter().map(|e| e.to_string() + "\n").collect(),
-							)
+							if errors.len() > 1 {
+								error::DylinkError::ListNotLoaded(
+									errors.iter().map(|e| e.to_string() + "\n").collect(),
+								)
+							} else if errors.len() == 1 {
+								errors[0].clone()
+							} else {
+								unreachable!()
+							}
 						})
 				}
 			};
