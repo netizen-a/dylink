@@ -9,44 +9,48 @@ use quote::*;
 use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned, Expr, Token};
 
 use attr_data::*;
+use syn::ForeignItem;
 
 #[proc_macro_attribute]
 pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
-	let args = TokenStream2::from(args);
-	let input = TokenStream2::from(input);
-	let foreign_mod = syn::parse2::<syn::ItemForeignMod>(input).expect("failed to parse");
-
 	let punct = Parser::parse2(
 		Punctuated::<Expr, Token!(,)>::parse_separated_nonempty,
-		args,
+		args.into(),
 	)
 	.expect("failed to parse");
 
-	let attr_data = match AttrData::try_from(punct) {
-		Ok(attr) => attr,
-		Err(e) => {
-			return syn::Error::into_compile_error(e).into();
+	match AttrData::try_from(punct) {
+		Ok(attr_data) => {
+			if let Ok(foreign_mod) = syn::parse2::<syn::ItemForeignMod>(input.clone().into()) {
+				let abi = &foreign_mod.abi;
+				foreign_mod
+					.items
+					.iter()
+					.map(|item| match item {
+						ForeignItem::Fn(fn_item) => parse_fn::<true>(fn_item, &attr_data),
+						other => quote!(#abi {#other}),
+					})
+					.collect::<TokenStream2>()
+					.into()
+			} else if let Ok(foreign_fn) = syn::parse2::<syn::ForeignItemFn>(input.into()) {
+				parse_fn::<false>(&foreign_fn, &attr_data)
+					.into()
+			} else {
+				panic!("failed to parse");
+			}
 		}
-	};
-	let mut ret = TokenStream2::new();
-	for item in foreign_mod.items {
-		use syn::ForeignItem;
-		let abi = &foreign_mod.abi;
-		match item {
-			ForeignItem::Fn(fn_item) => ret.extend(parse_fn(abi, fn_item, &attr_data)),
-			other => ret.extend(quote!(#abi {#other})),
-		}
+		Err(e) => syn::Error::into_compile_error(e).into(),
 	}
-	TokenStream1::from(ret)
 }
 
-fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 {
+fn parse_fn<const IS_MOD_ITEM: bool>(fn_item: &syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 {
 	let fn_name = fn_item.sig.ident.to_token_stream();
-	let abi = abi.into_token_stream();
+	let abi = fn_item.sig.abi.to_token_stream();
 	let vis = fn_item.vis.to_token_stream();
 	let output = fn_item.sig.output.to_token_stream();
 	let strip = attr_data.strip;
 	let link_ty = &attr_data.link_ty;
+	let linker = &attr_data.linker;
 
 	let fn_attrs: Vec<TokenStream2> = fn_item
 		.attrs
@@ -56,6 +60,8 @@ fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -
 
 	let mut param_list = Vec::new();
 	let mut param_ty_list = Vec::new();
+	let mut internal_param_ty_list = Vec::new();
+	let mut internal_param_list = Vec::new();
 	let params_default = fn_item.sig.inputs.to_token_stream();
 	for (i, arg) in fn_item.sig.inputs.iter().enumerate() {
 		match arg {
@@ -67,17 +73,29 @@ fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -
 					_ => unreachable!(),
 				};
 				param_list.push(param_name.clone());
+				internal_param_list.push(param_name.clone());
 				param_ty_list.push(quote!(#param_name : #ty));
+				internal_param_ty_list.push(quote!(#param_name : #ty));
 			}
 			syn::FnArg::Receiver(rec) => {
-				return syn::Error::new(rec.span(), "`self` arguments are unsupported")
-					.into_compile_error();
+				if IS_MOD_ITEM || strip {
+					// TODO: fix error message
+					return syn::Error::new(rec.span(), "`self` arguments are unsupported in this context")
+						.into_compile_error();
+				} else {
+					let ty = rec.ty.to_token_stream();
+					let param_name = format!("p{i}").parse::<TokenStream2>().unwrap();
+					param_list.push(quote!{self});
+					internal_param_list.push(param_name.clone());
+					param_ty_list.push(quote!(self : #ty));
+					internal_param_ty_list.push(quote!(#param_name : #ty));
+				}
 			}
 		}
 	}
 
 	// this is sure to obfuscate things, but this is needed here because `strip` screws with call context.
-	let caller_name = if strip.is_some() {
+	let caller_name = if strip {
 		quote! {function}
 	} else {
 		quote! {DYN_FUNC}
@@ -88,7 +106,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -
 	let call_dyn_func = if *link_ty == LinkType::Vulkan {
 		match fn_name.to_string().as_str() {
 			"vkCreateInstance" => {
-				if strip.is_some() {
+				if strip {
 					return syn::Error::new(
 						fn_item.span(),
 						"`vkCreateInstance` is incompatible with `strip=true`",
@@ -107,7 +125,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -
 				}
 			}
 			"vkDestroyInstance" => {
-				if strip.is_some() {
+				if strip {
 					return syn::Error::new(
 						fn_item.span(),
 						"`vkDestroyInstance` is incompatible with `strip=true`",
@@ -124,7 +142,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -
 				}
 			}
 			"vkCreateDevice" => {
-				if strip.is_some() {
+				if strip {
 					return syn::Error::new(
 						fn_item.span(),
 						"`vkCreateDevice` is incompatible with `strip=true`",
@@ -141,7 +159,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -
 				}
 			}
 			"vkDestroyDevice" => {
-				if strip.is_some() {
+				if strip {
 					return syn::Error::new(
 						fn_item.span(),
 						"`vkDestroyDevice` is incompatible with `strip=true`",
@@ -163,9 +181,18 @@ fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -
 		quote!(#caller_name(#(#param_list),*))
 	};
 
+	let try_link_call = match linker {
+		None => quote!{
+			try_link
+		},
+		Some(linker_name) => quote!{
+			try_link_with::<#linker_name>
+		},
+	};
+
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
-	if strip.is_some() {
+	if strip {		
 		quote! {
 			#(#fn_attrs)*
 			#[allow(non_upper_case_globals)]
@@ -176,7 +203,7 @@ fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -
 					type InstFnPtr = unsafe #abi fn (#params_default) #output;
 					unsafe #abi fn initial_fn (#(#param_ty_list),*) #output {
 						use std::ffi::CStr;
-						match #fn_name.try_link() {
+						match #fn_name.#try_link_call() {
 							Ok(function) => {#call_dyn_func},
 							Err(err) => panic!("{}", err),
 						}
@@ -195,11 +222,11 @@ fn parse_fn(abi: &syn::Abi, fn_item: syn::ForeignItemFn, attr_data: &AttrData) -
 			#[inline]
 			#vis unsafe #abi fn #fn_name (#(#param_ty_list),*) #output {
 				// InstFnPtr: instance function pointer type
-				type InstFnPtr = #abi fn (#params_default) #output;
-				#abi fn initial_fn (#(#param_ty_list),*) #output {
+				type InstFnPtr = #abi fn (#(#internal_param_ty_list),*) #output;
+				#abi fn initial_fn (#(#internal_param_ty_list),*) #output {
 					use std::ffi::CStr;
-					match DYN_FUNC.try_link() {
-						Ok(function) => {function(#(#param_list),*)},
+					match DYN_FUNC.#try_link_call() {
+						Ok(function) => {function(#(#internal_param_list),*)},
 						Err(err) => panic!("{}", err),
 					}
 				}

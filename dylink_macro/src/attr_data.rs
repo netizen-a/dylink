@@ -1,12 +1,13 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use proc_macro2::{Span as Span2, TokenStream as TokenStream2};
+use proc_macro2::TokenStream as TokenStream2;
 use std::str::FromStr;
 use syn::punctuated::Punctuated;
 use syn::{spanned::Spanned, *};
 
 pub struct AttrData {
-	pub strip: Option<Span2>,
+	pub strip: bool,
 	pub link_ty: LinkType,
+	pub linker: Option<Ident>,
 }
 
 #[derive(PartialEq)]
@@ -19,8 +20,9 @@ pub enum LinkType {
 impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 	type Error = syn::Error;
 	fn try_from(value: Punctuated<Expr, Token!(,)>) -> Result<Self> {
-		let mut strip: Option<Span2> = None;
+		let mut maybe_strip: Option<bool> = None;
 		let mut maybe_link_ty: Option<LinkType> = None;
+		let mut linker: Option<Ident> = None;
 		let mut errors = vec![];
 		const EXPECTED_KW: &str = "Expected `vulkan`, `any`, `strip`, or `name`.";
 
@@ -38,11 +40,14 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 						errors.push(Error::new(path.span(), EXPECTED_KW));
 					}
 				}
-				// Branch for syntax: #[dylink(name = "")]
 				Expr::Assign(assign) => {
 					let (assign_left, assign_right) = (assign.left.as_ref(), assign.right.as_ref());
-					if matches!(assign_left, Expr::Path(ExprPath { path, .. }) if path.is_ident("name"))
-					{
+
+					let Expr::Path(ExprPath { path, .. }) = assign_left else {
+						unreachable!("internal error when parsing Expr::Assign");
+					};
+					if path.is_ident("name") {
+						// Branch for syntax: #[dylink(name = <string literal>)]
 						match assign_right {
 							Expr::Lit(ExprLit {
 								lit: Lit::Str(lib), ..
@@ -60,26 +65,41 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 								errors.push(Error::new(right.span(), "Expected string literal."))
 							}
 						}
-					} else if matches!(assign_left, Expr::Path(ExprPath { path, .. }) if path.is_ident("strip"))
-					{
+					} else if path.is_ident("strip") {
+						// Branch for syntax: #[dylink(strip = <bool>)]
 						match assign_right {
 							Expr::Lit(ExprLit {
 								lit: Lit::Bool(val),
 								..
 							}) => {
-								if val.value() {
-									if strip.is_none() {
-										strip = Some(val.span())
-									} else {
-										errors.push(Error::new(
-											assign.span(),
-											"strip is already defined",
-										));
-									}
+								if maybe_strip.is_none() {
+									maybe_strip = Some(val.value());
+								} else {
+									errors.push(Error::new(
+										assign.span(),
+										"strip is already defined",
+									));
 								}
 							}
 							right => {
 								errors.push(Error::new(right.span(), "Expected boolean literal."))
+							}
+						}
+					} else if path.is_ident("linker") {
+						// Branch for syntax: #[dylink(linker = <ident>)]
+						match assign_right {
+							Expr::Path(ExprPath { path, .. }) => {
+								if linker.is_none() {
+									linker = Some(path.get_ident().unwrap().clone());
+								} else {
+									errors.push(Error::new(
+										assign.span(),
+										"linker is already defined",
+									));
+								}
+							}
+							right => {
+								errors.push(Error::new(right.span(), "Expected identifier."))
 							}
 						}
 					} else {
@@ -152,8 +172,9 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 			}
 		} else {
 			Ok(Self {
-				strip,
+				strip: maybe_strip.unwrap_or_default(),
 				link_ty: maybe_link_ty.unwrap(),
+				linker,
 			})
 		}
 	}

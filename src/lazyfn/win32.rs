@@ -18,7 +18,8 @@ extern "system" {
 }
 
 impl crate::RTLinker for DefaultLinker {
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle {
+	type Data = ffi::c_void;
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data> {
 		let wide_str: Vec<u16> = lib_name
 			.to_string_lossy()
 			.encode_utf16()
@@ -32,9 +33,44 @@ impl crate::RTLinker for DefaultLinker {
 				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
 			)
 		};
-		LibHandle(result)
+		LibHandle::from(unsafe { result.as_ref() })
 	}
-	fn load_sym(lib_handle: &LibHandle, fn_name: &ffi::CStr) -> Option<crate::FnPtr> {
-		unsafe { GetProcAddress(lib_handle.0.cast_mut(), fn_name.as_ptr().cast()) }
+	fn load_sym(
+		lib_handle: &LibHandle<'static, Self::Data>,
+		fn_name: &ffi::CStr,
+	) -> Option<crate::FnPtr> {
+		unsafe {
+			GetProcAddress(
+				lib_handle
+					.as_ref()
+					.map(|r| r as *const _ as *mut ffi::c_void)
+					.unwrap_or(std::ptr::null_mut()),
+				fn_name.as_ptr().cast(),
+			)
+		}
+	}
+}
+
+#[test]
+fn test_win32_macro_linker() {
+	extern crate self as dylink;
+	#[dylink::dylink(name = "Kernel32.dll", strip = true, linker=DefaultLinker)]
+	extern "stdcall" {
+		fn SetLastError(_: u32);
+	}
+
+	// macro output: function
+	#[dylink::dylink(name = "Kernel32.dll", strip = false, linker=DefaultLinker)]
+	extern "C" {
+		fn GetLastError() -> u32;
+	}
+
+	unsafe {
+		// static variable has crappy documentation, but can be use for library induction.
+		match SetLastError.try_link() {
+			Ok(f) => f(53),
+			Err(e) => panic!("{}", e),
+		}
+		assert_eq!(GetLastError(), 53);
 	}
 }

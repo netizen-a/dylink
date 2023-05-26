@@ -20,7 +20,7 @@
 //! The internal copies of the instance and device handles are only stored until destroyed through a dylink generated vulkan function.
 //!
 //! *Note: Due to how dylink handles loading, `vkCreateInstance`, `vkDestroyInstance`, `vkCreateDevice`, and `vkDestroyDevice` are
-//! incompatible with the `strip=true` macro argument.*
+//! incompatible with the `strip=true` macro argument with the `#[dylink(vulkan)]` specialization.*
 //! ```rust
 //! use dylink::dylink;
 //!
@@ -92,10 +92,12 @@
 //! Shared library unloading is extremely cursed, always unsafe, and we don't even try to support it.
 //! Unloading a library means not only are all loaded dylink functions invalidated, but functions loaded from **ALL**
 //! crates in the project are also invalidated, which will immediately lead to segfaults... a lot of them.
+//!
+//! *An unloader may be considered in future revisions, but the current abstraction is unsuitable for RAII unloading.*
 
-use std::{collections::HashSet, sync};
+use std::marker::PhantomData;
+use std::sync;
 
-use once_cell::sync::Lazy;
 use std::ffi;
 
 mod error;
@@ -121,20 +123,19 @@ compile_error!("Dylink Error: Wasm is unsupported.");
 
 // These globals are read every time a vulkan function is called for the first time,
 // which occurs through `LazyFn::link`.
-static VK_INSTANCE: sync::RwLock<Lazy<HashSet<vulkan::VkInstance>>> =
-	sync::RwLock::new(Lazy::new(HashSet::new));
+static VK_INSTANCE: sync::RwLock<Vec<vulkan::VkInstance>> = sync::RwLock::new(Vec::new());
 
-static VK_DEVICE: sync::RwLock<Lazy<HashSet<vulkan::VkDevice>>> =
-	sync::RwLock::new(Lazy::new(HashSet::new));
+static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> = sync::RwLock::new(Vec::new());
 
-// Used as a placeholder function pointer. This should **NEVER** be called directly,
-// and promptly cast into the correct function pointer type.
-pub(crate) type FnPtr = unsafe extern "system" fn() -> isize;
-// The result of a dylink function
-pub(crate) type Result<T> = std::result::Result<T, error::DylinkError>;
+/// Used as a placeholder function pointer. 
+/// 
+/// This should **NEVER** be called directly, and promptly cast into the correct function pointer type.
+pub type FnPtr = unsafe extern "system" fn() -> isize;
 
-// TODO: Make the `Global` struct below public when extern types are stable.
-//		 The name `Global` is still TBD.
+/// The result of a dylink function
+pub type DylinkResult<T> = Result<T, error::DylinkError>;
+
+// TODO: Make the `Global` struct below public when name is picked out
 
 /// The global context for specializations.
 ///
@@ -145,7 +146,7 @@ pub(crate) type Result<T> = std::result::Result<T, error::DylinkError>;
 pub struct Global;
 impl Global {
 	// This is safe since vulkan will just discard garbage values
-	/// Adds an instance to the internal HashSet.
+	/// Adds an instance to the internal Vec.
 	///
 	/// Returns whether the instance was newly inserted. That is:
 	///
@@ -156,7 +157,13 @@ impl Global {
 	pub fn insert_instance(&self, instance: vulkan::VkInstance) -> bool {
 		//println!("insert_instance called!");
 		let mut write_lock = VK_INSTANCE.write().unwrap();
-		write_lock.insert(instance)
+		match write_lock.binary_search(&instance) {
+			Ok(_) => false,
+			Err(index) => {
+				write_lock.insert(index, instance);
+				true
+			}
+		}
 	}
 
 	/// Removes an instance from the set. Returns whether the instance was present in the set.
@@ -165,11 +172,17 @@ impl Global {
 	pub unsafe fn remove_instance(&self, instance: &vulkan::VkInstance) -> bool {
 		//println!("remove_instance called!");
 		let mut write_lock = VK_INSTANCE.write().unwrap();
-		write_lock.remove(instance)
+		match write_lock.binary_search(instance) {
+			Ok(index) => {
+				write_lock.remove(index);
+				true
+			}
+			Err(_) => false,
+		}
 	}
 
 	// This is safe since vulkan will just discard garbage values
-	/// Adds a device to the internal HashSet.
+	/// Adds a device to the internal Vec.
 	///
 	/// Returns whether the device was newly inserted. That is:
 	///
@@ -180,7 +193,13 @@ impl Global {
 	pub fn insert_device(&self, device: vulkan::VkDevice) -> bool {
 		//println!("insert_device called!");
 		let mut write_lock = VK_DEVICE.write().unwrap();
-		write_lock.insert(device)
+		match write_lock.binary_search(&device) {
+			Ok(_) => false,
+			Err(index) => {
+				write_lock.insert(index, device);
+				true
+			}
+		}
 	}
 
 	/// Removes a device from the set. Returns whether the value was present in the set.
@@ -189,24 +208,58 @@ impl Global {
 	pub unsafe fn remove_device(&self, device: &vulkan::VkDevice) -> bool {
 		//println!("remove_device called!");
 		let mut write_lock = VK_DEVICE.write().unwrap();
-		write_lock.remove(device)
+		match write_lock.binary_search(device) {
+			Ok(index) => {
+				write_lock.remove(index);
+				true
+			}
+			Err(_) => false,
+		}
 	}
 }
 
-/// Opaque pointer sized library handle
-#[repr(transparent)]
-pub(crate) struct LibHandle(*const ffi::c_void);
-unsafe impl Send for LibHandle {}
-unsafe impl Sync for LibHandle {}
+// LibHandle is thread-safe because it's inherently immutable, therefore don't add mutable accessors.
 
-impl LibHandle {
+/// Library handle for [RTLinker]
+pub struct LibHandle<'a, T: ?Sized>(*const T, PhantomData<&'a ()>);
+unsafe impl<T> Send for LibHandle<'_, T> where T: Send {}
+unsafe impl<T> Sync for LibHandle<'_, T> where T: Sync {}
+
+impl<'a, T> LibHandle<'a, T> {
 	#[inline]
-	fn is_invalid(&self) -> bool {
+	pub fn is_invalid(&self) -> bool {
 		self.0.is_null()
 	}
+	// This is basically a clone to an opaque handle
+	pub(crate) fn as_opaque<'b>(&'a self) -> LibHandle<'b, ffi::c_void> {
+		LibHandle(self.0.cast(), PhantomData)
+	}
+	pub fn as_ref(&self) -> Option<&T> {
+		unsafe { self.0.as_ref() }
+	}
 }
 
-pub(crate) trait RTLinker {
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle;
-	fn load_sym(lib_handle: &LibHandle, fn_name: &ffi::CStr) -> Option<FnPtr>;
+impl<'a, T> From<Option<&'a T>> for LibHandle<'a, T> {
+	fn from(value: Option<&'a T>) -> Self {
+		value
+			.map(|r| Self((r as *const T).cast(), PhantomData))
+			.unwrap_or(Self(std::ptr::null(), PhantomData))
+	}
+}
+
+impl<'a, T> From<&'a T> for LibHandle<'a, T> {
+	fn from(value: &'a T) -> Self {
+		Self((value as *const T).cast(), PhantomData)
+	}
+}
+
+/// Used to specify a custom run-time linker loader for [LazyFn]
+pub trait RTLinker {
+	type Data;
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
+	where
+		Self::Data: Send + Sync;
+	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> Option<FnPtr>
+	where
+		Self::Data: Send + Sync;
 }

@@ -16,7 +16,7 @@ use std::{
 	},
 };
 
-use crate::error;
+use crate::{error, DylinkResult};
 
 struct DefaultLinker;
 
@@ -72,6 +72,9 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	/// for windows, or `dlsym`, and `dlopen` for unix. This function is used by the
 	/// [dylink](dylink_macro::dylink) macro by default.
 	/// If successful, stores address in current instance and returns a reference of the stored value.
+	///
+	/// # Errors
+	/// If the library fails to link, like if it can't find the library or function, then an error is returned.
 	/// # Example
 	/// ```rust
 	/// # use dylink::dylink;
@@ -87,16 +90,26 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	///     }
 	/// }
 	/// ```
-	pub fn try_link(&self) -> crate::Result<&F> {
+	pub fn try_link(&self) -> DylinkResult<&F> {
 		self.try_link_with::<DefaultLinker>()
 	}
 
 	/// Provides a generic argument to supply a user defined linker loader to load the library.
 	/// If successful, stores address in current instance and returns a reference of the stored value.
-	pub(crate) fn try_link_with<L: crate::RTLinker>(&self) -> crate::Result<&F> {
+	/// 
+	/// # Errors
+	/// If the library fails to link, like if it can't find the library or function, then an error is returned.
+	pub fn try_link_with<L: crate::RTLinker>(&self) -> DylinkResult<&F>
+	where
+		L::Data: Send + Sync,
+	{
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
-				LinkType::Vulkan => unsafe { loader::vulkan_loader(self.fn_name) },
+				LinkType::Vulkan => unsafe {
+					loader::vulkan_loader(self.fn_name).ok_or(error::DylinkError::FnNotFound(
+						self.fn_name.to_str().unwrap().to_owned(),
+					))
+				},
 				LinkType::General(lib_list) => {
 					let mut errors = vec![];
 					lib_list
@@ -106,12 +119,14 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 								.map_err(|e| errors.push(e))
 								.ok()
 						})
-						.ok_or_else(|| {							
-							let err: String = errors
-								.iter()
-								.map(|e| e.to_string() + "\n")
-								.collect();
-							error::DylinkError::ListNotLoaded(err)
+						.ok_or_else(|| {
+							match errors.len() {								
+								1 => errors[0].clone(),
+								2..=usize::MAX => error::DylinkError::ListNotLoaded(
+									errors.iter().map(|e| e.to_string() + "\n").collect(),
+								),
+								_ => unreachable!(),
+							}
 						})
 				}
 			};
@@ -130,7 +145,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 		});
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
-		match (*self.status.borrow()).clone() {
+		match self.status.clone().take() {
 			None => Ok(self.load(Ordering::Acquire)),
 			Some(err) => Err(err),
 		}
@@ -147,6 +162,8 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 		self.addr.into_inner()
 	}
 }
+
+// should this be removed in favor of just calling load?
 
 impl<F: Copy + Sync + Send> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
