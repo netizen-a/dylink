@@ -72,6 +72,9 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	/// for windows, or `dlsym`, and `dlopen` for unix. This function is used by the
 	/// [dylink](dylink_macro::dylink) macro by default.
 	/// If successful, stores address in current instance and returns a reference of the stored value.
+	///
+	/// # Errors
+	/// If the library fails to link, like if it can't find the library or function, then an error is returned.
 	/// # Example
 	/// ```rust
 	/// # use dylink::dylink;
@@ -93,6 +96,9 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 
 	/// Provides a generic argument to supply a user defined linker loader to load the library.
 	/// If successful, stores address in current instance and returns a reference of the stored value.
+	/// 
+	/// # Errors
+	/// If the library fails to link, like if it can't find the library or function, then an error is returned.
 	pub fn try_link_with<L: crate::RTLinker>(&self) -> DylinkResult<&F>
 	where
 		L::Data: Send + Sync,
