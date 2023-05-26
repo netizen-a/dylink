@@ -127,12 +127,13 @@ static VK_INSTANCE: sync::RwLock<Vec<vulkan::VkInstance>> = sync::RwLock::new(Ve
 
 static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> = sync::RwLock::new(Vec::new());
 
-// Used as a placeholder function pointer. This should **NEVER** be called directly,
-// and promptly cast into the correct function pointer type.
-pub(crate) type FnPtr = unsafe extern "system" fn() -> isize;
+/// Used as a placeholder function pointer. 
+/// 
+/// This should **NEVER** be called directly, and promptly cast into the correct function pointer type.
+pub type FnPtr = unsafe extern "system" fn() -> isize;
 
-// The result of a dylink function
-pub(crate) type DylinkResult<T> = Result<T, error::DylinkError>;
+/// The result of a dylink function
+pub type DylinkResult<T> = Result<T, error::DylinkError>;
 
 // TODO: Make the `Global` struct below public when name is picked out
 
