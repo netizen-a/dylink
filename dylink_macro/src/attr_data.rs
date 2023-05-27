@@ -1,5 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use proc_macro2::TokenStream as TokenStream2;
+use proc_macro2::{Span, TokenStream as TokenStream2};
 use std::str::FromStr;
 use syn::punctuated::Punctuated;
 use syn::{spanned::Spanned, *};
@@ -8,6 +8,7 @@ pub struct AttrData {
 	pub strip: bool,
 	pub link_ty: LinkType,
 	pub linker: Option<Ident>,
+	pub link_name: Option<(String, Span)>,
 }
 
 #[derive(PartialEq)]
@@ -23,6 +24,7 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 		let mut maybe_strip: Option<bool> = None;
 		let mut maybe_link_ty: Option<LinkType> = None;
 		let mut linker: Option<Ident> = None;
+		let mut link_name: Option<(String, Span)> = None;
 		let mut errors = vec![];
 		const EXPECTED_KW: &str = "Expected `vulkan`, `any`, `strip`, or `name`.";
 
@@ -98,9 +100,24 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 									));
 								}
 							}
-							right => {
-								errors.push(Error::new(right.span(), "Expected identifier."))
+							right => errors.push(Error::new(right.span(), "Expected identifier.")),
+						}
+					} else if path.is_ident("link_name") {
+						// Branch for syntax: #[dylink(link_name = <string>)]
+						match assign_right {
+							Expr::Lit(ExprLit {
+								lit: Lit::Str(val), ..
+							}) => {
+								if link_name.is_none() {
+									link_name = Some((val.value(), assign.span()));
+								} else {
+									errors.push(Error::new(
+										assign.span(),
+										"linker is already defined",
+									));
+								}
 							}
+							right => errors.push(Error::new(right.span(), "Expected string.")),
 						}
 					} else {
 						errors.push(Error::new(assign_left.span(), EXPECTED_KW));
@@ -175,6 +192,7 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 				strip: maybe_strip.unwrap_or_default(),
 				link_ty: maybe_link_ty.unwrap(),
 				linker,
+				link_name,
 			})
 		}
 	}

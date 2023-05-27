@@ -67,8 +67,8 @@ use dylink::dylink;
 struct Foo(u32);
 
 impl Foo {
-   #[dylink(name = "Kernel32.dll")]
-   extern "stdcall" fn GetLastError() -> Foo;
+   #[dylink(name = "Kernel32.dll", link_name = "GetLastError")]
+   extern "stdcall" fn get_last_error() -> Foo;
    #[dylink(name = "Kernel32.dll")]
    extern "stdcall" fn SetLastError(self: Foo);
 }
@@ -77,7 +77,7 @@ fn main() {
    let foo = Foo(43);
    unsafe {
       foo.SetLastError();
-      assert_eq!(Foo(43), Foo::GetLastError());
+      assert_eq!(Foo(43), Foo::get_last_error());
    }
 }
 ```

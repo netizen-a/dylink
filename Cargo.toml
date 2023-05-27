@@ -1,13 +1,13 @@
 [package]
 name = "dylink"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Jonathan Thomason"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
 keywords = ["ffi"]
 description = "Run-time dynamic linking loader utilities"
 repository = "https://github.com/Razordor/dylink.git"
-publish = true
+publish = false
 
 [workspace]
 members = ["dylink_macro"]
