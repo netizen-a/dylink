@@ -1,11 +1,11 @@
 [package]
 name = "dylink_macro"
-version = "0.6.1"
+version = "0.6.2"
 authors = ["Jonathan Thomason"]
 edition = "2021"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
-keywords = ["ffi", "macro", "attribute"]
+keywords = ["ffi", "macro", "macros", "attribute"]
 description = "Run-time dynamic linking loader attribute"
 repository = "https://github.com/Razordor/dylink.git"
 publish = true

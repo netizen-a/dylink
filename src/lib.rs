@@ -38,11 +38,49 @@
 //! }
 //! ```
 //!
+//! # Explicit Symbol Linkage
+//! By default dylink uses the function name as the symbol to import, but you can also specify the symbol explicitly using `link_name`.
+//! The `link_name` macro argument will allow identifiers to be used freely again, but conversely will re-enable lints that have been disabled by default.
+//! ```rust
+//! use dylink::dylink;
+//!
+//! #[dylink(name = "Kernel32.dll", link_name="GetLastError")]
+//! extern "system" fn get_last_error() -> u32;
+//! ```
+//! 
+//! # Custom Linker
+//! Custom dynamic linkers can be used through the `linker` macro argument.
+//! The linker must implement RTLinker to be used when linking to the symbol.
+//! 
+//! ```rust
+//! # use dylink::*;
+//! # use std::ffi::*;
+//! struct MyLinker;
+//! impl RTLinker for MyLinker {
+//! 	type Data = c_void;
+//!		fn load_lib(lib_name: &CStr) -> LibHandle<'static, Self::Data> {
+//! 		/* your implementation here */
+//!	# todo!()
+//!		}
+//!		fn load_sym(
+//!			lib_handle: &LibHandle<'static, Self::Data>,
+//!			fn_name: &CStr,
+//!		) -> Option<FnPtr> {
+//! 		/* your implementation here */
+//!	# todo!()
+//!		}
+//! }
+//!
+//! #[dylink(name = "my_lib", linker=MyLinker)]
+//! extern "system" fn foo() -> u32;
+//! ```
+//!
 //! # Configuration Predicates
 //! Dylink can also accept predicated disjunctions in an idiomatic manner by making use of the `any` function.
 //! `any()` uses short-circuit logic to check for the existance of shared libraries.
 //! ```rust
-//! # use dylink::dylink;
+//! use dylink::dylink;
+//!
 //! #[dylink(any(name = "example_lib.so", name = "example_lib.so.1"))]
 //! extern "C" {
 //!     fn my_function();
@@ -127,8 +165,8 @@ static VK_INSTANCE: sync::RwLock<Vec<vulkan::VkInstance>> = sync::RwLock::new(Ve
 
 static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> = sync::RwLock::new(Vec::new());
 
-/// Used as a placeholder function pointer. 
-/// 
+/// Used as a placeholder function pointer.
+///
 /// This should **NEVER** be called directly, and promptly cast into the correct function pointer type.
 pub type FnPtr = unsafe extern "system" fn() -> isize;
 

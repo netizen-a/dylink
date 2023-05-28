@@ -16,7 +16,7 @@ Related links:
 
 ## Supported platforms
 
-Dylink has been implemented for all major platforms.
+Dylink has been implemented for all 3 major platforms.
 
 | Windows | Linux | MacOS | WASM |
 |:-------:|:-----:|:-----:|------|
@@ -49,35 +49,6 @@ fn main() {
    unsafe {
       SetLastError(52);
       assert_eq!(52, GetLastError());
-   }
-}
-```
-
-## Adv. Example
-
-The `dylink` macro is also sophisticated enough to survive in `impl` blocks, and take advantage of the receiver argument `self`.
-Unfortunately, `Self` cannot be internally inferred, so `self` without an explicit type also cannot be inferred.
-The example below demonstrates how to work around these issues despite that:
-
-```rust
-use dylink::dylink;
-
-#[derive(Debug, PartialEq)]
-#[repr(transparent)]
-struct Foo(u32);
-
-impl Foo {
-   #[dylink(name = "Kernel32.dll")]
-   extern "stdcall" fn GetLastError() -> Foo;
-   #[dylink(name = "Kernel32.dll")]
-   extern "stdcall" fn SetLastError(self: Foo);
-}
-
-fn main() {
-   let foo = Foo(43);
-   unsafe {
-      foo.SetLastError();
-      assert_eq!(Foo(43), Foo::GetLastError());
    }
 }
 ```

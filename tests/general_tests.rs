@@ -11,7 +11,7 @@ fn test_win32_kernel32() {
 
 	// macro output: function
 	#[dylink(name = "Kernel32.dll", strip = false)]
-	extern "system" fn GetLastError() -> u32;	
+	extern "system" fn GetLastError() -> u32;
 
 	unsafe {
 		// static variable has crappy documentation, but can be use for library induction.
@@ -26,22 +26,21 @@ fn test_win32_kernel32() {
 #[cfg(windows)]
 #[test]
 fn test_win32_impl() {
-
 	#[repr(transparent)]
 	struct Foo(u32);
-	
+
 	// TODO: Self and self (by itself) are impossible to implement, so consider giving hard errors.
 	impl Foo {
-		#[dylink(name = "Kernel32.dll")]
-		extern "stdcall" fn SetLastError(self: Foo);
-		
+		#[dylink(name = "Kernel32.dll", link_name = "SetLastError")]
+		extern "stdcall" fn set_last_error(self: Foo);
+
 		#[dylink(name = "Kernel32.dll")]
 		extern "system" fn GetLastError() -> Foo;
 	}
 
 	let foo = Foo(23);
 	unsafe {
-		foo.SetLastError();
+		foo.set_last_error();
 		assert!(Foo::GetLastError().0 == 23)
 	}
 }
@@ -143,12 +142,11 @@ fn test_multiple_lib_panic() {
 	}
 }
 
-
 #[cfg(unix)]
 #[test]
 fn test_unix_libc() {
-	#[cfg_attr(target_os = "linux", dylink(name = "libc.so.6", strip=true))]
-	#[cfg_attr(target_os = "macos", dylink(name = "libc.dylib", strip=true))]
+	#[cfg_attr(target_os = "linux", dylink(name = "libc.so.6", strip = true))]
+	#[cfg_attr(target_os = "macos", dylink(name = "libc.dylib", strip = true))]
 	extern "C" {
 		fn foo();
 	}
@@ -160,6 +158,6 @@ fn test_unix_libc() {
 		}
 		Err(DylinkError::LibNotLoaded(err)) => panic!("e0\n{err}"),
 		Err(DylinkError::ListNotLoaded(err)) => panic!("e1\n{err}"),
-		Err(_) => todo!()
+		Err(_) => todo!(),
 	}
 }

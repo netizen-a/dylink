@@ -95,7 +95,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 		lazyfn::LazyFn::new(
 			&(initial_fn as PFN_vkGetDeviceProcAddr),
 			unsafe { CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") },
-			LinkType::General(&[]),
+			LinkType::Vulkan,
 		);
 	DEVICE_PROC_ADDR(device, name)
 }

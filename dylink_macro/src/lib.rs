@@ -22,6 +22,15 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 	match AttrData::try_from(punct) {
 		Ok(attr_data) => {
 			if let Ok(foreign_mod) = syn::parse2::<syn::ItemForeignMod>(input.clone().into()) {
+				if let Some((_, span)) = attr_data.link_name {
+					return syn::Error::new(
+						span,
+						"`link_name` should be applied to a foreign function",
+					)
+					.to_compile_error()
+					.into();
+				}
+
 				let abi = &foreign_mod.abi;
 				foreign_mod
 					.items
@@ -33,8 +42,7 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 					.collect::<TokenStream2>()
 					.into()
 			} else if let Ok(foreign_fn) = syn::parse2::<syn::ForeignItemFn>(input.into()) {
-				parse_fn::<false>(&foreign_fn, &attr_data)
-					.into()
+				parse_fn::<false>(&foreign_fn, &attr_data).into()
 			} else {
 				panic!("failed to parse");
 			}
@@ -43,7 +51,10 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 	}
 }
 
-fn parse_fn<const IS_MOD_ITEM: bool>(fn_item: &syn::ForeignItemFn, attr_data: &AttrData) -> TokenStream2 {
+fn parse_fn<const IS_MOD_ITEM: bool>(
+	fn_item: &syn::ForeignItemFn,
+	attr_data: &AttrData,
+) -> TokenStream2 {
 	let fn_name = fn_item.sig.ident.to_token_stream();
 	let abi = fn_item.sig.abi.to_token_stream();
 	let vis = fn_item.vis.to_token_stream();
@@ -58,6 +69,20 @@ fn parse_fn<const IS_MOD_ITEM: bool>(fn_item: &syn::ForeignItemFn, attr_data: &A
 		.map(syn::Attribute::to_token_stream)
 		.collect();
 
+	
+	if let syn::ReturnType::Type(_, ret_type) = &fn_item.sig.output {
+		if let syn::Type::Path(syn::TypePath{path, ..}) = ret_type.as_ref() {
+			if path.is_ident("Self") {
+				return syn::Error::new(
+					path.span(),
+					"`Self` cannot be inferred. Try using an explicit type instead",
+				)
+				.to_compile_error();
+			}
+		}
+	}
+
+
 	let mut param_list = Vec::new();
 	let mut param_ty_list = Vec::new();
 	let mut internal_param_ty_list = Vec::new();
@@ -66,6 +91,15 @@ fn parse_fn<const IS_MOD_ITEM: bool>(fn_item: &syn::ForeignItemFn, attr_data: &A
 	for (i, arg) in fn_item.sig.inputs.iter().enumerate() {
 		match arg {
 			syn::FnArg::Typed(pat_type) => {
+				if let syn::Type::Path(syn::TypePath{path, ..}) = pat_type.ty.as_ref() {
+					if path.is_ident("Self") {
+						return syn::Error::new(
+							path.span(),
+							"`Self` cannot be inferred. Try using an explicit type instead",
+						)
+						.to_compile_error();
+					}
+				}
 				let ty = pat_type.ty.to_token_stream();
 				let param_name = match pat_type.pat.as_ref() {
 					syn::Pat::Wild(_) => format!("p{i}").parse::<TokenStream2>().unwrap(),
@@ -80,12 +114,24 @@ fn parse_fn<const IS_MOD_ITEM: bool>(fn_item: &syn::ForeignItemFn, attr_data: &A
 			syn::FnArg::Receiver(rec) => {
 				if IS_MOD_ITEM || strip {
 					// TODO: fix error message
-					return syn::Error::new(rec.span(), "`self` arguments are unsupported in this context")
-						.into_compile_error();
+					return syn::Error::new(
+						rec.span(),
+						"`self` arguments are unsupported in this context",
+					)
+					.into_compile_error();
 				} else {
+					if let syn::Type::Path(syn::TypePath{path, ..}) = rec.ty.as_ref() {
+						if path.is_ident("Self") {
+							return syn::Error::new(
+								path.span(),
+								"type of `self` cannot be inferred. Try using an explicit type instead",
+							)
+							.to_compile_error();
+						}
+					}
 					let ty = rec.ty.to_token_stream();
 					let param_name = format!("p{i}").parse::<TokenStream2>().unwrap();
-					param_list.push(quote!{self});
+					param_list.push(quote! {self});
 					internal_param_list.push(param_name.clone());
 					param_ty_list.push(quote!(self : #ty));
 					internal_param_ty_list.push(quote!(#param_name : #ty));
@@ -182,20 +228,36 @@ fn parse_fn<const IS_MOD_ITEM: bool>(fn_item: &syn::ForeignItemFn, attr_data: &A
 	};
 
 	let try_link_call = match linker {
-		None => quote!{
+		None => quote! {
 			try_link
 		},
-		Some(linker_name) => quote!{
+		Some(linker_name) => quote! {
 			try_link_with::<#linker_name>
 		},
 	};
 
+	let lint;
+	let link_name = match &attr_data.link_name {
+		Some((name, _)) => {
+			lint = TokenStream2::default();
+			name.clone()
+		}
+		None => {
+			lint = if strip {
+				quote! {#[allow(non_upper_case_globals)]}
+			} else {
+				quote! {#[allow(non_snake_case)]}
+			};
+			fn_name.to_string()
+		}
+	};
+
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
-	if strip {		
+	if strip {
 		quote! {
 			#(#fn_attrs)*
-			#[allow(non_upper_case_globals)]
+			#lint
 			#vis static #fn_name
 			: dylink::LazyFn<'static, unsafe #abi fn (#params_default) #output>
 			= dylink::LazyFn::new(
@@ -211,14 +273,14 @@ fn parse_fn<const IS_MOD_ITEM: bool>(fn_item: &syn::ForeignItemFn, attr_data: &A
 					const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
 					DYN_FUNC_REF
 				},
-				unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
+				unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
 				dylink::#link_ty
 			);
 		}
 	} else {
 		quote! {
 			#(#fn_attrs)*
-			#[allow(non_snake_case)]
+			#lint
 			#[inline]
 			#vis unsafe #abi fn #fn_name (#(#param_ty_list),*) #output {
 				// InstFnPtr: instance function pointer type
@@ -235,7 +297,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(fn_item: &syn::ForeignItemFn, attr_data: &A
 				: dylink::LazyFn<'static, InstFnPtr>
 				= dylink::LazyFn::new(
 					DYN_FUNC_REF,
-					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(stringify!(#fn_name), '\0').as_bytes())},
+					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
 					dylink::#link_ty
 				);
 
