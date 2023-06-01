@@ -17,11 +17,6 @@ extern crate self as dylink;
 pub struct VkInstance(*mut ffi::c_void);
 unsafe impl Sync for VkInstance {}
 unsafe impl Send for VkInstance {}
-impl VkInstance {
-	pub const fn null() -> Self {
-		Self(std::ptr::null_mut())
-	}
-}
 
 #[doc(hidden)]
 #[repr(transparent)]
@@ -71,7 +66,9 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 		name: *const ffi::c_char,
 	) -> Option<FnPtr> {
 		DEVICE_PROC_ADDR.once.call_once(|| {
-			let read_lock = crate::VK_INSTANCE.read().expect("failed to get read lock");
+			let read_lock = crate::VK_INSTANCE
+				.read()
+				.expect("Dylink Error: failed to get read lock");
 			// check other instances if fails in case one has a higher available version number
 			let fn_ptr = read_lock
 				.iter()
@@ -81,7 +78,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 						b"vkGetDeviceProcAddr\0".as_ptr() as *const ffi::c_char,
 					)
 				})
-				.unwrap();
+				.expect("Dylink Error: failed to load `vkGetDeviceProcAddr`.");
 
 			DEVICE_PROC_ADDR.addr.set(mem::transmute_copy(&fn_ptr));
 			DEVICE_PROC_ADDR
@@ -98,4 +95,29 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 			LinkType::Vulkan,
 		);
 	DEVICE_PROC_ADDR(device, name)
+}
+
+pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> Option<FnPtr> {
+	let mut maybe_fn = crate::VK_DEVICE
+		.read()
+		.expect("failed to get read lock")
+		.iter()
+		.find_map(|device| vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const ffi::c_char));
+	maybe_fn = match maybe_fn {
+		Some(addr) => return Some(addr),
+		None => crate::VK_INSTANCE
+			.read()
+			.expect("failed to get read lock")
+			.iter()
+			.find_map(|instance| {
+				vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char)
+			}),
+	};
+	match maybe_fn {
+		Some(addr) => Some(addr),
+		None => vkGetInstanceProcAddr(
+			VkInstance(std::ptr::null_mut()),
+			fn_name.as_ptr() as *const ffi::c_char,
+		),
+	}
 }

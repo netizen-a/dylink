@@ -1,11 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-#[cfg_attr(windows, path = "lazyfn/win32.rs")]
-#[cfg_attr(unix, path = "lazyfn/unix.rs")]
-mod os;
-
-mod loader;
-
 use std::{
 	cell,
 	ffi::CStr,
@@ -16,9 +10,7 @@ use std::{
 	},
 };
 
-use crate::{error, DylinkResult};
-
-struct DefaultLinker;
+use crate::{error, vulkan, DefaultLinker, DylinkResult};
 
 /// Determines how to load the library when [LazyFn::try_link] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
@@ -44,6 +36,7 @@ pub struct LazyFn<'a, F: Copy + Sync + Send> {
 	// The function to be called.
 	// mutating this data without locks is UB.
 	pub(crate) addr: cell::Cell<F>,
+	//pub(crate) init: F,
 	fn_name: &'a CStr,
 	link_ty: LinkType<'a>,
 }
@@ -63,6 +56,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 			once: sync::Once::new(),
 			status: cell::RefCell::new(None),
 			addr: cell::Cell::new(*thunk),
+			//init: *thunk,
 			fn_name,
 			link_ty,
 		}
@@ -106,7 +100,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 		self.once.call_once(|| {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe {
-					loader::vulkan_loader(self.fn_name).ok_or(error::DylinkError::FnNotFound(
+					vulkan::vulkan_loader(self.fn_name).ok_or(error::DylinkError::FnNotFound(
 						self.fn_name.to_str().unwrap().to_owned(),
 					))
 				},
@@ -115,7 +109,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 					lib_list
 						.iter()
 						.find_map(|lib| {
-							loader::general_loader::<L>(lib, self.fn_name)
+							L::load_with(lib, self.fn_name)
 								.map_err(|e| errors.push(e))
 								.ok()
 						})

@@ -69,9 +69,8 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		.map(syn::Attribute::to_token_stream)
 		.collect();
 
-	
 	if let syn::ReturnType::Type(_, ret_type) = &fn_item.sig.output {
-		if let syn::Type::Path(syn::TypePath{path, ..}) = ret_type.as_ref() {
+		if let syn::Type::Path(syn::TypePath { path, .. }) = ret_type.as_ref() {
 			if path.is_ident("Self") {
 				return syn::Error::new(
 					path.span(),
@@ -82,7 +81,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		}
 	}
 
-
 	let mut param_list = Vec::new();
 	let mut param_ty_list = Vec::new();
 	let mut internal_param_ty_list = Vec::new();
@@ -91,7 +89,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	for (i, arg) in fn_item.sig.inputs.iter().enumerate() {
 		match arg {
 			syn::FnArg::Typed(pat_type) => {
-				if let syn::Type::Path(syn::TypePath{path, ..}) = pat_type.ty.as_ref() {
+				if let syn::Type::Path(syn::TypePath { path, .. }) = pat_type.ty.as_ref() {
 					if path.is_ident("Self") {
 						return syn::Error::new(
 							path.span(),
@@ -120,7 +118,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 					)
 					.into_compile_error();
 				} else {
-					if let syn::Type::Path(syn::TypePath{path, ..}) = rec.ty.as_ref() {
+					if let syn::Type::Path(syn::TypePath { path, .. }) = rec.ty.as_ref() {
 						if path.is_ident("Self") {
 							return syn::Error::new(
 								path.span(),

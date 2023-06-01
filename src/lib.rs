@@ -47,11 +47,11 @@
 //! #[dylink(name = "Kernel32.dll", link_name="GetLastError")]
 //! extern "system" fn get_last_error() -> u32;
 //! ```
-//! 
+//!
 //! # Custom Linker
 //! Custom dynamic linkers can be used through the `linker` macro argument.
 //! The linker must implement RTLinker to be used when linking to the symbol.
-//! 
+//!
 //! ```rust
 //! # use dylink::*;
 //! # use std::ffi::*;
@@ -133,17 +133,16 @@
 //!
 //! *An unloader may be considered in future revisions, but the current abstraction is unsuitable for RAII unloading.*
 
-use std::marker::PhantomData;
 use std::sync;
-
-use std::ffi;
 
 mod error;
 mod lazyfn;
+mod linker;
 mod vulkan;
 
 pub use error::*;
 pub use lazyfn::*;
+pub use linker::*;
 pub use vulkan::{VkDevice, VkInstance};
 
 /// Macro for generating dynamically linked functions procedurally.
@@ -254,50 +253,4 @@ impl Global {
 			Err(_) => false,
 		}
 	}
-}
-
-// LibHandle is thread-safe because it's inherently immutable, therefore don't add mutable accessors.
-
-/// Library handle for [RTLinker]
-pub struct LibHandle<'a, T: ?Sized>(*const T, PhantomData<&'a ()>);
-unsafe impl<T> Send for LibHandle<'_, T> where T: Send {}
-unsafe impl<T> Sync for LibHandle<'_, T> where T: Sync {}
-
-impl<'a, T> LibHandle<'a, T> {
-	#[inline]
-	pub fn is_invalid(&self) -> bool {
-		self.0.is_null()
-	}
-	// This is basically a clone to an opaque handle
-	pub(crate) fn as_opaque<'b>(&'a self) -> LibHandle<'b, ffi::c_void> {
-		LibHandle(self.0.cast(), PhantomData)
-	}
-	pub fn as_ref(&self) -> Option<&T> {
-		unsafe { self.0.as_ref() }
-	}
-}
-
-impl<'a, T> From<Option<&'a T>> for LibHandle<'a, T> {
-	fn from(value: Option<&'a T>) -> Self {
-		value
-			.map(|r| Self((r as *const T).cast(), PhantomData))
-			.unwrap_or(Self(std::ptr::null(), PhantomData))
-	}
-}
-
-impl<'a, T> From<&'a T> for LibHandle<'a, T> {
-	fn from(value: &'a T) -> Self {
-		Self((value as *const T).cast(), PhantomData)
-	}
-}
-
-/// Used to specify a custom run-time linker loader for [LazyFn]
-pub trait RTLinker {
-	type Data;
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
-	where
-		Self::Data: Send + Sync;
-	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> Option<FnPtr>
-	where
-		Self::Data: Send + Sync;
 }
