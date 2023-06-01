@@ -80,10 +80,10 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 				})
 				.expect("Dylink Error: failed to load `vkGetDeviceProcAddr`.");
 
-			DEVICE_PROC_ADDR.addr.set(mem::transmute_copy(&fn_ptr));
+			*DEVICE_PROC_ADDR.addr.get() = mem::transmute(fn_ptr);
 			DEVICE_PROC_ADDR
 				.addr_ptr
-				.store(DEVICE_PROC_ADDR.addr.as_ptr(), Ordering::Relaxed);
+				.store(DEVICE_PROC_ADDR.addr.get(), Ordering::Relaxed);
 		});
 		DEVICE_PROC_ADDR(device, name)
 	}

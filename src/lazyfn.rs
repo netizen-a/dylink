@@ -30,12 +30,12 @@ pub struct LazyFn<'a, F: Copy + Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: sync::Once,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
-	status: cell::RefCell<Option<error::DylinkError>>,
+	status: sync::OnceLock<error::DylinkError>,
 	// this exists so that `F` is considered thread-safe
 	pub(crate) addr_ptr: AtomicPtr<F>,
 	// The function to be called.
 	// mutating this data without locks is UB.
-	pub(crate) addr: cell::Cell<F>,
+	pub(crate) addr: cell::UnsafeCell<F>,
 	//pub(crate) init: F,
 	fn_name: &'a CStr,
 	link_ty: LinkType<'a>,
@@ -54,8 +54,8 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 		Self {
 			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
 			once: sync::Once::new(),
-			status: cell::RefCell::new(None),
-			addr: cell::Cell::new(*thunk),
+			status: sync::OnceLock::new(),
+			addr: cell::UnsafeCell::new(*thunk),
 			//init: *thunk,
 			fn_name,
 			link_ty,
@@ -126,20 +126,20 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 			match maybe {
 				Ok(addr) => {
 					unsafe {
-						self.addr.set(mem::transmute_copy(&addr));
+						*self.addr.get() = mem::transmute_copy(&addr);
 					}
-					self.addr_ptr.store(self.addr.as_ptr(), Ordering::Release);
+					self.addr_ptr.store(self.addr.get(), Ordering::Release);
 				}
 				Err(err) => {
-					let _ = self.status.replace(Some(err));
+					let _ = self.status.set(err);
 				}
 			}
 		});
 		// `call_once` is blocking, so `self.status` is read-only
 		// by this point. Race conditions shouldn't occur.
-		match self.status.clone().take() {
+		match self.status.get() {
 			None => Ok(self.load(Ordering::Acquire)),
-			Some(err) => Err(err),
+			Some(err) => Err(err.clone()),
 		}
 	}
 

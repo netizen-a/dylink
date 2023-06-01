@@ -31,6 +31,10 @@ Add this to your `Cargo.toml`
 dylink = "0.5"
 ```
 
+## Rust version support
+
+The minimum supported Rust toolchain version is currently **Rust 1.70.0**.
+
 ## Example
 
 Below is a basic working example on how to use the macro on windows.

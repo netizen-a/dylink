@@ -18,7 +18,7 @@ impl<'a, T> LibHandle<'a, T> {
 		self.0.is_null()
 	}
 	// This is basically a clone to an opaque handle
-	pub(crate) fn as_opaque<'b>(&'a self) -> LibHandle<'b, ffi::c_void> {
+	fn to_opaque<'b>(&'a self) -> LibHandle<'b, ffi::c_void> {
 		LibHandle(self.0.cast(), PhantomData)
 	}
 	pub fn as_ref(&self) -> Option<&T> {
@@ -82,7 +82,7 @@ pub trait RTLinker {
 					DLL_DATA
 						.write()
 						.unwrap()
-						.insert(index, (lib_name.to_owned(), lib_handle.as_opaque()));
+						.insert(index, (lib_name.to_owned(), lib_handle.to_opaque()));
 				}
 			}
 		}
