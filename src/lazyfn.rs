@@ -24,7 +24,7 @@ pub enum LinkType<'a> {
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// The provided member functions can be used from the generated macro when `strip=true` is enabled.
 #[derive(Debug)]
-pub struct LazyFn<'a, F: Copy + Sync + Send> {
+pub struct LazyFn<'a, F: Copy> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: OnceCell<()>,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
@@ -39,9 +39,9 @@ pub struct LazyFn<'a, F: Copy + Sync + Send> {
 	link_ty: LinkType<'a>,
 }
 
-unsafe impl<F: Copy + Sync + Send> Sync for LazyFn<'_, F> {}
+unsafe impl<F: Copy> Sync for LazyFn<'_, F> {}
 
-impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
+impl<'a, F: Copy> LazyFn<'a, F> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
@@ -152,7 +152,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 
 // should this be removed in favor of just calling load?
 
-impl<F: Copy + Sync + Send> std::ops::Deref for LazyFn<'_, F> {
+impl<F: Copy> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
 	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {
