@@ -65,7 +65,7 @@
 //!		fn load_sym(
 //!			lib_handle: &LibHandle<'static, Self::Data>,
 //!			fn_name: &CStr,
-//!		) -> Option<FnPtr> {
+//!		) -> FnAddr {
 //! 		/* your implementation here */
 //!	# todo!()
 //!		}
@@ -143,6 +143,7 @@ mod vulkan;
 pub use error::*;
 pub use lazyfn::*;
 pub use linker::*;
+#[doc(hidden)]
 pub use vulkan::{VkDevice, VkInstance};
 
 /// Macro for generating dynamically linked functions procedurally.
@@ -164,10 +165,10 @@ static VK_INSTANCE: sync::RwLock<Vec<vulkan::VkInstance>> = sync::RwLock::new(Ve
 
 static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> = sync::RwLock::new(Vec::new());
 
-/// Used as a placeholder function pointer.
+/// Raw function address.
 ///
-/// This should **NEVER** be called directly, and promptly cast into the correct function pointer type.
-pub type FnPtr = unsafe extern "system" fn() -> isize;
+/// Must be cast into a function pointer to be useable.
+pub type FnAddr = *mut ();
 
 /// The result of a dylink function
 pub type DylinkResult<T> = Result<T, error::DylinkError>;

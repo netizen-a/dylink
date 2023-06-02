@@ -46,27 +46,27 @@ pub trait RTLinker {
 	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
 	where
 		Self::Data: Send + Sync;
-	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> Option<FnPtr>
+	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> FnAddr
 	where
 		Self::Data: Send + Sync;
 
 	/// loads library once across all calls and attempts to load the function.
 	#[doc(hidden)]
-	fn load_with(lib_name: &ffi::CStr, fn_name: &ffi::CStr) -> DylinkResult<FnPtr>
+	fn load_with(lib_name: &ffi::CStr, fn_name: &ffi::CStr) -> DylinkResult<FnAddr>
 	where
 		Self::Data: 'static + Send + Sync,
 	{
 		static DLL_DATA: RwLock<Vec<(ffi::CString, crate::LibHandle<ffi::c_void>)>> =
 			RwLock::new(Vec::new());
 
-		// somehow rust is smart enough to infer that maybe_fn is assigned to only once after branching.
-		let maybe_fn;
+		// somehow rust is smart enough to infer that fn_addr is assigned to only once after branching.
+		let fn_addr;
 
 		let read_lock = DLL_DATA.read().unwrap();
 		match read_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
 			Ok(index) => {
 				let handle = LibHandle::<Self::Data>(read_lock[index].1 .0.cast(), PhantomData);
-				maybe_fn = Self::load_sym(&handle, fn_name)
+				fn_addr = Self::load_sym(&handle, fn_name)
 			}
 			Err(index) => {
 				mem::drop(read_lock);
@@ -78,7 +78,7 @@ pub trait RTLinker {
 						lib_name.to_string_lossy().into_owned(),
 					));
 				} else {
-					maybe_fn = Self::load_sym(&lib_handle, fn_name);
+					fn_addr = Self::load_sym(&lib_handle, fn_name);
 					DLL_DATA
 						.write()
 						.unwrap()
@@ -86,11 +86,12 @@ pub trait RTLinker {
 				}
 			}
 		}
-		match maybe_fn {
-			Some(addr) => Ok(addr),
-			None => Err(DylinkError::FnNotFound(
+		if fn_addr.is_null() {
+			Err(DylinkError::FnNotFound(
 				fn_name.to_str().unwrap().to_owned(),
-			)),
+			))
+		} else {
+			Ok(fn_addr)
 		}
 	}
 }
@@ -112,7 +113,7 @@ mod win32 {
 	const LOAD_LIBRARY_SAFE_CURRENT_DIRS: u32 = 0x00002000u32;
 	extern "stdcall" {
 		fn LoadLibraryExW(lplibfilename: PCWSTR, hfile: HANDLE, dwflags: u32) -> HMODULE;
-		fn GetProcAddress(hmodule: HMODULE, lpprocname: PCSTR) -> Option<crate::FnPtr>;
+		fn GetProcAddress(hmodule: HMODULE, lpprocname: PCSTR) -> crate::FnAddr;
 	}
 
 	impl RTLinker for DefaultLinker {
@@ -139,7 +140,7 @@ mod win32 {
 		fn load_sym(
 			lib_handle: &LibHandle<'static, Self::Data>,
 			fn_name: &ffi::CStr,
-		) -> Option<crate::FnPtr> {
+		) -> crate::FnAddr {
 			unsafe {
 				GetProcAddress(
 					lib_handle
@@ -187,7 +188,7 @@ mod unix {
 	const RTLD_LOCAL: c_int = 0;
 	extern "C" {
 		fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
-		fn dlsym(handle: *mut c_void, symbol: *const c_char) -> Option<crate::FnPtr>;
+		fn dlsym(handle: *mut c_void, symbol: *const c_char) -> crate::FnAddr;
 	}
 
 	impl RTLinker for DefaultLinker {
@@ -201,10 +202,7 @@ mod unix {
 			}
 		}
 		#[cfg_attr(miri, track_caller)]
-		fn load_sym(
-			lib_handle: &LibHandle<'static, Self::Data>,
-			fn_name: &CStr,
-		) -> Option<crate::FnPtr> {
+		fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &CStr) -> crate::FnAddr {
 			unsafe {
 				dlsym(
 					lib_handle

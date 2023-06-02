@@ -7,7 +7,7 @@ use std::{
 	sync::atomic::{AtomicPtr, Ordering},
 };
 
-use crate::{error, vulkan, DefaultLinker, DylinkResult};
+use crate::{error, vulkan, DefaultLinker, DylinkResult, FnAddr};
 use once_cell::sync::OnceCell;
 
 /// Determines how to load the library when [LazyFn::try_link] is called.
@@ -26,7 +26,7 @@ pub enum LinkType<'a> {
 #[derive(Debug)]
 pub struct LazyFn<'a, F: Copy> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
-	pub(crate) once: OnceCell<()>,	
+	pub(crate) once: OnceCell<()>,
 	// this exists so that `F` is considered thread-safe
 	pub(crate) addr_ptr: AtomicPtr<F>,
 	// The function to be called.
@@ -46,7 +46,7 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 	#[inline]
 	pub const fn new(thunk: &'a F, fn_name: &'a CStr, link_ty: LinkType<'a>) -> Self {
 		// In a const context this assert will be optimized out.
-		assert!(mem::size_of::<crate::FnPtr>() == mem::size_of::<F>());
+		assert!(mem::size_of::<crate::FnAddr>() == mem::size_of::<F>());
 		Self {
 			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
 			once: OnceCell::new(),
@@ -97,9 +97,14 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 			.get_or_try_init(|| {
 				match self.link_ty {
 					LinkType::Vulkan => unsafe {
-						vulkan::vulkan_loader(self.fn_name).ok_or(error::DylinkError::FnNotFound(
-							self.fn_name.to_str().unwrap().to_owned(),
-						))
+						let addr: FnAddr = vulkan::vulkan_loader(self.fn_name);
+						if addr.is_null() {
+							Err(error::DylinkError::FnNotFound(
+								self.fn_name.to_str().unwrap().to_owned(),
+							))
+						} else {
+							Ok(addr)
+						}
 					},
 					LinkType::General(lib_list) => {
 						let mut errors = vec![];

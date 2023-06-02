@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use crate::lazyfn;
-use crate::{FnPtr, LinkType};
+use crate::{FnAddr, LinkType};
 use std::ffi::CStr;
 use std::sync::atomic::Ordering;
 use std::{ffi, mem};
@@ -44,15 +44,12 @@ unsafe impl Send for VkDevice {}
 	))
 )]
 extern "system" {
-	pub(crate) fn vkGetInstanceProcAddr(
-		instance: VkInstance,
-		pName: *const ffi::c_char,
-	) -> Option<FnPtr>;
+	pub(crate) fn vkGetInstanceProcAddr(instance: VkInstance, pName: *const ffi::c_char) -> FnAddr;
 }
 
 #[allow(non_camel_case_types)]
 pub(crate) type PFN_vkGetDeviceProcAddr =
-	unsafe extern "system" fn(VkDevice, *const ffi::c_char) -> Option<FnPtr>;
+	unsafe extern "system" fn(VkDevice, *const ffi::c_char) -> FnAddr;
 
 // vkGetDeviceProcAddr must be implemented manually to avoid recursion
 #[allow(non_snake_case)]
@@ -60,25 +57,24 @@ pub(crate) type PFN_vkGetDeviceProcAddr =
 pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	device: VkDevice,
 	name: *const ffi::c_char,
-) -> Option<FnPtr> {
-	unsafe extern "system" fn initial_fn(
-		device: VkDevice,
-		name: *const ffi::c_char,
-	) -> Option<FnPtr> {
+) -> FnAddr {
+	unsafe extern "system" fn initial_fn(device: VkDevice, name: *const ffi::c_char) -> FnAddr {
 		DEVICE_PROC_ADDR.once.get_or_init(|| {
 			let read_lock = crate::VK_INSTANCE
 				.read()
 				.expect("Dylink Error: failed to get read lock");
 			// check other instances if fails in case one has a higher available version number
-			let fn_ptr = read_lock
+			let fn_ptr: FnAddr = read_lock
 				.iter()
 				.find_map(|instance| {
 					vkGetInstanceProcAddr(
 						*instance,
 						b"vkGetDeviceProcAddr\0".as_ptr() as *const ffi::c_char,
 					)
+					.as_mut()
 				})
-				.expect("Dylink Error: failed to load `vkGetDeviceProcAddr`.");
+				.expect("Dylink Error: failed to load `vkGetDeviceProcAddr`.")
+				as FnAddr;
 
 			*DEVICE_PROC_ADDR.addr.get() = mem::transmute(fn_ptr);
 			DEVICE_PROC_ADDR
@@ -97,24 +93,26 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	DEVICE_PROC_ADDR(device, name)
 }
 
-pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> Option<FnPtr> {
+pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> FnAddr {
 	let mut maybe_fn = crate::VK_DEVICE
 		.read()
 		.expect("failed to get read lock")
 		.iter()
-		.find_map(|device| vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const ffi::c_char));
+		.find_map(|device| {
+			vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const ffi::c_char).as_mut()
+		});
 	maybe_fn = match maybe_fn {
-		Some(addr) => return Some(addr),
+		Some(addr) => return addr,
 		None => crate::VK_INSTANCE
 			.read()
 			.expect("failed to get read lock")
 			.iter()
 			.find_map(|instance| {
-				vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char)
+				vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char).as_mut()
 			}),
 	};
 	match maybe_fn {
-		Some(addr) => Some(addr),
+		Some(addr) => addr,
 		None => vkGetInstanceProcAddr(
 			VkInstance(std::ptr::null_mut()),
 			fn_name.as_ptr() as *const ffi::c_char,
