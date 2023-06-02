@@ -65,7 +65,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 		device: VkDevice,
 		name: *const ffi::c_char,
 	) -> Option<FnPtr> {
-		DEVICE_PROC_ADDR.once.call_once(|| {
+		DEVICE_PROC_ADDR.once.get_or_init(|| {
 			let read_lock = crate::VK_INSTANCE
 				.read()
 				.expect("Dylink Error: failed to get read lock");

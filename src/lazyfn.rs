@@ -4,13 +4,11 @@ use std::{
 	cell,
 	ffi::CStr,
 	mem,
-	sync::{
-		self,
-		atomic::{AtomicPtr, Ordering},
-	},
+	sync::atomic::{AtomicPtr, Ordering},
 };
 
 use crate::{error, vulkan, DefaultLinker, DylinkResult};
+use once_cell::sync::OnceCell;
 
 /// Determines how to load the library when [LazyFn::try_link] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
@@ -28,9 +26,9 @@ pub enum LinkType<'a> {
 #[derive(Debug)]
 pub struct LazyFn<'a, F: Copy + Sync + Send> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
-	pub(crate) once: sync::Once,
+	pub(crate) once: OnceCell<()>,
 	// this is here to track the state of the instance during `LazyFn::try_link`.
-	status: sync::OnceLock<error::DylinkError>,
+	//status: sync::OnceLock<error::DylinkError>,
 	// this exists so that `F` is considered thread-safe
 	pub(crate) addr_ptr: AtomicPtr<F>,
 	// The function to be called.
@@ -53,8 +51,8 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 		assert!(mem::size_of::<crate::FnPtr>() == mem::size_of::<F>());
 		Self {
 			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
-			once: sync::Once::new(),
-			status: sync::OnceLock::new(),
+			once: OnceCell::new(),
+			//status: sync::OnceLock::new(),
 			addr: cell::UnsafeCell::new(*thunk),
 			//init: *thunk,
 			fn_name,
@@ -97,7 +95,7 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 	where
 		L::Data: Send + Sync,
 	{
-		self.once.call_once(|| {
+		let result = self.once.get_or_try_init(|| {
 			let maybe = match self.link_ty {
 				LinkType::Vulkan => unsafe {
 					vulkan::vulkan_loader(self.fn_name).ok_or(error::DylinkError::FnNotFound(
@@ -129,17 +127,14 @@ impl<'a, F: Copy + Sync + Send> LazyFn<'a, F> {
 						*self.addr.get() = mem::transmute_copy(&addr);
 					}
 					self.addr_ptr.store(self.addr.get(), Ordering::Release);
+					Ok(())
 				}
-				Err(err) => {
-					let _ = self.status.set(err);
-				}
+				Err(err) => Err(err),
 			}
 		});
-		// `call_once` is blocking, so `self.status` is read-only
-		// by this point. Race conditions shouldn't occur.
-		match self.status.get() {
-			None => Ok(self.load(Ordering::Acquire)),
-			Some(err) => Err(err.clone()),
+		match result {
+			Ok(_) => Ok(self.load(Ordering::Acquire)),
+			Err(err) => Err(err),
 		}
 	}
 

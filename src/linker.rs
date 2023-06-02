@@ -181,7 +181,7 @@ mod win32 {
 mod unix {
 	use std::ffi::{c_char, c_int, c_void, CStr};
 
-	use super::*;	
+	use super::*;
 
 	const RTLD_NOW: c_int = 0x2;
 	const RTLD_LOCAL: c_int = 0;
