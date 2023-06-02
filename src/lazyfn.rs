@@ -95,47 +95,41 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 	where
 		L::Data: Send + Sync,
 	{
-		let result = self.once.get_or_try_init(|| {
-			let maybe = match self.link_ty {
-				LinkType::Vulkan => unsafe {
-					vulkan::vulkan_loader(self.fn_name).ok_or(error::DylinkError::FnNotFound(
-						self.fn_name.to_str().unwrap().to_owned(),
-					))
-				},
-				LinkType::General(lib_list) => {
-					let mut errors = vec![];
-					lib_list
-						.iter()
-						.find_map(|lib| {
-							L::load_with(lib, self.fn_name)
-								.map_err(|e| errors.push(e))
-								.ok()
-						})
-						.ok_or_else(|| match errors.len() {
-							1 => errors[0].clone(),
-							2..=usize::MAX => error::DylinkError::ListNotLoaded(
-								errors.iter().map(|e| e.to_string() + "\n").collect(),
-							),
-							_ => unreachable!(),
-						})
+		self.once
+			.get_or_try_init(|| {
+				match self.link_ty {
+					LinkType::Vulkan => unsafe {
+						vulkan::vulkan_loader(self.fn_name).ok_or(error::DylinkError::FnNotFound(
+							self.fn_name.to_str().unwrap().to_owned(),
+						))
+					},
+					LinkType::General(lib_list) => {
+						let mut errors = vec![];
+						lib_list
+							.iter()
+							.find_map(|lib| {
+								L::load_with(lib, self.fn_name)
+									.map_err(|e| errors.push(e))
+									.ok()
+							})
+							.ok_or_else(|| match errors.len() {
+								1 => errors[0].clone(),
+								2..=usize::MAX => error::DylinkError::ListNotLoaded(
+									errors.iter().map(|e| e.to_string() + "\n").collect(),
+								),
+								_ => unreachable!(),
+							})
+					}
 				}
-			};
-
-			match maybe {
-				Ok(addr) => {
+				.and_then(|addr| {
 					unsafe {
 						*self.addr.get() = mem::transmute_copy(&addr);
 					}
 					self.addr_ptr.store(self.addr.get(), Ordering::Release);
 					Ok(())
-				}
-				Err(err) => Err(err),
-			}
-		});
-		match result {
-			Ok(_) => Ok(self.load(Ordering::Acquire)),
-			Err(err) => Err(err),
-		}
+				})
+			})
+			.and(Ok(self.load(Ordering::Acquire)))
 	}
 
 	#[inline]
