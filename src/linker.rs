@@ -8,7 +8,7 @@ use std::{ffi, mem, sync::RwLock};
 // LibHandle is thread-safe because it's inherently immutable, therefore don't add mutable accessors.
 
 /// Library handle for [RTLinker]
-pub struct LibHandle<'a, T: ?Sized>(*const T, PhantomData<&'a ()>);
+pub struct LibHandle<'a, T: ?Sized>(*const T, PhantomData<&'a T>);
 unsafe impl<T> Send for LibHandle<'_, T> where T: Send {}
 unsafe impl<T> Sync for LibHandle<'_, T> where T: Sync {}
 
@@ -54,7 +54,7 @@ pub trait RTLinker {
 	#[doc(hidden)]
 	fn load_with(lib_name: &ffi::CStr, fn_name: &ffi::CStr) -> DylinkResult<FnPtr>
 	where
-		Self::Data: Send + Sync,
+		Self::Data: 'static + Send + Sync,
 	{
 		static DLL_DATA: RwLock<Vec<(ffi::CString, crate::LibHandle<ffi::c_void>)>> =
 			RwLock::new(Vec::new());

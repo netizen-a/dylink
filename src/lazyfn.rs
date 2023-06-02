@@ -26,9 +26,7 @@ pub enum LinkType<'a> {
 #[derive(Debug)]
 pub struct LazyFn<'a, F: Copy> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
-	pub(crate) once: OnceCell<()>,
-	// this is here to track the state of the instance during `LazyFn::try_link`.
-	//status: sync::OnceLock<error::DylinkError>,
+	pub(crate) once: OnceCell<()>,	
 	// this exists so that `F` is considered thread-safe
 	pub(crate) addr_ptr: AtomicPtr<F>,
 	// The function to be called.
@@ -93,7 +91,7 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 	/// If the library fails to link, like if it can't find the library or function, then an error is returned.
 	pub fn try_link_with<L: crate::RTLinker>(&self) -> DylinkResult<&F>
 	where
-		L::Data: Send + Sync,
+		L::Data: 'static + Send + Sync,
 	{
 		self.once
 			.get_or_try_init(|| {
