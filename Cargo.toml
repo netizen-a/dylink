@@ -4,7 +4,7 @@ version = "0.6.0"
 authors = ["Jonathan Thomason"]
 edition = "2021"
 license = "MIT OR Apache-2.0"
-keywords = ["ffi", "dlopen", "load", "shared", "dylib"]
+keywords = ["ffi", "dlopen", "load", "shared", "lazy"]
 categories = ["api-bindings"]
 description = "Run-time dynamic linking loader utilities"
 repository = "https://github.com/Razordor/dylink.git"
@@ -14,7 +14,7 @@ publish = true
 members = ["dylink_macro"]
 
 [dependencies.dylink_macro]
-version = "0.6"
+version = "0.7"
 path="./dylink_macro"
 
 [dependencies]

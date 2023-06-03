@@ -36,13 +36,13 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 					.items
 					.iter()
 					.map(|item| match item {
-						ForeignItem::Fn(fn_item) => parse_fn::<true>(fn_item, &attr_data),
+						ForeignItem::Fn(fn_item) => parse_fn::<true>(Some(abi), fn_item, &attr_data),
 						other => quote!(#abi {#other}),
 					})
 					.collect::<TokenStream2>()
 					.into()
 			} else if let Ok(foreign_fn) = syn::parse2::<syn::ForeignItemFn>(input.into()) {
-				parse_fn::<false>(&foreign_fn, &attr_data).into()
+				parse_fn::<false>(foreign_fn.sig.abi.as_ref(), &foreign_fn, &attr_data).into()
 			} else {
 				panic!("failed to parse");
 			}
@@ -52,11 +52,12 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 }
 
 fn parse_fn<const IS_MOD_ITEM: bool>(
+	abi: Option<&syn::Abi>,
 	fn_item: &syn::ForeignItemFn,
 	attr_data: &AttrData,
 ) -> TokenStream2 {
-	let fn_name = fn_item.sig.ident.to_token_stream();
-	let abi = fn_item.sig.abi.to_token_stream();
+	let abi = abi.to_token_stream();
+	let fn_name = fn_item.sig.ident.to_token_stream();	
 	let vis = fn_item.vis.to_token_stream();
 	let output = fn_item.sig.output.to_token_stream();
 	let strip = attr_data.strip;
@@ -162,7 +163,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 					let result = #caller_name(#(#param_list),*);
 					unsafe {
 						dylink::Global.insert_instance(
-							*#std_transmute::<_, *mut dylink::VkInstance>(#inst_param)
+							*#std_transmute::<_, *mut dylink::vk::Instance>(#inst_param)
 						);
 					}
 					result
@@ -180,7 +181,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				quote! {
 					let result = #caller_name(#(#param_list),*);
 					unsafe {
-						dylink::Global.remove_instance(&#std_transmute::<_, dylink::VkInstance>(#inst_param));
+						dylink::Global.remove_instance(&#std_transmute::<_, dylink::vk::Instance>(#inst_param));
 					}
 					result
 				}
@@ -197,7 +198,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				quote! {
 					let result = #caller_name(#(#param_list),*);
 					unsafe {
-						dylink::Global.insert_device(*#std_transmute::<_, *mut dylink::VkDevice>(#inst_param));
+						dylink::Global.insert_device(*#std_transmute::<_, *mut dylink::vk::Device>(#inst_param));
 					}
 					result
 				}
@@ -214,7 +215,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				quote! {
 					let result = #caller_name(#(#param_list),*);
 					unsafe {
-						dylink::Global.remove_device(&#std_transmute::<_, dylink::VkDevice>(#inst_param));
+						dylink::Global.remove_device(&#std_transmute::<_, dylink::vk::Device>(#inst_param));
 					}
 					result
 				}
@@ -249,7 +250,8 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			fn_name.to_string()
 		}
 	};
-
+	//println!("{fn_name}:{abi}");
+	
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
 	if strip {

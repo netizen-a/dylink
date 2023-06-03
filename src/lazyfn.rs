@@ -7,7 +7,7 @@ use std::{
 	sync::atomic::{AtomicPtr, Ordering},
 };
 
-use crate::{error, vulkan, DefaultLinker, DylinkResult, FnAddr};
+use crate::{error, vk, link, DylinkResult, FnAddr};
 use once_cell::sync::OnceCell;
 
 /// Determines how to load the library when [LazyFn::try_link] is called.
@@ -26,13 +26,11 @@ pub enum LinkType<'a> {
 #[derive(Debug)]
 pub struct LazyFn<'a, F: Copy> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
-	pub(crate) once: OnceCell<()>,
+	pub(crate) once: OnceCell<F>,
 	// this exists so that `F` is considered thread-safe
 	pub(crate) addr_ptr: AtomicPtr<F>,
 	// The function to be called.
-	// mutating this data without locks is UB.
 	pub(crate) addr: cell::UnsafeCell<F>,
-	//pub(crate) init: F,
 	fn_name: &'a CStr,
 	link_ty: LinkType<'a>,
 }
@@ -81,7 +79,7 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 	/// }
 	/// ```
 	pub fn try_link(&self) -> DylinkResult<&F> {
-		self.try_link_with::<DefaultLinker>()
+		self.try_link_with::<link::System>()
 	}
 
 	/// Provides a generic argument to supply a user defined linker loader to load the library.
@@ -91,13 +89,13 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 	/// If the library fails to link, like if it can't find the library or function, then an error is returned.
 	pub fn try_link_with<L: crate::RTLinker>(&self) -> DylinkResult<&F>
 	where
-		L::Data: 'static + Send + Sync,
+		L::Data: 'static + Send,
 	{
 		self.once
 			.get_or_try_init(|| {
 				match self.link_ty {
 					LinkType::Vulkan => unsafe {
-						let addr: FnAddr = vulkan::vulkan_loader(self.fn_name);
+						let addr: FnAddr = vk::vulkan_loader(self.fn_name);
 						if addr.is_null() {
 							Err(error::DylinkError::FnNotFound(
 								self.fn_name.to_str().unwrap().to_owned(),
@@ -124,12 +122,13 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 							})
 					}
 				}
-				.and_then(|addr| {
-					unsafe {
-						*self.addr.get() = mem::transmute_copy(&addr);
-					}
+				.map(|raw_addr| unsafe {
+					let addr = self
+						.addr
+						.get()
+						.replace(mem::transmute_copy::<_, F>(&raw_addr));
 					self.addr_ptr.store(self.addr.get(), Ordering::Release);
-					Ok(())
+					addr
 				})
 			})
 			.and(Ok(self.load(Ordering::Acquire)))
@@ -145,6 +144,8 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 	pub fn into_inner(self) -> F {
 		self.addr.into_inner()
 	}
+	// invalidates instance and resets to initial state
+	//fn take() ->
 }
 
 // should this be removed in favor of just calling load?

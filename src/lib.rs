@@ -57,18 +57,18 @@
 //! # use std::ffi::*;
 //! struct MyLinker;
 //! impl RTLinker for MyLinker {
-//! 	type Data = c_void;
-//!		fn load_lib(lib_name: &CStr) -> LibHandle<'static, Self::Data> {
-//! 		/* your implementation here */
-//!	# todo!()
-//!		}
-//!		fn load_sym(
-//!			lib_handle: &LibHandle<'static, Self::Data>,
-//!			fn_name: &CStr,
-//!		) -> FnAddr {
-//! 		/* your implementation here */
-//!	# todo!()
-//!		}
+//!     type Data = c_void;
+//!     fn load_lib(lib_name: &CStr) -> LibHandle<'static, Self::Data> {
+//!         /* your implementation here */
+//! # todo!()
+//!     }
+//!     fn load_sym(
+//!         lib_handle: &LibHandle<'static, Self::Data>,
+//!         fn_name: &CStr,
+//!     ) -> FnAddr {
+//!         /* your implementation here */
+//! # todo!()
+//!     }
 //! }
 //!
 //! #[dylink(name = "my_lib", linker=MyLinker)]
@@ -133,18 +133,15 @@
 //!
 //! *An unloader may be considered in future revisions, but the current abstraction is unsuitable for RAII unloading.*
 
-use std::sync;
-
 mod error;
 mod lazyfn;
-mod linker;
-mod vulkan;
+mod link;
+#[doc(hidden)]
+pub mod vk;
 
 pub use error::*;
 pub use lazyfn::*;
-pub use linker::*;
-#[doc(hidden)]
-pub use vulkan::{VkDevice, VkInstance};
+pub use link::*;
 
 /// Macro for generating dynamically linked functions procedurally.
 ///
@@ -158,12 +155,6 @@ pub struct ReadmeDoctests;
 // I don't know how to implement wasm, so I'll just drop this here...
 #[cfg(wasm)]
 compile_error!("Dylink Error: Wasm is unsupported.");
-
-// These globals are read every time a vulkan function is called for the first time,
-// which occurs through `LazyFn::link`.
-static VK_INSTANCE: sync::RwLock<Vec<vulkan::VkInstance>> = sync::RwLock::new(Vec::new());
-
-static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> = sync::RwLock::new(Vec::new());
 
 /// Raw function address.
 ///
@@ -192,9 +183,9 @@ impl Global {
 	/// *    If the set already contained this value, `false` is returned.
 	///
 	/// *note: This function returns `false` if the instance is valid and defined through dylink.*
-	pub fn insert_instance(&self, instance: vulkan::VkInstance) -> bool {
+	pub fn insert_instance(&self, instance: vk::Instance) -> bool {
 		//println!("insert_instance called!");
-		let mut write_lock = VK_INSTANCE.write().unwrap();
+		let mut write_lock = vk::INSTANCES.write().unwrap();
 		match write_lock.binary_search(&instance) {
 			Ok(_) => false,
 			Err(index) => {
@@ -207,9 +198,9 @@ impl Global {
 	/// Removes an instance from the set. Returns whether the instance was present in the set.
 	/// # Safety
 	/// Using this function may break dylink's checked lifetimes!
-	pub unsafe fn remove_instance(&self, instance: &vulkan::VkInstance) -> bool {
+	pub unsafe fn remove_instance(&self, instance: &vk::Instance) -> bool {
 		//println!("remove_instance called!");
-		let mut write_lock = VK_INSTANCE.write().unwrap();
+		let mut write_lock = vk::INSTANCES.write().unwrap();
 		match write_lock.binary_search(instance) {
 			Ok(index) => {
 				write_lock.remove(index);
@@ -228,9 +219,9 @@ impl Global {
 	/// *    If the set already contained this value, `false` is returned.
 	///
 	/// *note: This function returns `false` if the device is valid and defined through dylink.*
-	pub fn insert_device(&self, device: vulkan::VkDevice) -> bool {
+	pub fn insert_device(&self, device: vk::Device) -> bool {
 		//println!("insert_device called!");
-		let mut write_lock = VK_DEVICE.write().unwrap();
+		let mut write_lock = vk::DEVICES.write().unwrap();
 		match write_lock.binary_search(&device) {
 			Ok(_) => false,
 			Err(index) => {
@@ -243,9 +234,9 @@ impl Global {
 	/// Removes a device from the set. Returns whether the value was present in the set.
 	/// # Safety
 	/// Using this function may break dylink's checked lifetimes!
-	pub unsafe fn remove_device(&self, device: &vulkan::VkDevice) -> bool {
+	pub unsafe fn remove_device(&self, device: &vk::Device) -> bool {
 		//println!("remove_device called!");
-		let mut write_lock = VK_DEVICE.write().unwrap();
+		let mut write_lock = vk::DEVICES.write().unwrap();
 		match write_lock.binary_search(device) {
 			Ok(index) => {
 				write_lock.remove(index);

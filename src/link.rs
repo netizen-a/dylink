@@ -17,12 +17,15 @@ impl<'a, T> LibHandle<'a, T> {
 	pub fn is_invalid(&self) -> bool {
 		self.0.is_null()
 	}
+	pub fn as_ref(&self) -> Option<&T> {
+		unsafe { self.0.as_ref() }
+	}
 	// This is basically a clone to an opaque handle
 	fn to_opaque<'b>(&'a self) -> LibHandle<'b, ffi::c_void> {
 		LibHandle(self.0.cast(), PhantomData)
 	}
-	pub fn as_ref(&self) -> Option<&T> {
-		unsafe { self.0.as_ref() }
+	fn from_opaque<'b>(a: &'a LibHandle::<ffi::c_void>) -> LibHandle::<'b, T> {
+		LibHandle::<T>(a.0.cast(), PhantomData)
 	}
 }
 
@@ -34,45 +37,36 @@ impl<'a, T> From<Option<&'a T>> for LibHandle<'a, T> {
 	}
 }
 
-impl<'a, T> From<&'a T> for LibHandle<'a, T> {
-	fn from(value: &'a T) -> Self {
-		Self((value as *const T).cast(), PhantomData)
-	}
-}
-
 /// Used to specify a custom run-time linker loader for [LazyFn]
 pub trait RTLinker {
 	type Data;
 	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
 	where
-		Self::Data: Send + Sync;
+		Self::Data: Send;
 	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> FnAddr
 	where
-		Self::Data: Send + Sync;
+		Self::Data: Send;
 
 	/// loads library once across all calls and attempts to load the function.
 	#[doc(hidden)]
 	fn load_with(lib_name: &ffi::CStr, fn_name: &ffi::CStr) -> DylinkResult<FnAddr>
 	where
-		Self::Data: 'static + Send + Sync,
+		Self::Data: 'static + Send,
 	{
 		static DLL_DATA: RwLock<Vec<(ffi::CString, crate::LibHandle<ffi::c_void>)>> =
 			RwLock::new(Vec::new());
 
-		// somehow rust is smart enough to infer that fn_addr is assigned to only once after branching.
-		let fn_addr;
-
+		let fn_addr: FnAddr;
+		let lib_handle: LibHandle::<Self::Data>;
 		let read_lock = DLL_DATA.read().unwrap();
 		match read_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
 			Ok(index) => {
-				let handle = LibHandle::<Self::Data>(read_lock[index].1 .0.cast(), PhantomData);
-				fn_addr = Self::load_sym(&handle, fn_name)
+				lib_handle = LibHandle::from_opaque(&read_lock[index].1);
+				fn_addr = Self::load_sym(&lib_handle, fn_name)
 			}
 			Err(index) => {
 				mem::drop(read_lock);
-
-				let lib_handle = Self::load_lib(lib_name);
-
+				lib_handle = Self::load_lib(lib_name);
 				if lib_handle.is_invalid() {
 					return Err(DylinkError::LibNotLoaded(
 						lib_name.to_string_lossy().into_owned(),
@@ -96,7 +90,7 @@ pub trait RTLinker {
 	}
 }
 
-pub(crate) struct DefaultLinker;
+pub(crate) struct System;
 
 #[cfg(windows)]
 mod win32 {
@@ -116,7 +110,7 @@ mod win32 {
 		fn GetProcAddress(hmodule: HMODULE, lpprocname: PCSTR) -> crate::FnAddr;
 	}
 
-	impl RTLinker for DefaultLinker {
+	impl RTLinker for System {
 		type Data = ffi::c_void;
 		#[cfg_attr(miri, track_caller)]
 		#[inline]
@@ -153,16 +147,17 @@ mod win32 {
 		}
 	}
 
+	#[cfg(not(miri))]
 	#[test]
 	fn test_win32_macro_linker() {
 		extern crate self as dylink;
-		#[dylink::dylink(name = "Kernel32.dll", strip = true, linker=DefaultLinker)]
+		#[dylink::dylink(name = "Kernel32.dll", strip = true, linker=System)]
 		extern "stdcall" {
 			fn SetLastError(_: u32);
 		}
 
 		// macro output: function
-		#[dylink::dylink(name = "Kernel32.dll", strip = false, linker=DefaultLinker)]
+		#[dylink::dylink(name = "Kernel32.dll", strip = false, linker=System)]
 		extern "C" {
 			fn GetLastError() -> u32;
 		}
@@ -191,7 +186,7 @@ mod unix {
 		fn dlsym(handle: *mut c_void, symbol: *const c_char) -> crate::FnAddr;
 	}
 
-	impl RTLinker for DefaultLinker {
+	impl RTLinker for System {
 		type Data = c_void;
 		#[cfg_attr(miri, track_caller)]
 		#[inline]
