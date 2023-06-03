@@ -226,15 +226,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		quote!(#caller_name(#(#param_list),*))
 	};
 
-	let try_link_call = match linker {
-		None => quote! {
-			try_link
-		},
-		Some(linker_name) => quote! {
-			try_link_with::<#linker_name>
-		},
-	};
-
 	let lint;
 	let link_name = match &attr_data.link_name {
 		Some((name, _)) => {
@@ -259,13 +250,13 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			#(#fn_attrs)*
 			#lint
 			#vis static #fn_name
-			: dylink::LazyFn<'static, unsafe #abi fn (#params_default) #output>
+			: dylink::LazyFn<unsafe #abi fn (#params_default) #output, #linker>
 			= dylink::LazyFn::new(
 				{
 					type InstFnPtr = unsafe #abi fn (#params_default) #output;
 					unsafe #abi fn initial_fn (#(#param_ty_list),*) #output {
 						use std::ffi::CStr;
-						match #fn_name.#try_link_call() {
+						match #fn_name.try_link() {
 							Ok(function) => {#call_dyn_func},
 							Err(err) => panic!("{}", err),
 						}
@@ -287,14 +278,14 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				type InstFnPtr = #abi fn (#(#internal_param_ty_list),*) #output;
 				#abi fn initial_fn (#(#internal_param_ty_list),*) #output {
 					use std::ffi::CStr;
-					match DYN_FUNC.#try_link_call() {
+					match DYN_FUNC.try_link() {
 						Ok(function) => {function(#(#internal_param_list),*)},
 						Err(err) => panic!("{}", err),
 					}
 				}
 				const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
 				static DYN_FUNC
-				: dylink::LazyFn<'static, InstFnPtr>
+				: dylink::LazyFn<InstFnPtr, #linker>
 				= dylink::LazyFn::new(
 					DYN_FUNC_REF,
 					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},

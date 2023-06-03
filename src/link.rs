@@ -42,18 +42,18 @@ pub trait RTLinker {
 	type Data;
 	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
 	where
-		Self::Data: Send;
+		Self::Data: Send + Sync;
 	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> FnAddr
 	where
-		Self::Data: Send;
+		Self::Data: Send + Sync;
 
 	/// loads library once across all calls and attempts to load the function.
 	#[doc(hidden)]
 	fn load_with(lib_name: &ffi::CStr, fn_name: &ffi::CStr) -> DylinkResult<FnAddr>
 	where
-		Self::Data: 'static + Send,
+		Self::Data: 'static + Send + Sync,
 	{
-		static DLL_DATA: RwLock<Vec<(ffi::CString, crate::LibHandle<ffi::c_void>)>> =
+		static DLL_DATA: RwLock<Vec<(ffi::CString, LibHandle<ffi::c_void>)>> =
 			RwLock::new(Vec::new());
 
 		let fn_addr: FnAddr;
@@ -90,7 +90,8 @@ pub trait RTLinker {
 	}
 }
 
-pub(crate) struct System;
+/// Default system linker used in [LazyFn]
+pub struct System;
 
 #[cfg(windows)]
 mod win32 {

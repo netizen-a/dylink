@@ -4,7 +4,7 @@ use std::{
 	cell,
 	ffi::CStr,
 	mem,
-	sync::atomic::{AtomicPtr, Ordering},
+	sync::atomic::{AtomicPtr, Ordering}, marker::PhantomData,
 };
 
 use crate::{error, vk, link, DylinkResult, FnAddr};
@@ -24,7 +24,7 @@ pub enum LinkType<'a> {
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// The provided member functions can be used from the generated macro when `strip=true` is enabled.
 #[derive(Debug)]
-pub struct LazyFn<'a, F: Copy> {
+pub struct LazyFn<'a, F: Copy + Sync, L: link::RTLinker = link::System> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	pub(crate) once: OnceCell<F>,
 	// this exists so that `F` is considered thread-safe
@@ -33,11 +33,12 @@ pub struct LazyFn<'a, F: Copy> {
 	pub(crate) addr: cell::UnsafeCell<F>,
 	fn_name: &'a CStr,
 	link_ty: LinkType<'a>,
+	phantom: PhantomData<L>,
 }
 
-unsafe impl<F: Copy> Sync for LazyFn<'_, F> {}
+unsafe impl<F: Copy + Sync> Sync for LazyFn<'_, F> {}
 
-impl<'a, F: Copy> LazyFn<'a, F> {
+impl<'a, F: Copy + Sync, L: link::RTLinker> LazyFn<'a, F, L> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
@@ -53,6 +54,7 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 			//init: *thunk,
 			fn_name,
 			link_ty,
+			phantom: PhantomData,
 		}
 	}
 
@@ -78,18 +80,9 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 	///     }
 	/// }
 	/// ```
-	pub fn try_link(&self) -> DylinkResult<&F> {
-		self.try_link_with::<link::System>()
-	}
-
-	/// Provides a generic argument to supply a user defined linker loader to load the library.
-	/// If successful, stores address in current instance and returns a reference of the stored value.
-	///
-	/// # Errors
-	/// If the library fails to link, like if it can't find the library or function, then an error is returned.
-	pub fn try_link_with<L: crate::RTLinker>(&self) -> DylinkResult<&F>
+	pub fn try_link(&self) -> DylinkResult<&F>
 	where
-		L::Data: 'static + Send,
+		L::Data: 'static + Send + Sync,
 	{
 		self.once
 			.get_or_try_init(|| {
@@ -150,7 +143,7 @@ impl<'a, F: Copy> LazyFn<'a, F> {
 
 // should this be removed in favor of just calling load?
 
-impl<F: Copy> std::ops::Deref for LazyFn<'_, F> {
+impl<F: Copy + Sync> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
 	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {

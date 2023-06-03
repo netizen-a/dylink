@@ -53,25 +53,25 @@
 //! The linker must implement RTLinker to be used when linking to the symbol.
 //!
 //! ```rust
-//! # use dylink::*;
+//! # use dylink::{*, link::*};
 //! # use std::ffi::*;
 //! struct MyLinker;
 //! impl RTLinker for MyLinker {
-//!     type Data = c_void;
+//!     type Data = ();
 //!     fn load_lib(lib_name: &CStr) -> LibHandle<'static, Self::Data> {
 //!         /* your implementation here */
-//! # todo!()
+//! # LibHandle::from(None)
 //!     }
 //!     fn load_sym(
 //!         lib_handle: &LibHandle<'static, Self::Data>,
 //!         fn_name: &CStr,
 //!     ) -> FnAddr {
 //!         /* your implementation here */
-//! # todo!()
+//! # std::ptr::null()
 //!     }
 //! }
 //!
-//! #[dylink(name = "my_lib", linker=MyLinker)]
+//! #[dylink(name = "my_lib", linker=System)]
 //! extern "system" fn foo() -> u32;
 //! ```
 //!
@@ -135,13 +135,13 @@
 
 mod error;
 mod lazyfn;
-mod link;
+pub mod link;
 #[doc(hidden)]
 pub mod vk;
 
 pub use error::*;
 pub use lazyfn::*;
-pub use link::*;
+//pub use link::*;
 
 /// Macro for generating dynamically linked functions procedurally.
 ///
@@ -159,7 +159,7 @@ compile_error!("Dylink Error: Wasm is unsupported.");
 /// Raw function address.
 ///
 /// Must be cast into a function pointer to be useable.
-pub type FnAddr = *mut ();
+pub type FnAddr = *const ();
 
 /// The result of a dylink function
 pub type DylinkResult<T> = Result<T, error::DylinkError>;
