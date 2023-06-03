@@ -135,6 +135,7 @@
 
 mod error;
 mod lazyfn;
+/// custom linker module
 pub mod link;
 #[doc(hidden)]
 pub mod vk;

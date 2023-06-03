@@ -45,7 +45,8 @@ fn test_win32_impl() {
 	}
 }
 
-// tbh I don't know why this test passes.
+// This test works because the AtomicPtr is referencing external data when it's first initialized
+// When it's initialized, a new reference to a different memory location is created.
 #[cfg(windows)]
 #[test]
 fn test_win32_lifetimes() {
@@ -53,7 +54,7 @@ fn test_win32_lifetimes() {
 	use std::ops::Deref;
 
 	extern "stdcall" fn foo() -> u32 {
-		0
+		1234
 	}
 	type PfnTy = extern "stdcall" fn() -> u32;
 
@@ -66,11 +67,13 @@ fn test_win32_lifetimes() {
 	// `deref` isn't suppose to be used this way, but if
 	// it is used, this test will check if it's valid.
 	let old_ref = lazyfn.deref();
-	let new_addr = lazyfn.try_link().unwrap();
+	let new_ref = lazyfn.try_link().unwrap();
+	assert!(old_ref() == 1234);
 
 	// This is verbose like this because GitHub Actions keeps giving me `error[E0369]`.
 	assert!(*old_ref as isize == foo as PfnTy as isize);
-	assert!(*new_addr as isize != foo as PfnTy as isize);
+	assert!(new_ref as isize != foo as PfnTy as isize);
+	assert!(new_ref as isize != *old_ref as isize);
 	assert!(lazyfn.deref() as *const PfnTy as isize != old_ref as *const PfnTy as isize);
 }
 

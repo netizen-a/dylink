@@ -24,21 +24,23 @@ pub enum LinkType<'a> {
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// The provided member functions can be used from the generated macro when `strip=true` is enabled.
 #[derive(Debug)]
-pub struct LazyFn<'a, F: Copy + Sync, L: link::RTLinker = link::System> {
+pub struct LazyFn<'a, F: Copy, L: link::RTLinker = link::System> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
+	// SAFETY: once is not allowed to be reset, because it can break references
 	pub(crate) once: OnceCell<F>,
 	// this exists so that `F` is considered thread-safe
 	pub(crate) addr_ptr: AtomicPtr<F>,
 	// The function to be called.
+	// SAFETY: This should only be accessed atomically or when thread is blocking.
 	pub(crate) addr: cell::UnsafeCell<F>,
 	fn_name: &'a CStr,
 	link_ty: LinkType<'a>,
 	phantom: PhantomData<L>,
 }
 
-unsafe impl<F: Copy + Sync> Sync for LazyFn<'_, F> {}
+unsafe impl<F: Copy> Sync for LazyFn<'_, F> {}
 
-impl<'a, F: Copy + Sync, L: link::RTLinker> LazyFn<'a, F, L> {
+impl<'a, F: Copy, L: link::RTLinker> LazyFn<'a, F, L> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
@@ -49,19 +51,15 @@ impl<'a, F: Copy + Sync, L: link::RTLinker> LazyFn<'a, F, L> {
 		Self {
 			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
 			once: OnceCell::new(),
-			//status: sync::OnceLock::new(),
 			addr: cell::UnsafeCell::new(*thunk),
-			//init: *thunk,
 			fn_name,
 			link_ty,
 			phantom: PhantomData,
 		}
 	}
 
-	/// Implicitly calls system defined linker loader, such as `GetProcAddress`, and `LoadLibraryExW`
-	/// for windows, or `dlsym`, and `dlopen` for unix. This function is used by the
-	/// [dylink](dylink_macro::dylink) macro by default.
-	/// If successful, stores address in current instance and returns a reference of the stored value.
+	/// Calls the run-time linker loader, and tries to link the function.
+	/// If successful, stores address in current instance and returns a copy of the stored value.
 	///
 	/// # Errors
 	/// If the library fails to link, like if it can't find the library or function, then an error is returned.
@@ -80,7 +78,7 @@ impl<'a, F: Copy + Sync, L: link::RTLinker> LazyFn<'a, F, L> {
 	///     }
 	/// }
 	/// ```
-	pub fn try_link(&self) -> DylinkResult<&F>
+	pub fn try_link(&self) -> DylinkResult<F>
 	where
 		L::Data: 'static + Send + Sync,
 	{
@@ -124,12 +122,18 @@ impl<'a, F: Copy + Sync, L: link::RTLinker> LazyFn<'a, F, L> {
 					addr
 				})
 			})
-			.and(Ok(self.load(Ordering::Acquire)))
+			.and(Ok(unsafe {*self.load(Ordering::Acquire)}))
 	}
 
+	/// loads a value from the object.
+	/// 
+	/// `load` takes an [`Ordering`] argument which describes the memory ordering
+	/// of this operation. Possible values are [`SeqCst`](Ordering::SeqCst), [`Acquire`](Ordering::Acquire) and [`Relaxed`](Ordering::Relaxed).
+	/// # Panics
+	/// Panics if `order` is [`Release`](Ordering::Release) or [`AcqRel`](Ordering::AcqRel).
 	#[inline]
-	fn load(&self, order: Ordering) -> &F {
-		unsafe { self.addr_ptr.load(order).as_ref().unwrap_unchecked() }
+	fn load(&self, order: Ordering) -> *mut F {
+		self.addr_ptr.load(order)
 	}
 	/// Consumes `LazyFn` and returns the contained value.
 	///
@@ -137,16 +141,13 @@ impl<'a, F: Copy + Sync, L: link::RTLinker> LazyFn<'a, F, L> {
 	pub fn into_inner(self) -> F {
 		self.addr.into_inner()
 	}
-	// invalidates instance and resets to initial state
-	//fn take() ->
 }
 
-// should this be removed in favor of just calling load?
-
-impl<F: Copy + Sync> std::ops::Deref for LazyFn<'_, F> {
+// This will always return a valid reference, but not always the same reference
+impl<F: Copy> std::ops::Deref for LazyFn<'_, F> {
 	type Target = F;
 	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {
-		self.load(Ordering::Relaxed)
+		unsafe {self.load(Ordering::Relaxed).as_ref().unwrap_unchecked()}
 	}
 }

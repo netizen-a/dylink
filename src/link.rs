@@ -115,7 +115,10 @@ mod win32 {
 		type Data = ffi::c_void;
 		#[cfg_attr(miri, track_caller)]
 		#[inline]
-		fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data> {
+		fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
+		where
+			Self::Data: 'static + Send + Sync,
+		{
 			let wide_str: Vec<u16> = lib_name
 				.to_string_lossy()
 				.encode_utf16()
@@ -135,7 +138,10 @@ mod win32 {
 		fn load_sym(
 			lib_handle: &LibHandle<'static, Self::Data>,
 			fn_name: &ffi::CStr,
-		) -> crate::FnAddr {
+		) -> crate::FnAddr
+		where
+			Self::Data: 'static + Send + Sync,
+		{
 			unsafe {
 				GetProcAddress(
 					lib_handle
