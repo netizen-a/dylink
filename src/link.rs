@@ -37,25 +37,20 @@ impl<'a, T> From<Option<&'a T>> for LibHandle<'a, T> {
 	}
 }
 
+static DLL_DATA: RwLock<Vec<(ffi::CString, LibHandle<ffi::c_void>)>> =
+			RwLock::new(Vec::new());
+
 /// Used to specify a custom run-time linker loader for [LazyFn]
 pub trait RTLinker {
 	type Data;
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
-	where
-		Self::Data: Send + Sync;
-	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> FnAddr
-	where
-		Self::Data: Send + Sync;
+	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>;
+	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> FnAddr;
 
-	/// loads library once across all calls and attempts to load the function.
-	#[doc(hidden)]
+	/// loads function from library synchronously and stores library handle internally
 	fn load_with(lib_name: &ffi::CStr, fn_name: &ffi::CStr) -> DylinkResult<FnAddr>
 	where
 		Self::Data: 'static + Send + Sync,
 	{
-		static DLL_DATA: RwLock<Vec<(ffi::CString, LibHandle<ffi::c_void>)>> =
-			RwLock::new(Vec::new());
-
 		let fn_addr: FnAddr;
 		let lib_handle: LibHandle::<Self::Data>;
 		let read_lock = DLL_DATA.read().unwrap();
@@ -99,16 +94,24 @@ mod win32 {
 	// The windows API conventions are kept deliberately, so it's easier to refer to references.
 
 	use std::ffi;
-	use std::os::windows::raw::HANDLE;
+	use std::io::{Result, Error};
+use std::os::windows::raw::HANDLE;
 
 	type HMODULE = HANDLE;
 	type PCSTR = *const ffi::c_char;
 	type PCWSTR = *const u16;
+	type BOOL = ffi::c_int;
+	//type DWORD = ffi::c_ulong;
 	const LOAD_LIBRARY_SEARCH_DEFAULT_DIRS: u32 = 0x00001000u32;
 	const LOAD_LIBRARY_SAFE_CURRENT_DIRS: u32 = 0x00002000u32;
 	extern "stdcall" {
 		fn LoadLibraryExW(lplibfilename: PCWSTR, hfile: HANDLE, dwflags: u32) -> HMODULE;
 		fn GetProcAddress(hmodule: HMODULE, lpprocname: PCSTR) -> crate::FnAddr;
+		fn FreeLibrary(hlibmodule: HMODULE) -> BOOL;
+		/*fn FreeLibraryAndExitThread(
+			hLibModule:HMODULE,
+			dwExitCode:DWORD
+		) -> !;*/
 	}
 
 	impl RTLinker for System {
@@ -116,8 +119,6 @@ mod win32 {
 		#[cfg_attr(miri, track_caller)]
 		#[inline]
 		fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
-		where
-			Self::Data: 'static + Send + Sync,
 		{
 			let wide_str: Vec<u16> = lib_name
 				.to_string_lossy()
@@ -139,8 +140,6 @@ mod win32 {
 			lib_handle: &LibHandle<'static, Self::Data>,
 			fn_name: &ffi::CStr,
 		) -> crate::FnAddr
-		where
-			Self::Data: 'static + Send + Sync,
 		{
 			unsafe {
 				GetProcAddress(
@@ -152,6 +151,46 @@ mod win32 {
 				)
 			}
 		}
+	}
+
+	impl System {
+		pub unsafe fn unload(lib_name: &ffi::CStr) -> Result<()> {
+			let mut write_lock = DLL_DATA.write().unwrap();
+			let ret: BOOL;
+			match write_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
+				Ok(index) => {				
+					let hlibmodule = write_lock.remove(index).1
+						.as_ref()
+						.map(|r| r as *const _ as *mut ffi::c_void)
+						.unwrap();
+					ret = FreeLibrary(hlibmodule);
+				}
+				Err(_) => {
+					ret = 0;
+				}
+			}
+			if ret != 0 {
+				Ok(())
+			} else {
+				Err(Error::last_os_error())
+			}
+		}
+		/*pub fn unload_and_exit(lib_name: &ffi::CStr, code: DWORD) -> ! {
+			let read_lock = DLL_DATA.read().unwrap();
+			match read_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
+				Ok(index) => {				
+					let hlibmodule = read_lock[index].1
+						.as_ref()
+						.map(|r| r as *const _ as *mut ffi::c_void)
+						.unwrap();
+					unsafe {FreeLibraryAndExitThread(hlibmodule, code);}
+				}
+				Err(_) => {
+					mem::drop(read_lock);
+					panic!("could not find library");
+				}
+			}
+		}*/
 	}
 
 	#[cfg(not(miri))]
@@ -182,7 +221,7 @@ mod win32 {
 
 #[cfg(unix)]
 mod unix {
-	use std::ffi::{c_char, c_int, c_void, CStr};
+	use std::{ffi::{c_char, c_int, c_void, CStr}, io::Error};
 
 	use super::*;
 
@@ -191,6 +230,7 @@ mod unix {
 	extern "C" {
 		fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
 		fn dlsym(handle: *mut c_void, symbol: *const c_char) -> crate::FnAddr;
+		fn dlclose(handle: *mut c_void) -> c_int;
 	}
 
 	impl RTLinker for System {
@@ -213,6 +253,29 @@ mod unix {
 						.unwrap_or(std::ptr::null_mut()),
 					fn_name.as_ptr(),
 				)
+			}
+		}
+	}
+	impl System {
+		pub unsafe fn unload(lib_name: &ffi::CStr) -> std::io::Result<()> {
+			let mut write_lock = DLL_DATA.write().unwrap();
+			let ret: c_int;
+			match write_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
+				Ok(index) => {				
+					let hlibmodule = write_lock.remove(index).1
+						.as_ref()
+						.map(|r| r as *const _ as *mut ffi::c_void)
+						.unwrap();
+					ret = dlclose(hlibmodule);
+				}
+				Err(_) => {
+					mem::drop(write_lock);
+					ret = -1;
+				}
+			}
+			match ret {
+				0 => Ok(()),
+				_ => Err(Error::last_os_error())
 			}
 		}
 	}

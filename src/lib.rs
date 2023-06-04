@@ -127,11 +127,12 @@
 //! ```
 //!
 //! # About Library Unloading
-//! Shared library unloading is extremely cursed, always unsafe, and we don't even try to support it.
+//! Shared library unloading is extremely cursed, always unsafe.
 //! Unloading a library means not only are all loaded dylink functions invalidated, but functions loaded from **ALL**
-//! crates in the project are also invalidated, which will immediately lead to segfaults... a lot of them.
-//!
-//! *An unloader may be considered in future revisions, but the current abstraction is unsuitable for RAII unloading.*
+//! crates in the project are also invalidated when unloaded carelessly.
+//! 
+//! The [`System`](link::System) linker loader provides an `unload` function that may be used to unload the library.
+//! If a custom loader is used then the user must unload the library manually.
 
 mod error;
 mod lazyfn;
