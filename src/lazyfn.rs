@@ -100,7 +100,7 @@ impl<'a, F: Copy, L: link::RTLinker> LazyFn<'a, F, L> {
 						lib_list
 							.iter()
 							.find_map(|lib| {
-								L::load_with(lib, self.fn_name)
+								link::load_and_bind::<L>(lib, self.fn_name)
 									.map_err(|e| errors.push(e))
 									.ok()
 							})

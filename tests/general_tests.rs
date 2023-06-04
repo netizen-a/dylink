@@ -164,3 +164,20 @@ fn test_unix_libc() {
 		Err(_) => todo!(),
 	}
 }
+
+#[test]
+fn test_kernel32_unload() {
+	use dylink::*;
+	use std::ffi::CStr;
+
+	#[dylink(name = "Kernel32.dll")]
+	extern "system" {
+	    fn GetLastError() -> u32;
+	}
+	
+	unsafe {
+	   	let _ = GetLastError();
+		let lib_name = CStr::from_bytes_with_nul(b"Kernel32.dll\0").unwrap();
+		link::System::unload(lib_name).unwrap();
+	}
+}

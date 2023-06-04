@@ -2,6 +2,7 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use crate::*;
+use std::io::ErrorKind;
 use std::marker::PhantomData;
 use std::{ffi, mem, sync::RwLock};
 
@@ -20,11 +21,10 @@ impl<'a, T> LibHandle<'a, T> {
 	pub fn as_ref(&self) -> Option<&T> {
 		unsafe { self.0.as_ref() }
 	}
-	// This is basically a clone to an opaque handle
-	fn to_opaque<'b>(&'a self) -> LibHandle<'b, ffi::c_void> {
+	fn to_opaque<'b>(&self) -> LibHandle<'b, ffi::c_void> {
 		LibHandle(self.0.cast(), PhantomData)
 	}
-	fn from_opaque<'b>(a: &'a LibHandle::<ffi::c_void>) -> LibHandle::<'b, T> {
+	fn from_opaque<'b>(a: &LibHandle::<ffi::c_void>) -> LibHandle::<'b, T> {
 		LibHandle::<T>(a.0.cast(), PhantomData)
 	}
 }
@@ -45,73 +45,144 @@ pub trait RTLinker {
 	type Data;
 	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>;
 	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> FnAddr;
+}
 
-	/// loads function from library synchronously and stores library handle internally
-	fn load_with(lib_name: &ffi::CStr, fn_name: &ffi::CStr) -> DylinkResult<FnAddr>
-	where
-		Self::Data: 'static + Send + Sync,
-	{
-		let fn_addr: FnAddr;
-		let lib_handle: LibHandle::<Self::Data>;
-		let read_lock = DLL_DATA.read().unwrap();
-		match read_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
-			Ok(index) => {
-				lib_handle = LibHandle::from_opaque(&read_lock[index].1);
-				fn_addr = Self::load_sym(&lib_handle, fn_name)
-			}
-			Err(index) => {
-				mem::drop(read_lock);
-				lib_handle = Self::load_lib(lib_name);
-				if lib_handle.is_invalid() {
-					return Err(DylinkError::LibNotLoaded(
-						lib_name.to_string_lossy().into_owned(),
-					));
-				} else {
-					fn_addr = Self::load_sym(&lib_handle, fn_name);
-					DLL_DATA
-						.write()
-						.unwrap()
-						.insert(index, (lib_name.to_owned(), lib_handle.to_opaque()));
-				}
+/// loads function from library synchronously and binds library handle internally to dylink.
+/// 
+/// If the library is already bound, the bound handle will be used for loading the function.
+pub fn load_and_bind<L: RTLinker>(lib_name: &ffi::CStr, fn_name: &ffi::CStr) -> DylinkResult<FnAddr>
+where
+	L::Data: 'static + Send + Sync,
+{
+	let fn_addr: FnAddr;
+	let lib_handle: LibHandle::<L::Data>;
+	let read_lock = DLL_DATA.read().unwrap();
+	match read_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
+		Ok(index) => {
+			lib_handle = LibHandle::from_opaque(&read_lock[index].1);
+			fn_addr = L::load_sym(&lib_handle, fn_name)
+		}
+		Err(index) => {
+			mem::drop(read_lock);
+			lib_handle = L::load_lib(lib_name);
+			if lib_handle.is_invalid() {
+				return Err(DylinkError::LibNotLoaded(
+					lib_name.to_string_lossy().into_owned(),
+				));
+			} else {
+				fn_addr = L::load_sym(&lib_handle, fn_name);
+				DLL_DATA
+					.write()
+					.unwrap()
+					.insert(index, (lib_name.to_owned(), lib_handle.to_opaque()));
 			}
 		}
-		if fn_addr.is_null() {
-			Err(DylinkError::FnNotFound(
-				fn_name.to_str().unwrap().to_owned(),
-			))
-		} else {
-			Ok(fn_addr)
+	}
+	if fn_addr.is_null() {
+		Err(DylinkError::FnNotFound(
+			fn_name.to_str().unwrap().to_owned(),
+		))
+	} else {
+		Ok(fn_addr)
+	}
+}
+
+/// unbinds handle synchronously from dylink and returns the handle.
+/// 
+/// This is safe because the library if found is not unloaded. If an uninitialized dylink generated function is called
+/// after [`unbind`], the library will call [`load_lib`](RTLinker::load_lib) and bind another handle.
+pub fn unbind<L: RTLinker>(lib_name: &ffi::CStr) -> Option<LibHandle<'static, L::Data>>
+where
+	L::Data: 'static + Send + Sync,
+{
+	let mut write_lock = DLL_DATA.write().unwrap();	
+	match write_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
+		Ok(index) => {				
+			Some(LibHandle::<L::Data>::from_opaque(&write_lock.remove(index).1))
 		}
+		Err(_) => None
 	}
 }
 
 /// Default system linker used in [LazyFn]
 pub struct System;
 
+impl System {
+	/// unbind and unload the library.
+	/// 
+	/// # Safety
+	/// You should not call *any* functions associated with the library that have already been initialized.
+	/// # Examples
+	/// ```rust
+	/// use dylink::*;
+	/// use std::ffi::CStr;
+	///
+	/// #[dylink(name = "Kernel32.dll")]
+	/// extern "system" {
+	///     fn GetLastError() -> u32;
+	/// }
+	/// fn main() {
+	///     unsafe {
+	///         println!("{}", GetLastError());
+	///         let lib_name = CStr::from_bytes_with_nul(b"Kernel32.dll\0").unwrap();
+	///         link::System::unload(lib_name).unwrap();
+	///     }
+	/// }
+	/// ```
+	#[cfg_attr(miri, track_caller)]
+	pub unsafe fn unload(lib_name: &ffi::CStr) -> std::io::Result<()> {
+		use std::ffi::{c_int, c_void};
+		use std::io::Error;
+
+		// windows and unix use the same type signature. how convenient :)
+		extern "system" {
+			#[cfg_attr(windows, link_name="FreeLibrary")]
+			#[cfg_attr(unix, link_name="dlclose")]
+			fn dlclose(hlibmodule: *mut c_void) -> c_int;
+		}
+
+		let ret: c_int;
+		match unbind::<Self>(lib_name) {
+			Some(lib_handle) => {
+				let handle = lib_handle
+					.as_ref()
+					.map(|r| r as *const _ as *mut ffi::c_void)
+					.unwrap();
+				ret = dlclose(handle);
+			}
+			None => {
+				return Err(Error::new(ErrorKind::NotFound, "could not find library handle"))
+			}
+		}
+		let is_success = if cfg!(windows) {
+			ret != 0
+		} else if cfg!(unix) {
+			ret == 0
+		} else {
+			unreachable!();
+		};
+		match is_success {
+			true => Ok(()),
+			false => Err(Error::last_os_error())
+		}
+	}
+}
+
 #[cfg(windows)]
 mod win32 {
 	use super::*;
 	// The windows API conventions are kept deliberately, so it's easier to refer to references.
 
-	use std::ffi;
-	use std::io::{Result, Error};
-use std::os::windows::raw::HANDLE;
-
+	use std::ffi;	
+	use std::os::windows::raw::HANDLE;
 	type HMODULE = HANDLE;
 	type PCSTR = *const ffi::c_char;
 	type PCWSTR = *const u16;
-	type BOOL = ffi::c_int;
-	//type DWORD = ffi::c_ulong;
 	const LOAD_LIBRARY_SEARCH_DEFAULT_DIRS: u32 = 0x00001000u32;
 	const LOAD_LIBRARY_SAFE_CURRENT_DIRS: u32 = 0x00002000u32;
 	extern "stdcall" {
 		fn LoadLibraryExW(lplibfilename: PCWSTR, hfile: HANDLE, dwflags: u32) -> HMODULE;
 		fn GetProcAddress(hmodule: HMODULE, lpprocname: PCSTR) -> crate::FnAddr;
-		fn FreeLibrary(hlibmodule: HMODULE) -> BOOL;
-		/*fn FreeLibraryAndExitThread(
-			hLibModule:HMODULE,
-			dwExitCode:DWORD
-		) -> !;*/
 	}
 
 	impl RTLinker for System {
@@ -136,6 +207,7 @@ use std::os::windows::raw::HANDLE;
 			LibHandle::from(unsafe { result.as_ref() })
 		}
 		#[cfg_attr(miri, track_caller)]
+		#[inline]
 		fn load_sym(
 			lib_handle: &LibHandle<'static, Self::Data>,
 			fn_name: &ffi::CStr,
@@ -153,45 +225,7 @@ use std::os::windows::raw::HANDLE;
 		}
 	}
 
-	impl System {
-		pub unsafe fn unload(lib_name: &ffi::CStr) -> Result<()> {
-			let mut write_lock = DLL_DATA.write().unwrap();
-			let ret: BOOL;
-			match write_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
-				Ok(index) => {				
-					let hlibmodule = write_lock.remove(index).1
-						.as_ref()
-						.map(|r| r as *const _ as *mut ffi::c_void)
-						.unwrap();
-					ret = FreeLibrary(hlibmodule);
-				}
-				Err(_) => {
-					ret = 0;
-				}
-			}
-			if ret != 0 {
-				Ok(())
-			} else {
-				Err(Error::last_os_error())
-			}
-		}
-		/*pub fn unload_and_exit(lib_name: &ffi::CStr, code: DWORD) -> ! {
-			let read_lock = DLL_DATA.read().unwrap();
-			match read_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
-				Ok(index) => {				
-					let hlibmodule = read_lock[index].1
-						.as_ref()
-						.map(|r| r as *const _ as *mut ffi::c_void)
-						.unwrap();
-					unsafe {FreeLibraryAndExitThread(hlibmodule, code);}
-				}
-				Err(_) => {
-					mem::drop(read_lock);
-					panic!("could not find library");
-				}
-			}
-		}*/
-	}
+	
 
 	#[cfg(not(miri))]
 	#[test]
@@ -221,7 +255,7 @@ use std::os::windows::raw::HANDLE;
 
 #[cfg(unix)]
 mod unix {
-	use std::{ffi::{c_char, c_int, c_void, CStr}, io::Error};
+	use std::ffi::{c_char, c_int, c_void, CStr};
 
 	use super::*;
 
@@ -230,7 +264,6 @@ mod unix {
 	extern "C" {
 		fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
 		fn dlsym(handle: *mut c_void, symbol: *const c_char) -> crate::FnAddr;
-		fn dlclose(handle: *mut c_void) -> c_int;
 	}
 
 	impl RTLinker for System {
@@ -244,6 +277,7 @@ mod unix {
 			}
 		}
 		#[cfg_attr(miri, track_caller)]
+		#[inline]
 		fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &CStr) -> crate::FnAddr {
 			unsafe {
 				dlsym(
@@ -256,27 +290,5 @@ mod unix {
 			}
 		}
 	}
-	impl System {
-		pub unsafe fn unload(lib_name: &ffi::CStr) -> std::io::Result<()> {
-			let mut write_lock = DLL_DATA.write().unwrap();
-			let ret: c_int;
-			match write_lock.binary_search_by_key(&lib_name, |(k, _)| k) {
-				Ok(index) => {				
-					let hlibmodule = write_lock.remove(index).1
-						.as_ref()
-						.map(|r| r as *const _ as *mut ffi::c_void)
-						.unwrap();
-					ret = dlclose(hlibmodule);
-				}
-				Err(_) => {
-					mem::drop(write_lock);
-					ret = -1;
-				}
-			}
-			match ret {
-				0 => Ok(()),
-				_ => Err(Error::last_os_error())
-			}
-		}
-	}
+	
 }
