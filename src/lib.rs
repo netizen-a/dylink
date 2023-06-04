@@ -47,31 +47,31 @@
 //! #[dylink(name = "Kernel32.dll", link_name="GetLastError")]
 //! extern "system" fn get_last_error() -> u32;
 //! ```
-//! 
+//!
 //! # Custom Linker
 //! Custom dynamic linkers can be used through the `linker` macro argument.
 //! The linker must implement RTLinker to be used when linking to the symbol.
-//! 
+//!
 //! ```rust
-//! # use dylink::*;
+//! # use dylink::{*, link::*};
 //! # use std::ffi::*;
 //! struct MyLinker;
 //! impl RTLinker for MyLinker {
-//! 	type Data = c_void;
-//!		fn load_lib(lib_name: &CStr) -> LibHandle<'static, Self::Data> {
-//! 		/* your implementation here */
-//!	# todo!()
-//!		}
-//!		fn load_sym(
-//!			lib_handle: &LibHandle<'static, Self::Data>,
-//!			fn_name: &CStr,
-//!		) -> Option<FnPtr> {
-//! 		/* your implementation here */
-//!	# todo!()
-//!		}
+//!     type Data = ();
+//!     fn load_lib(lib_name: &CStr) -> LibHandle<'static, Self::Data> {
+//!         /* your implementation here */
+//! # LibHandle::from(None)
+//!     }
+//!     fn load_sym(
+//!         lib_handle: &LibHandle<'static, Self::Data>,
+//!         fn_name: &CStr,
+//!     ) -> FnAddr {
+//!         /* your implementation here */
+//! # std::ptr::null()
+//!     }
 //! }
 //!
-//! #[dylink(name = "my_lib", linker=MyLinker)]
+//! #[dylink(name = "my_lib", linker=System)]
 //! extern "system" fn foo() -> u32;
 //! ```
 //!
@@ -127,24 +127,23 @@
 //! ```
 //!
 //! # About Library Unloading
-//! Shared library unloading is extremely cursed, always unsafe, and we don't even try to support it.
+//! Shared library unloading is extremely cursed, always unsafe.
 //! Unloading a library means not only are all loaded dylink functions invalidated, but functions loaded from **ALL**
-//! crates in the project are also invalidated, which will immediately lead to segfaults... a lot of them.
-//!
-//! *An unloader may be considered in future revisions, but the current abstraction is unsuitable for RAII unloading.*
-
-use std::marker::PhantomData;
-use std::sync;
-
-use std::ffi;
+//! crates in the project are also invalidated when unloaded carelessly.
+//! 
+//! The [`System`](link::System) linker loader provides an `unload` function that may be used to unload the library.
+//! If a custom loader is used then the user must unload the library manually.
 
 mod error;
 mod lazyfn;
-mod vulkan;
+/// custom linker module
+pub mod link;
+#[doc(hidden)]
+pub mod vk;
 
 pub use error::*;
 pub use lazyfn::*;
-pub use vulkan::{VkDevice, VkInstance};
+//pub use link::*;
 
 /// Macro for generating dynamically linked functions procedurally.
 ///
@@ -159,16 +158,10 @@ pub struct ReadmeDoctests;
 #[cfg(wasm)]
 compile_error!("Dylink Error: Wasm is unsupported.");
 
-// These globals are read every time a vulkan function is called for the first time,
-// which occurs through `LazyFn::link`.
-static VK_INSTANCE: sync::RwLock<Vec<vulkan::VkInstance>> = sync::RwLock::new(Vec::new());
-
-static VK_DEVICE: sync::RwLock<Vec<vulkan::VkDevice>> = sync::RwLock::new(Vec::new());
-
-/// Used as a placeholder function pointer.
+/// Raw function address.
 ///
-/// This should **NEVER** be called directly, and promptly cast into the correct function pointer type.
-pub type FnPtr = unsafe extern "system" fn() -> isize;
+/// Must be cast into a function pointer to be useable.
+pub type FnAddr = *const ();
 
 /// The result of a dylink function
 pub type DylinkResult<T> = Result<T, error::DylinkError>;
@@ -192,9 +185,9 @@ impl Global {
 	/// *    If the set already contained this value, `false` is returned.
 	///
 	/// *note: This function returns `false` if the instance is valid and defined through dylink.*
-	pub fn insert_instance(&self, instance: vulkan::VkInstance) -> bool {
+	pub fn insert_instance(&self, instance: vk::Instance) -> bool {
 		//println!("insert_instance called!");
-		let mut write_lock = VK_INSTANCE.write().unwrap();
+		let mut write_lock = vk::INSTANCES.write().unwrap();
 		match write_lock.binary_search(&instance) {
 			Ok(_) => false,
 			Err(index) => {
@@ -207,9 +200,9 @@ impl Global {
 	/// Removes an instance from the set. Returns whether the instance was present in the set.
 	/// # Safety
 	/// Using this function may break dylink's checked lifetimes!
-	pub unsafe fn remove_instance(&self, instance: &vulkan::VkInstance) -> bool {
+	pub unsafe fn remove_instance(&self, instance: &vk::Instance) -> bool {
 		//println!("remove_instance called!");
-		let mut write_lock = VK_INSTANCE.write().unwrap();
+		let mut write_lock = vk::INSTANCES.write().unwrap();
 		match write_lock.binary_search(instance) {
 			Ok(index) => {
 				write_lock.remove(index);
@@ -228,9 +221,9 @@ impl Global {
 	/// *    If the set already contained this value, `false` is returned.
 	///
 	/// *note: This function returns `false` if the device is valid and defined through dylink.*
-	pub fn insert_device(&self, device: vulkan::VkDevice) -> bool {
+	pub fn insert_device(&self, device: vk::Device) -> bool {
 		//println!("insert_device called!");
-		let mut write_lock = VK_DEVICE.write().unwrap();
+		let mut write_lock = vk::DEVICES.write().unwrap();
 		match write_lock.binary_search(&device) {
 			Ok(_) => false,
 			Err(index) => {
@@ -243,9 +236,9 @@ impl Global {
 	/// Removes a device from the set. Returns whether the value was present in the set.
 	/// # Safety
 	/// Using this function may break dylink's checked lifetimes!
-	pub unsafe fn remove_device(&self, device: &vulkan::VkDevice) -> bool {
+	pub unsafe fn remove_device(&self, device: &vk::Device) -> bool {
 		//println!("remove_device called!");
-		let mut write_lock = VK_DEVICE.write().unwrap();
+		let mut write_lock = vk::DEVICES.write().unwrap();
 		match write_lock.binary_search(device) {
 			Ok(index) => {
 				write_lock.remove(index);
@@ -254,50 +247,4 @@ impl Global {
 			Err(_) => false,
 		}
 	}
-}
-
-// LibHandle is thread-safe because it's inherently immutable, therefore don't add mutable accessors.
-
-/// Library handle for [RTLinker]
-pub struct LibHandle<'a, T: ?Sized>(*const T, PhantomData<&'a ()>);
-unsafe impl<T> Send for LibHandle<'_, T> where T: Send {}
-unsafe impl<T> Sync for LibHandle<'_, T> where T: Sync {}
-
-impl<'a, T> LibHandle<'a, T> {
-	#[inline]
-	pub fn is_invalid(&self) -> bool {
-		self.0.is_null()
-	}
-	// This is basically a clone to an opaque handle
-	pub(crate) fn as_opaque<'b>(&'a self) -> LibHandle<'b, ffi::c_void> {
-		LibHandle(self.0.cast(), PhantomData)
-	}
-	pub fn as_ref(&self) -> Option<&T> {
-		unsafe { self.0.as_ref() }
-	}
-}
-
-impl<'a, T> From<Option<&'a T>> for LibHandle<'a, T> {
-	fn from(value: Option<&'a T>) -> Self {
-		value
-			.map(|r| Self((r as *const T).cast(), PhantomData))
-			.unwrap_or(Self(std::ptr::null(), PhantomData))
-	}
-}
-
-impl<'a, T> From<&'a T> for LibHandle<'a, T> {
-	fn from(value: &'a T) -> Self {
-		Self((value as *const T).cast(), PhantomData)
-	}
-}
-
-/// Used to specify a custom run-time linker loader for [LazyFn]
-pub trait RTLinker {
-	type Data;
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
-	where
-		Self::Data: Send + Sync;
-	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> Option<FnPtr>
-	where
-		Self::Data: Send + Sync;
 }

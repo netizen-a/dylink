@@ -1,3 +1,4 @@
+#[cfg(not(miri))]
 #[cfg(windows)]
 #[test]
 #[ignore = "this is just instrumentation"]

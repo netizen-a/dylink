@@ -36,13 +36,13 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 					.items
 					.iter()
 					.map(|item| match item {
-						ForeignItem::Fn(fn_item) => parse_fn::<true>(fn_item, &attr_data),
+						ForeignItem::Fn(fn_item) => parse_fn::<true>(Some(abi), fn_item, &attr_data),
 						other => quote!(#abi {#other}),
 					})
 					.collect::<TokenStream2>()
 					.into()
 			} else if let Ok(foreign_fn) = syn::parse2::<syn::ForeignItemFn>(input.into()) {
-				parse_fn::<false>(&foreign_fn, &attr_data).into()
+				parse_fn::<false>(foreign_fn.sig.abi.as_ref(), &foreign_fn, &attr_data).into()
 			} else {
 				panic!("failed to parse");
 			}
@@ -52,11 +52,12 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 }
 
 fn parse_fn<const IS_MOD_ITEM: bool>(
+	abi: Option<&syn::Abi>,
 	fn_item: &syn::ForeignItemFn,
 	attr_data: &AttrData,
 ) -> TokenStream2 {
-	let fn_name = fn_item.sig.ident.to_token_stream();
-	let abi = fn_item.sig.abi.to_token_stream();
+	let abi = abi.to_token_stream();
+	let fn_name = fn_item.sig.ident.to_token_stream();	
 	let vis = fn_item.vis.to_token_stream();
 	let output = fn_item.sig.output.to_token_stream();
 	let strip = attr_data.strip;
@@ -69,9 +70,8 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		.map(syn::Attribute::to_token_stream)
 		.collect();
 
-	
 	if let syn::ReturnType::Type(_, ret_type) = &fn_item.sig.output {
-		if let syn::Type::Path(syn::TypePath{path, ..}) = ret_type.as_ref() {
+		if let syn::Type::Path(syn::TypePath { path, .. }) = ret_type.as_ref() {
 			if path.is_ident("Self") {
 				return syn::Error::new(
 					path.span(),
@@ -82,7 +82,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		}
 	}
 
-
 	let mut param_list = Vec::new();
 	let mut param_ty_list = Vec::new();
 	let mut internal_param_ty_list = Vec::new();
@@ -91,7 +90,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	for (i, arg) in fn_item.sig.inputs.iter().enumerate() {
 		match arg {
 			syn::FnArg::Typed(pat_type) => {
-				if let syn::Type::Path(syn::TypePath{path, ..}) = pat_type.ty.as_ref() {
+				if let syn::Type::Path(syn::TypePath { path, .. }) = pat_type.ty.as_ref() {
 					if path.is_ident("Self") {
 						return syn::Error::new(
 							path.span(),
@@ -120,7 +119,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 					)
 					.into_compile_error();
 				} else {
-					if let syn::Type::Path(syn::TypePath{path, ..}) = rec.ty.as_ref() {
+					if let syn::Type::Path(syn::TypePath { path, .. }) = rec.ty.as_ref() {
 						if path.is_ident("Self") {
 							return syn::Error::new(
 								path.span(),
@@ -164,7 +163,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 					let result = #caller_name(#(#param_list),*);
 					unsafe {
 						dylink::Global.insert_instance(
-							*#std_transmute::<_, *mut dylink::VkInstance>(#inst_param)
+							*#std_transmute::<_, *mut dylink::vk::Instance>(#inst_param)
 						);
 					}
 					result
@@ -182,7 +181,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				quote! {
 					let result = #caller_name(#(#param_list),*);
 					unsafe {
-						dylink::Global.remove_instance(&#std_transmute::<_, dylink::VkInstance>(#inst_param));
+						dylink::Global.remove_instance(&#std_transmute::<_, dylink::vk::Instance>(#inst_param));
 					}
 					result
 				}
@@ -199,7 +198,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				quote! {
 					let result = #caller_name(#(#param_list),*);
 					unsafe {
-						dylink::Global.insert_device(*#std_transmute::<_, *mut dylink::VkDevice>(#inst_param));
+						dylink::Global.insert_device(*#std_transmute::<_, *mut dylink::vk::Device>(#inst_param));
 					}
 					result
 				}
@@ -216,7 +215,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				quote! {
 					let result = #caller_name(#(#param_list),*);
 					unsafe {
-						dylink::Global.remove_device(&#std_transmute::<_, dylink::VkDevice>(#inst_param));
+						dylink::Global.remove_device(&#std_transmute::<_, dylink::vk::Device>(#inst_param));
 					}
 					result
 				}
@@ -225,15 +224,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		}
 	} else {
 		quote!(#caller_name(#(#param_list),*))
-	};
-
-	let try_link_call = match linker {
-		None => quote! {
-			try_link
-		},
-		Some(linker_name) => quote! {
-			try_link_with::<#linker_name>
-		},
 	};
 
 	let lint;
@@ -251,7 +241,8 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			fn_name.to_string()
 		}
 	};
-
+	//println!("{fn_name}:{abi}");
+	
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
 	if strip {
@@ -259,13 +250,13 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			#(#fn_attrs)*
 			#lint
 			#vis static #fn_name
-			: dylink::LazyFn<'static, unsafe #abi fn (#params_default) #output>
+			: dylink::LazyFn<unsafe #abi fn (#params_default) #output, #linker>
 			= dylink::LazyFn::new(
 				{
 					type InstFnPtr = unsafe #abi fn (#params_default) #output;
 					unsafe #abi fn initial_fn (#(#param_ty_list),*) #output {
 						use std::ffi::CStr;
-						match #fn_name.#try_link_call() {
+						match #fn_name.try_link() {
 							Ok(function) => {#call_dyn_func},
 							Err(err) => panic!("{}", err),
 						}
@@ -287,14 +278,14 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				type InstFnPtr = #abi fn (#(#internal_param_ty_list),*) #output;
 				#abi fn initial_fn (#(#internal_param_ty_list),*) #output {
 					use std::ffi::CStr;
-					match DYN_FUNC.#try_link_call() {
+					match DYN_FUNC.try_link() {
 						Ok(function) => {function(#(#internal_param_list),*)},
 						Err(err) => panic!("{}", err),
 					}
 				}
 				const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
 				static DYN_FUNC
-				: dylink::LazyFn<'static, InstFnPtr>
+				: dylink::LazyFn<InstFnPtr, #linker>
 				= dylink::LazyFn::new(
 					DYN_FUNC_REF,
 					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
