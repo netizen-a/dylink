@@ -113,7 +113,7 @@ impl System {
 	/// # Safety
 	/// You should not call *any* functions associated with the library that have already been initialized.
 	/// # Examples
-	/// ```rust
+	/// ```no_run
 	/// use dylink::*;
 	/// use std::ffi::CStr;
 	///

@@ -165,6 +165,7 @@ fn test_unix_libc() {
 	}
 }
 
+#[cfg(windows)]
 #[test]
 fn test_kernel32_unload() {
 	use dylink::*;
