@@ -92,7 +92,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 		DEVICE_PROC_ADDR(device, name)
 	}
 
-	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr> =
+	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr, dylink::link::System> =
 		lazyfn::LazyFn::new(
 			&(initial_fn as PFN_vkGetDeviceProcAddr),
 			unsafe { CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") },

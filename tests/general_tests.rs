@@ -51,6 +51,7 @@ fn test_win32_impl() {
 #[test]
 fn test_win32_lifetimes() {
 	use std::ffi::CStr;
+	use dylink::link;
 	use std::ops::Deref;
 
 	extern "stdcall" fn foo() -> u32 {
@@ -59,7 +60,7 @@ fn test_win32_lifetimes() {
 	type PfnTy = extern "stdcall" fn() -> u32;
 
 	let list = unsafe { [CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")] };
-	let lazyfn: LazyFn<PfnTy> = LazyFn::<PfnTy>::new(
+	let lazyfn: LazyFn<PfnTy, link::System> = LazyFn::<PfnTy, link::System>::new(
 		&(foo as PfnTy),
 		unsafe { CStr::from_bytes_with_nul_unchecked(b"SetLastError\0") },
 		dylink::LinkType::General(&list),
@@ -180,5 +181,34 @@ fn test_kernel32_unload() {
 	   	let _ = GetLastError();
 		let lib_name = CStr::from_bytes_with_nul(b"Kernel32.dll\0").unwrap();
 		link::System::unload(lib_name).unwrap();
+	}
+}
+
+#[cfg(windows)]
+#[test]
+fn test_custom_linker() {
+	use dylink::{*, link::*};
+	use std::ffi::*;
+	struct MyLinker;
+	struct MyData();
+	unsafe impl Sync for MyData {}
+	unsafe impl Send for MyData {}
+
+	impl RTLinker for MyLinker {
+	    type Data = Box<u32>;
+	    fn load_lib(_: &CStr) -> LibHandle<'static, Self::Data> {
+			LibHandle::from(None)
+	    }
+	    fn load_sym(
+	        _: &LibHandle<'static, Self::Data>,
+	        _: &CStr,
+	    ) -> FnAddr {
+			std::ptr::null()
+	    }
+	}
+
+ 	#[dylink(name = "my_lib.dll", linker=MyLinker)]
+	extern "C" {
+		fn foo() -> u32;
 	}
 }

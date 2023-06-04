@@ -38,7 +38,7 @@ pub struct LazyFn<'a, F: Copy, L: link::RTLinker = link::System> {
 	phantom: PhantomData<L>,
 }
 
-unsafe impl<F: Copy> Sync for LazyFn<'_, F> {}
+unsafe impl<F: Copy, L: link::RTLinker> Sync for LazyFn<'_, F, L> {}
 
 impl<'a, F: Copy, L: link::RTLinker> LazyFn<'a, F, L> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
@@ -144,7 +144,7 @@ impl<'a, F: Copy, L: link::RTLinker> LazyFn<'a, F, L> {
 }
 
 // This will always return a valid reference, but not always the same reference
-impl<F: Copy> std::ops::Deref for LazyFn<'_, F> {
+impl<F: Copy, L: link::RTLinker> std::ops::Deref for LazyFn<'_, F, L> {
 	type Target = F;
 	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {

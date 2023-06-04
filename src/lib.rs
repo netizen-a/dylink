@@ -71,7 +71,7 @@
 //!     }
 //! }
 //!
-//! #[dylink(name = "my_lib", linker=System)]
+//! #[dylink(name = "my_lib", linker=MyLinker)]
 //! extern "system" fn foo() -> u32;
 //! ```
 //!
