@@ -6,6 +6,13 @@ use std::io::ErrorKind;
 use std::marker::PhantomData;
 use std::{ffi, mem, sync::RwLock};
 
+
+// self documenting hidden trait
+// TODO: add `Clone` trait on next version bump
+#[doc(hidden)]
+pub trait FnPtr: Copy {}
+impl <T: Copy> FnPtr for T {}
+
 // LibHandle is thread-safe because it's inherently immutable, therefore don't add mutable accessors.
 
 /// Library handle for [RTLinker]
@@ -37,20 +44,20 @@ impl<'a, T> From<Option<&'a T>> for LibHandle<'a, T> {
 	}
 }
 
-static DLL_DATA: RwLock<Vec<(ffi::CString, LibHandle<ffi::c_void>)>> =
+static DLL_DATA: RwLock<Vec<(&'static ffi::CStr, LibHandle<ffi::c_void>)>> =
 			RwLock::new(Vec::new());
 
 /// Used to specify a custom run-time linker loader for [LazyFn]
 pub trait RTLinker {
 	type Data;
-	fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>;
-	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &ffi::CStr) -> FnAddr;
+	fn load_lib(lib_name: &'static ffi::CStr) -> LibHandle<'static, Self::Data>;
+	fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &'static ffi::CStr) -> FnAddr;
 }
 
 /// loads function from library synchronously and binds library handle internally to dylink.
 /// 
 /// If the library is already bound, the bound handle will be used for loading the function.
-pub fn load_and_bind<L: RTLinker>(lib_name: &ffi::CStr, fn_name: &ffi::CStr) -> DylinkResult<FnAddr>
+pub fn load_and_bind<L: RTLinker>(lib_name: &'static ffi::CStr, fn_name: &'static ffi::CStr) -> DylinkResult<FnAddr>
 where
 	L::Data: 'static + Send + Sync,
 {
@@ -74,7 +81,7 @@ where
 				DLL_DATA
 					.write()
 					.unwrap()
-					.insert(index, (lib_name.to_owned(), lib_handle.to_opaque()));
+					.insert(index, (lib_name, lib_handle.to_opaque()));
 			}
 		}
 	}
@@ -91,7 +98,7 @@ where
 /// 
 /// This is safe because the library if found is not unloaded. If an uninitialized dylink generated function is called
 /// after [`unbind`], the library will call [`load_lib`](RTLinker::load_lib) and bind another handle.
-pub fn unbind<L: RTLinker>(lib_name: &ffi::CStr) -> Option<LibHandle<'static, L::Data>>
+pub fn unbind<L: RTLinker>(lib_name: &'static ffi::CStr) -> Option<LibHandle<'static, L::Data>>
 where
 	L::Data: 'static + Send + Sync,
 {
@@ -130,7 +137,7 @@ impl System {
 	/// }
 	/// ```
 	#[cfg_attr(miri, track_caller)]
-	pub unsafe fn unload(lib_name: &ffi::CStr) -> std::io::Result<()> {
+	pub unsafe fn unload(lib_name: &'static ffi::CStr) -> std::io::Result<()> {
 		use std::ffi::{c_int, c_void};
 		use std::io::Error;
 
@@ -189,7 +196,7 @@ mod win32 {
 		type Data = ffi::c_void;
 		#[cfg_attr(miri, track_caller)]
 		#[inline]
-		fn load_lib(lib_name: &ffi::CStr) -> LibHandle<'static, Self::Data>
+		fn load_lib(lib_name: &'static ffi::CStr) -> LibHandle<'static, Self::Data>
 		{
 			let wide_str: Vec<u16> = lib_name
 				.to_string_lossy()
@@ -210,7 +217,7 @@ mod win32 {
 		#[inline]
 		fn load_sym(
 			lib_handle: &LibHandle<'static, Self::Data>,
-			fn_name: &ffi::CStr,
+			fn_name: &'static ffi::CStr,
 		) -> crate::FnAddr
 		{
 			unsafe {
@@ -270,7 +277,7 @@ mod unix {
 		type Data = c_void;
 		#[cfg_attr(miri, track_caller)]
 		#[inline]
-		fn load_lib(lib_name: &CStr) -> LibHandle<'static, Self::Data> {
+		fn load_lib(lib_name: &'static CStr) -> LibHandle<'static, Self::Data> {
 			unsafe {
 				let result = dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL);
 				LibHandle::from(result.as_ref())
@@ -278,7 +285,7 @@ mod unix {
 		}
 		#[cfg_attr(miri, track_caller)]
 		#[inline]
-		fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &CStr) -> crate::FnAddr {
+		fn load_sym(lib_handle: &LibHandle<'static, Self::Data>, fn_name: &'static CStr) -> crate::FnAddr {
 			unsafe {
 				dlsym(
 					lib_handle

@@ -10,13 +10,16 @@ use std::{
 use crate::{error, vk, link, DylinkResult, FnAddr};
 use once_cell::sync::OnceCell;
 
+
+
+
 /// Determines how to load the library when [LazyFn::try_link] is called.
 #[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd, Hash, Debug)]
 pub enum LinkType<'a> {
 	/// Specifies a specialization for loading vulkan functions using vulkan loaders.
 	Vulkan,
 	/// Specifies a generalization for loading functions.
-	General(&'a [&'a CStr]),
+	General(&'a [&'static CStr]),
 }
 
 /// Fundamental data type of dylink.
@@ -24,7 +27,7 @@ pub enum LinkType<'a> {
 /// This can be used safely without the dylink macro, however using the `dylink` macro should be preferred.
 /// The provided member functions can be used from the generated macro when `strip=true` is enabled.
 #[derive(Debug)]
-pub struct LazyFn<'a, F: Copy, L: link::RTLinker = link::System> {
+pub struct LazyFn<'a, F: link::FnPtr, L: link::RTLinker = link::System> {
 	// It's imperative that LazyFn manages once, so that `LazyFn::try_link` is sound.
 	// SAFETY: once is not allowed to be reset, because it can break references
 	pub(crate) once: OnceCell<F>,
@@ -33,20 +36,19 @@ pub struct LazyFn<'a, F: Copy, L: link::RTLinker = link::System> {
 	// The function to be called.
 	// SAFETY: This should only be accessed atomically or when thread is blocking.
 	pub(crate) addr: cell::UnsafeCell<F>,
-	fn_name: &'a CStr,
+	fn_name: &'static CStr,
 	link_ty: LinkType<'a>,
 	phantom: PhantomData<L>,
 }
 
-unsafe impl<F: Copy, L: link::RTLinker> Sync for LazyFn<'_, F, L> {}
+unsafe impl<F: link::FnPtr, L: link::RTLinker> Sync for LazyFn<'_, F, L> {}
 
-impl<'a, F: Copy, L: link::RTLinker> LazyFn<'a, F, L> {
+impl<'a, F: link::FnPtr, L: link::RTLinker> LazyFn<'a, F, L> {
 	/// Initializes a `LazyFn` with a placeholder value `thunk`.
 	/// # Panic
 	/// Type `F` must be the same size as a [function pointer](fn) or `new` will panic.
 	#[inline]
-	pub const fn new(thunk: &'a F, fn_name: &'a CStr, link_ty: LinkType<'a>) -> Self {
-		// In a const context this assert will be optimized out.
+	pub const fn new(thunk: &'a F, fn_name: &'static CStr, link_ty: LinkType<'a>) -> Self {
 		assert!(mem::size_of::<crate::FnAddr>() == mem::size_of::<F>());
 		Self {
 			addr_ptr: AtomicPtr::new(thunk as *const _ as *mut _),
@@ -62,7 +64,8 @@ impl<'a, F: Copy, L: link::RTLinker> LazyFn<'a, F, L> {
 	/// If successful, stores address in current instance and returns a copy of the stored value.
 	///
 	/// # Errors
-	/// If the library fails to link, like if it can't find the library or function, then an error is returned.
+	/// If the library or function can't be found, then an error value is returned.
+	/// 
 	/// # Example
 	/// ```rust
 	/// # use dylink::dylink;
@@ -144,7 +147,7 @@ impl<'a, F: Copy, L: link::RTLinker> LazyFn<'a, F, L> {
 }
 
 // This will always return a valid reference, but not always the same reference
-impl<F: Copy, L: link::RTLinker> std::ops::Deref for LazyFn<'_, F, L> {
+impl<F: link::FnPtr, L: link::RTLinker> std::ops::Deref for LazyFn<'_, F, L> {
 	type Target = F;
 	/// Dereferences the value atomically.
 	fn deref(&self) -> &Self::Target {

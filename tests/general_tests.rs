@@ -196,12 +196,12 @@ fn test_custom_linker() {
 
 	impl RTLinker for MyLinker {
 	    type Data = Box<u32>;
-	    fn load_lib(_: &CStr) -> LibHandle<'static, Self::Data> {
+	    fn load_lib(_: &'static CStr) -> LibHandle<'static, Self::Data> {
 			LibHandle::from(None)
 	    }
 	    fn load_sym(
 	        _: &LibHandle<'static, Self::Data>,
-	        _: &CStr,
+	        _: &'static CStr,
 	    ) -> FnAddr {
 			std::ptr::null()
 	    }

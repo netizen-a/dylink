@@ -58,13 +58,13 @@
 //! struct MyLinker;
 //! impl RTLinker for MyLinker {
 //!     type Data = ();
-//!     fn load_lib(lib_name: &CStr) -> LibHandle<'static, Self::Data> {
+//!     fn load_lib(lib_name: &'static CStr) -> LibHandle<'static, Self::Data> {
 //!         /* your implementation here */
 //! # LibHandle::from(None)
 //!     }
 //!     fn load_sym(
 //!         lib_handle: &LibHandle<'static, Self::Data>,
-//!         fn_name: &CStr,
+//!         fn_name: &'static CStr,
 //!     ) -> FnAddr {
 //!         /* your implementation here */
 //! # std::ptr::null()
