@@ -12,23 +12,20 @@ use std::sync;
 // this is just here to resolve the missing namespace issue.
 extern crate self as dylink;
 
-// These globals are read every time a vulkan function is called for the first time,
-// which occurs through `LazyFn::link`.
-pub(crate) static INSTANCES: sync::RwLock<Vec<Instance>> = sync::RwLock::new(Vec::new());
-pub(crate) static DEVICES: sync::RwLock<Vec<Device>> = sync::RwLock::new(Vec::new());
+// I'm using a mutex here because vulkan can be sent between threads, but isn't externally synchronized (`Sync`)
+pub(crate) static INSTANCES: sync::Mutex<Vec<Instance>> = sync::Mutex::new(Vec::new());
+pub(crate) static DEVICES: sync::Mutex<Vec<Device>> = sync::Mutex::new(Vec::new());
 
 #[doc(hidden)]
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Instance(*mut ffi::c_void);
-unsafe impl Sync for Instance {}
 unsafe impl Send for Instance {}
 
 #[doc(hidden)]
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Device(*mut ffi::c_void);
-unsafe impl Sync for Device {}
 unsafe impl Send for Device {}
 
 // Windows and Linux are fully tested and useable as of this comment.
@@ -67,7 +64,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	unsafe extern "system" fn initial_fn(device: Device, name: *const ffi::c_char) -> FnAddr {
 		DEVICE_PROC_ADDR.once.get_or_init(|| {
 			let read_lock = INSTANCES
-				.read()
+				.lock()
 				.expect("Dylink Error: failed to get read lock");
 			// check other instances if fails in case one has a higher available version number
 			let raw_addr: FnAddr = read_lock
@@ -103,7 +100,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 
 pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> FnAddr {
 	let mut maybe_fn = DEVICES
-		.read()
+		.lock()
 		.expect("failed to get read lock")
 		.iter()
 		.find_map(|device| {
@@ -112,7 +109,7 @@ pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> FnAddr {
 	maybe_fn = match maybe_fn {
 		Some(addr) => return addr,
 		None => INSTANCES
-			.read()
+			.lock()
 			.expect("failed to get read lock")
 			.iter()
 			.find_map(|instance| {

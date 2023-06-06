@@ -187,7 +187,7 @@ impl Global {
 	/// *note: This function returns `false` if the instance is valid and defined through dylink.*
 	pub fn insert_instance(&self, instance: vk::Instance) -> bool {
 		//println!("insert_instance called!");
-		let mut write_lock = vk::INSTANCES.write().unwrap();
+		let mut write_lock = vk::INSTANCES.lock().unwrap();
 		match write_lock.binary_search(&instance) {
 			Ok(_) => false,
 			Err(index) => {
@@ -202,7 +202,7 @@ impl Global {
 	/// Using this function may break dylink's checked lifetimes!
 	pub unsafe fn remove_instance(&self, instance: &vk::Instance) -> bool {
 		//println!("remove_instance called!");
-		let mut write_lock = vk::INSTANCES.write().unwrap();
+		let mut write_lock = vk::INSTANCES.lock().unwrap();
 		match write_lock.binary_search(instance) {
 			Ok(index) => {
 				write_lock.remove(index);
@@ -223,7 +223,7 @@ impl Global {
 	/// *note: This function returns `false` if the device is valid and defined through dylink.*
 	pub fn insert_device(&self, device: vk::Device) -> bool {
 		//println!("insert_device called!");
-		let mut write_lock = vk::DEVICES.write().unwrap();
+		let mut write_lock = vk::DEVICES.lock().unwrap();
 		match write_lock.binary_search(&device) {
 			Ok(_) => false,
 			Err(index) => {
@@ -238,7 +238,7 @@ impl Global {
 	/// Using this function may break dylink's checked lifetimes!
 	pub unsafe fn remove_device(&self, device: &vk::Device) -> bool {
 		//println!("remove_device called!");
-		let mut write_lock = vk::DEVICES.write().unwrap();
+		let mut write_lock = vk::DEVICES.lock().unwrap();
 		match write_lock.binary_search(device) {
 			Ok(index) => {
 				write_lock.remove(index);
