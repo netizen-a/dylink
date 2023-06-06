@@ -14,7 +14,7 @@ publish = true
 members = ["dylink_macro"]
 
 [dependencies.dylink_macro]
-version = "0.7"
+version = "0.8"
 path="./dylink_macro"
 
 [dependencies]

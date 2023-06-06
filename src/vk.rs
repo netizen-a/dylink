@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use crate::lazyfn;
-use crate::{FnAddr, LinkType};
+use crate::loader::System;
+use crate::{FnAddr, lazylib};
 use std::ffi::CStr;
 use std::sync::atomic::Ordering;
 use std::{ffi, mem};
@@ -28,12 +28,24 @@ unsafe impl Send for Instance {}
 pub struct Device(*mut ffi::c_void);
 unsafe impl Send for Device {}
 
+#[cfg(windows)]
+static VK_LIB: lazylib::LazyLib<System, 1> = lazylib::LazyLib::new(unsafe{[CStr::from_bytes_with_nul_unchecked(b"vulkan-1.dll\0")]});
+#[cfg(all(unix, not(target_os = "macos")))]
+static VK_LIB: lazylib::LazyLib<System, 1> 	= lazylib::LazyLib::new(unsafe{[
+		CStr::from_bytes_with_nul_unchecked(b"libvulkan.so.1\0"),
+		CStr::from_bytes_with_nul_unchecked(b"libvulkan.so\0"),
+]});
+#[cfg(target_os = "macos")]
+static VK_LIB: lazylib::LazyLib<System, 1> = lazylib::LazyLib::new(unsafe{[
+	CStr::from_bytes_with_nul_unchecked(b"libvulkan.dylib\0"),
+	CStr::from_bytes_with_nul_unchecked(b"libvulkan.1.dylib\0"),
+	CStr::from_bytes_with_nul_unchecked(b"libMoltenVK.dylib\0"),
+]});
+
 // Windows and Linux are fully tested and useable as of this comment.
 // MacOS should theoretically work, but it's untested.
 // This function is in itself an axiom of the vulkan specialization.
-//
-// Do not add `strip` here since loader::lazyfn::vulkan_loader needs it as a function pointer.
-#[cfg_attr(windows, crate::dylink(name = "vulkan-1.dll"))]
+
 #[cfg_attr(
 	all(unix, not(target_os = "macos")),
 	crate::dylink(any(name = "libvulkan.so.1", name = "libvulkan.so"))
@@ -46,6 +58,7 @@ unsafe impl Send for Device {}
 		name = "libMoltenVK.dylib"
 	))
 )]
+#[crate::dylink(library=VK_LIB)]
 extern "system" {
 	pub(crate) fn vkGetInstanceProcAddr(instance: Instance, pName: *const ffi::c_char) -> FnAddr;
 }
@@ -61,7 +74,7 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 	device: Device,
 	name: *const ffi::c_char,
 ) -> FnAddr {
-	unsafe extern "system" fn initial_fn(device: Device, name: *const ffi::c_char) -> FnAddr {
+	/*unsafe extern "system" fn initial_fn(device: Device, name: *const ffi::c_char) -> FnAddr {
 		DEVICE_PROC_ADDR.once.get_or_init(|| {
 			let read_lock = INSTANCES
 				.lock()
@@ -83,44 +96,42 @@ pub(crate) unsafe extern "system" fn vkGetDeviceProcAddr(
 			DEVICE_PROC_ADDR
 				.addr_ptr
 				.store(DEVICE_PROC_ADDR.addr.get(), Ordering::Relaxed);
-			// store initial function
-			initial_fn
 		});
 		DEVICE_PROC_ADDR(device, name)
 	}
 
-	pub(crate) static DEVICE_PROC_ADDR: lazyfn::LazyFn<PFN_vkGetDeviceProcAddr, dylink::link::System> =
-		lazyfn::LazyFn::new(
+	pub(crate) static DEVICE_PROC_ADDR: lazyfn::VkLazyFn<PFN_vkGetDeviceProcAddr> =
+		lazyfn::VkLazyFn::new(
 			&(initial_fn as PFN_vkGetDeviceProcAddr),
 			unsafe { CStr::from_bytes_with_nul_unchecked(b"vkGetDeviceProcAddr\0") },
-			LinkType::Vulkan,
 		);
-	DEVICE_PROC_ADDR(device, name)
+	DEVICE_PROC_ADDR(device, name)*/
+	std::ptr::null()
 }
 
-pub(crate) unsafe fn vulkan_loader(fn_name: &ffi::CStr) -> FnAddr {
+pub(crate) fn vulkan_loader(fn_name: &ffi::CStr) -> FnAddr {
 	let mut maybe_fn = DEVICES
 		.lock()
-		.expect("failed to get read lock")
+		.expect("failed to get lock")
 		.iter()
 		.find_map(|device| {
-			vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const ffi::c_char).as_ref()
+			unsafe {vkGetDeviceProcAddr(*device, fn_name.as_ptr() as *const ffi::c_char).as_ref()}
 		});
 	maybe_fn = match maybe_fn {
 		Some(addr) => return addr,
 		None => INSTANCES
 			.lock()
-			.expect("failed to get read lock")
+			.expect("failed to get lock")
 			.iter()
 			.find_map(|instance| {
-				vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char).as_ref()
+				unsafe {vkGetInstanceProcAddr(*instance, fn_name.as_ptr() as *const ffi::c_char).as_ref()}
 			}),
 	};
 	match maybe_fn {
 		Some(addr) => addr,
-		None => vkGetInstanceProcAddr(
+		None => unsafe {vkGetInstanceProcAddr(
 			Instance(std::ptr::null_mut()),
 			fn_name.as_ptr() as *const ffi::c_char,
-		),
+		)},
 	}
 }

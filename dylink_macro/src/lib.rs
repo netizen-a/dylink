@@ -60,9 +60,8 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	let fn_name = fn_item.sig.ident.to_token_stream();	
 	let vis = fn_item.vis.to_token_stream();
 	let output = fn_item.sig.output.to_token_stream();
-	let strip = attr_data.strip;
 	let link_ty = &attr_data.link_ty;
-	let linker = &attr_data.linker;
+	let library = &attr_data.library;
 
 	let fn_attrs: Vec<TokenStream2> = fn_item
 		.attrs
@@ -86,7 +85,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	let mut param_ty_list = Vec::new();
 	let mut internal_param_ty_list = Vec::new();
 	let mut internal_param_list = Vec::new();
-	let params_default = fn_item.sig.inputs.to_token_stream();
 	for (i, arg) in fn_item.sig.inputs.iter().enumerate() {
 		match arg {
 			syn::FnArg::Typed(pat_type) => {
@@ -111,7 +109,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				internal_param_ty_list.push(quote!(#param_name : #ty));
 			}
 			syn::FnArg::Receiver(rec) => {
-				if IS_MOD_ITEM || strip {
+				if IS_MOD_ITEM {
 					// TODO: fix error message
 					return syn::Error::new(
 						rec.span(),
@@ -139,25 +137,14 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		}
 	}
 
-	// this is sure to obfuscate things, but this is needed here because `strip` screws with call context.
-	let caller_name = if strip {
-		quote! {function}
-	} else {
-		quote! {DYN_FUNC}
-	};
+	
+	let caller_name = quote! {pfn};
 
 	let std_transmute = quote! {std::mem::transmute};
 
 	let call_dyn_func = if *link_ty == LinkType::Vulkan {
 		match fn_name.to_string().as_str() {
 			"vkCreateInstance" => {
-				if strip {
-					return syn::Error::new(
-						fn_item.span(),
-						"`vkCreateInstance` is incompatible with `strip=true`",
-					)
-					.to_compile_error();
-				}
 				let inst_param = &param_list[2];
 				quote! {
 					let result = #caller_name(#(#param_list),*);
@@ -170,13 +157,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				}
 			}
 			"vkDestroyInstance" => {
-				if strip {
-					return syn::Error::new(
-						fn_item.span(),
-						"`vkDestroyInstance` is incompatible with `strip=true`",
-					)
-					.to_compile_error();
-				}
 				let inst_param = &param_list[0];
 				quote! {
 					let result = #caller_name(#(#param_list),*);
@@ -186,14 +166,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 					result
 				}
 			}
-			"vkCreateDevice" => {
-				if strip {
-					return syn::Error::new(
-						fn_item.span(),
-						"`vkCreateDevice` is incompatible with `strip=true`",
-					)
-					.to_compile_error();
-				}
+			"vkCreateDevice" => {				
 				let inst_param = &param_list[3];
 				quote! {
 					let result = #caller_name(#(#param_list),*);
@@ -203,14 +176,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 					result
 				}
 			}
-			"vkDestroyDevice" => {
-				if strip {
-					return syn::Error::new(
-						fn_item.span(),
-						"`vkDestroyDevice` is incompatible with `strip=true`",
-					)
-					.to_compile_error();
-				}
+			"vkDestroyDevice" => {				
 				let inst_param = &param_list[0];
 				quote! {
 					let result = #caller_name(#(#param_list),*);
@@ -233,67 +199,40 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			name.clone()
 		}
 		None => {
-			lint = if strip {
-				quote! {#[allow(non_upper_case_globals)]}
-			} else {
-				quote! {#[allow(non_snake_case)]}
-			};
+			lint = quote! {#[allow(non_snake_case)]};
 			fn_name.to_string()
 		}
 	};
-	//println!("{fn_name}:{abi}");
 	
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
-	if strip {
-		quote! {
-			#(#fn_attrs)*
-			#lint
-			#vis static #fn_name
-			: dylink::LazyFn<unsafe #abi fn (#params_default) #output, #linker>
-			= dylink::LazyFn::new(
-				{
-					type InstFnPtr = unsafe #abi fn (#params_default) #output;
-					unsafe #abi fn initial_fn (#(#param_ty_list),*) #output {
-						use std::ffi::CStr;
-						match #fn_name.try_link() {
-							Ok(function) => {#call_dyn_func},
-							Err(err) => panic!("{}", err),
-						}
-					}
-					const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
-					DYN_FUNC_REF
-				},
-				unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
-				dylink::#link_ty
+	
+	quote! {
+		#(#fn_attrs)*
+		#lint
+		#[inline]
+		#vis unsafe #abi fn #fn_name (#(#param_ty_list),*) #output {
+			use std::sync::atomic::{AtomicPtr, Ordering};
+			static FUNC: AtomicPtr<()> = AtomicPtr::new(
+				initializer as *mut ()
 			);
-		}
-	} else {
-		quote! {
-			#(#fn_attrs)*
-			#lint
-			#[inline]
-			#vis unsafe #abi fn #fn_name (#(#param_ty_list),*) #output {
-				// InstFnPtr: instance function pointer type
-				type InstFnPtr = #abi fn (#(#internal_param_ty_list),*) #output;
-				#abi fn initial_fn (#(#internal_param_ty_list),*) #output {
-					use std::ffi::CStr;
-					match DYN_FUNC.try_link() {
-						Ok(function) => {function(#(#internal_param_list),*)},
-						Err(err) => panic!("{}", err),
-					}
-				}
-				const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
-				static DYN_FUNC
-				: dylink::LazyFn<InstFnPtr, #linker>
-				= dylink::LazyFn::new(
-					DYN_FUNC_REF,
-					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
-					dylink::#link_ty
-				);
 
-				#call_dyn_func
+			unsafe #abi fn initializer (#(#internal_param_ty_list),*) #output {
+				let symbol : *const () = #library.find_sym(
+					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())}
+				);
+				if symbol.is_null() {
+					panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name));
+				}
+				FUNC.store(symbol as *mut (), Ordering::Release);
+				let pfn : #abi fn (#(#internal_param_ty_list),*) #output = std::mem::transmute(symbol);
+				pfn(#(#internal_param_list),*)
 			}
+
+			let symbol: *mut () = FUNC.load(Ordering::Relaxed);
+			std::sync::atomic::compiler_fence(Ordering::Acquire);
+			let pfn : #abi fn (#(#internal_param_ty_list),*) #output = std::mem::transmute(symbol);
+			#call_dyn_func
 		}
 	}
 }

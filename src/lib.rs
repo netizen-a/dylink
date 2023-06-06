@@ -133,17 +133,13 @@
 //! 
 //! The [`System`](link::System) linker loader provides an `unload` function that may be used to unload the library.
 //! If a custom loader is used then the user must unload the library manually.
-
-mod error;
-mod lazyfn;
+pub mod lazylib;
 /// custom linker module
-pub mod link;
+pub mod loader;
 #[doc(hidden)]
 pub mod vk;
 
-pub use error::*;
-pub use lazyfn::*;
-//pub use link::*;
+pub use lazylib::*;
 
 /// Macro for generating dynamically linked functions procedurally.
 ///
@@ -154,19 +150,13 @@ pub use dylink_macro::dylink;
 #[cfg(all(doctest, windows))]
 pub struct ReadmeDoctests;
 
-// I don't know how to implement wasm, so I'll just drop this here...
-#[cfg(wasm)]
-compile_error!("Dylink Error: Wasm is unsupported.");
-
 /// Raw function address.
 ///
 /// Must be cast into a function pointer to be useable.
 pub type FnAddr = *const ();
 
-/// The result of a dylink function
-pub type DylinkResult<T> = Result<T, error::DylinkError>;
-
 // TODO: Make the `Global` struct below public when name is picked out
+// TODO: change insert_* and remove_* to use bind_* and unbind_*
 
 /// The global context for specializations.
 ///

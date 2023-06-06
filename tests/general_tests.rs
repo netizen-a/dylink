@@ -51,7 +51,7 @@ fn test_win32_impl() {
 #[test]
 fn test_win32_lifetimes() {
 	use std::ffi::CStr;
-	use dylink::link;
+	use dylink::loader;
 	use std::ops::Deref;
 
 	extern "stdcall" fn foo() -> u32 {
@@ -60,7 +60,7 @@ fn test_win32_lifetimes() {
 	type PfnTy = extern "stdcall" fn() -> u32;
 
 	let list = unsafe { [CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")] };
-	let lazyfn: LazyFn<PfnTy, link::System> = LazyFn::<PfnTy, link::System>::new(
+	let lazyfn: LazyFn<PfnTy, loader::System> = LazyFn::<PfnTy, loader::System>::new(
 		&(foo as PfnTy),
 		unsafe { CStr::from_bytes_with_nul_unchecked(b"SetLastError\0") },
 		dylink::LinkType::General(&list),
@@ -180,14 +180,14 @@ fn test_kernel32_unload() {
 	unsafe {
 	   	let _ = GetLastError();
 		let lib_name = CStr::from_bytes_with_nul(b"Kernel32.dll\0").unwrap();
-		link::System::unload(lib_name).unwrap();
+		loader::System::unload(lib_name).unwrap();
 	}
 }
 
 #[cfg(windows)]
 #[test]
 fn test_custom_linker() {
-	use dylink::{*, link::*};
+	use dylink::{*, loader::*};
 	use std::ffi::*;
 	struct MyLinker;
 	struct MyData();
