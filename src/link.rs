@@ -28,10 +28,10 @@ impl<'a, T> LibHandle<'a, T> {
 	pub fn as_ref(&self) -> Option<&T> {
 		unsafe { self.0.as_ref() }
 	}
-	fn to_opaque<'b>(&self) -> LibHandle<'b, ffi::c_void> {
+	const fn to_opaque<'b>(&self) -> LibHandle<'b, ffi::c_void> {
 		LibHandle(self.0.cast(), PhantomData)
 	}
-	fn from_opaque<'b>(a: &LibHandle::<ffi::c_void>) -> LibHandle::<'b, T> {
+	const fn from_opaque<'b>(a: &LibHandle::<ffi::c_void>) -> LibHandle::<'b, T> {
 		LibHandle::<T>(a.0.cast(), PhantomData)
 	}
 }

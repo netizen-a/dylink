@@ -1,8 +1,8 @@
 [package]
 name = "dylink"
 version = "0.7.0"
-authors = ["Jonathan Thomason"]
 edition = "2021"
+authors = ["Jonathan Thomason"]
 license = "MIT OR Apache-2.0"
 keywords = ["ffi", "dlopen", "load", "shared", "lazy"]
 categories = ["api-bindings"]
