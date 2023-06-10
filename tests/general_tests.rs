@@ -75,6 +75,10 @@ fn test_linux_x11() {
 			XCloseDisplay(disp);
 		}
 	}
+	#[cfg(feature="unload")]
+	unsafe {
+		crate::loader::System::unload(&LIB_X11).expect("unload failed");
+	}
 }
 
 #[cfg(unix)]

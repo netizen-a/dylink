@@ -1,11 +1,8 @@
 use crate::loader;
 use crate::loader::{LibHandle, Loader};
 use crate::FnAddr;
-use once_cell::sync::OnceCell;
 use std::ffi::CStr;
-use std::marker::PhantomData;
 use std::sync::atomic::AtomicPtr;
-#[cfg(feature="unload")]
 use std::sync::Mutex;
 
 // this wrapper struct is the bane of my existance...
@@ -17,21 +14,19 @@ unsafe impl Send for FnAddrWrapper {}
 pub struct LazyLib<'a, L: Loader<'a> = loader::System> {
 	libs: &'a [&'static CStr],
 	// library handles sorted by name
-	pub(crate) hlib: OnceCell<LibHandle<'a, L::Data>>,
+	pub(crate) hlib: Mutex<Option<LibHandle<'a, L::Data>>>,	
 	// reset lock vector
 	#[cfg(feature="unload")]
 	pub(crate) rstl: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
-	phtm: PhantomData<L>,
 }
 
 impl<'a, L: Loader<'a>> LazyLib<'a, L> {
 	pub const fn new(libs: &'a [&'static CStr]) -> Self {
 		Self {
 			libs,
-			hlib: OnceCell::new(),
+			hlib: Mutex::new(None),
 			#[cfg(feature="unload")]
 			rstl: Mutex::new(Vec::new()),
-			phtm: PhantomData,
 		}
 	}
 	/// loads function from library synchronously and binds library handle internally to dylink.
@@ -46,17 +41,16 @@ impl<'a, L: Loader<'a>> LazyLib<'a, L> {
 	where
 		L::Data: 'static + Send,
 	{
-		let maybe_handle = self.hlib.get_or_try_init(|| {
-			let mut handle;
+		let mut lock = self.hlib.lock().unwrap();
+		if let None = *lock {
 			for lib_name in self.libs {
-				handle = L::load_lib(lib_name);
+				let handle = L::load_lib(lib_name);
 				if !handle.is_invalid() {
-					return Ok(handle);
+					*lock = Some(handle);
 				}
 			}
-			Err(())
-		});
-		if let Ok(lib_handle) = maybe_handle {
+		}
+		if let Some(ref lib_handle) = *lock {
 			#[cfg(feature="unload")]
 			self.rstl.lock().unwrap().push((_atom, FnAddrWrapper(_init)));
 			L::load_sym(&lib_handle, sym)
