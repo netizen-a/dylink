@@ -14,8 +14,8 @@ pub(crate) struct FnAddrWrapper(pub FnAddr);
 unsafe impl Send for FnAddrWrapper {}
 
 #[derive(Debug)]
-pub struct LazyLib<'a, L: Loader<'a> = loader::System, const N: usize = 1> {
-	libs: [&'static CStr; N],
+pub struct LazyLib<'a, L: Loader<'a> = loader::System> {
+	libs: &'a [&'static CStr],
 	// library handles sorted by name
 	pub(crate) hlib: OnceCell<LibHandle<'a, L::Data>>,
 	// reset lock vector
@@ -24,8 +24,8 @@ pub struct LazyLib<'a, L: Loader<'a> = loader::System, const N: usize = 1> {
 	phtm: PhantomData<L>,
 }
 
-impl<'a, L: Loader<'a>, const N: usize> LazyLib<'a, L, N> {
-	pub const fn new(libs: [&'static CStr; N]) -> Self {
+impl<'a, L: Loader<'a>> LazyLib<'a, L> {
+	pub const fn new(libs: &'a [&'static CStr]) -> Self {
 		Self {
 			libs,
 			hlib: OnceCell::new(),

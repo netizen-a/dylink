@@ -49,7 +49,7 @@ impl <'a> Loader<'a> for System {
 
 impl System {
 	#[cfg(feature = "unload")]
-	pub unsafe fn unload<const N: usize>(library: &mut lazylib::LazyLib<Self, N>) -> std::io::Result<()> {
+	pub unsafe fn unload<const N: usize>(library: &mut lazylib::LazyLib<Self>) -> std::io::Result<()> {
     	use std::{sync::atomic::Ordering, io::Error};
         if let Some(handle) = library.hlib.take() {
 			let mut rstl_lock = library.rstl.lock().unwrap();

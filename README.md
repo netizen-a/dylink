@@ -39,8 +39,9 @@ Below is a basic working example on how to use the macro on windows.
 use dylink::*;
 use std::ffi::CStr;
 
-const KERNEL32_STR: &'static CStr = unsafe {CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")};
-static KERNEL32: LazyLib = LazyLib::new([KERNEL32_STR]);
+static KERNEL32: LazyLib = LazyLib::new(&[
+   unsafe {CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")}
+]);
 
 #[dylink(library=KERNEL32)]
 extern "stdcall" {
