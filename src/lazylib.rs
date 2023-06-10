@@ -1,73 +1,67 @@
-use std::ffi::{CStr, c_void};
-use std::marker::PhantomData;
-use std::sync::Mutex;
+use crate::loader;
 use crate::loader::{LibHandle, Loader};
-use once_cell::sync::OnceCell;
 use crate::FnAddr;
-use crate::vk;
+use once_cell::sync::OnceCell;
+use std::ffi::CStr;
+use std::marker::PhantomData;
+use std::sync::atomic::AtomicPtr;
+#[cfg(feature="unload")]
+use std::sync::Mutex;
+
+// this wrapper struct is the bane of my existance...
+#[derive(Debug)]
+pub(crate) struct FnAddrWrapper(pub FnAddr);
+unsafe impl Send for FnAddrWrapper {}
 
 #[derive(Debug)]
-pub struct LazyLib<L: Loader, const N: usize>{
-    once: OnceCell<()>,
-    libs: [&'static CStr; N],
-    hlib: Mutex<Vec<(&'static CStr, LibHandle<'static, c_void>)>>,
-    phtm: PhantomData<L>,
+pub struct LazyLib<'a, L: Loader<'a> = loader::System, const N: usize = 1> {
+	libs: [&'static CStr; N],
+	// library handles sorted by name
+	pub(crate) hlib: OnceCell<LibHandle<'a, L::Data>>,
+	// reset lock vector
+	#[cfg(feature="unload")]
+	pub(crate) rstl: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
+	phtm: PhantomData<L>,
 }
 
-impl <L: Loader, const N: usize> LazyLib<L, N> {
-    pub const fn new(libs: [&'static CStr; N]) -> Self {
-        Self{
-            once: OnceCell::new(),
-            libs,
-            hlib: Mutex::new(Vec::new()),
-            phtm: PhantomData
-        }
-    }
-    pub fn find_sym(&self, sym: &'static CStr) -> crate::FnAddr
-	where
-		L::Data: 'static + Send,
-	{		
-		for lib in self.libs.iter() {
-			let sym = self.load_and_bind(lib, sym);
-			if !sym.is_null() {
-				return sym;
-			}
+impl<'a, L: Loader<'a>, const N: usize> LazyLib<'a, L, N> {
+	pub const fn new(libs: [&'static CStr; N]) -> Self {
+		Self {
+			libs,
+			hlib: OnceCell::new(),
+			#[cfg(feature="unload")]
+			rstl: Mutex::new(Vec::new()),
+			phtm: PhantomData,
 		}
-		std::ptr::null()
 	}
-    
-    pub fn vk_find_sym(&self, sym: &'static CStr) -> crate::FnAddr
+	/// loads function from library synchronously and binds library handle internally to dylink.
+	///
+	/// If the library is already bound, the bound handle will be used for loading the function.
+	pub unsafe fn find_sym(
+		&self,
+		sym: &'static CStr,
+		_init: FnAddr,
+		_atom: &'static AtomicPtr<()>,
+	) -> crate::FnAddr
 	where
 		L::Data: 'static + Send,
 	{
-		vk::vulkan_loader(sym)
+		let maybe_handle = self.hlib.get_or_try_init(|| {
+			let mut handle;
+			for lib_name in self.libs {
+				handle = L::load_lib(lib_name);
+				if !handle.is_invalid() {
+					return Ok(handle);
+				}
+			}
+			Err(())
+		});
+		if let Ok(lib_handle) = maybe_handle {
+			#[cfg(feature="unload")]
+			self.rstl.lock().unwrap().push((_atom, FnAddrWrapper(_init)));
+			L::load_sym(&lib_handle, sym)
+		} else {
+			std::ptr::null()
+		}
 	}
-
-    /// loads function from library synchronously and binds library handle internally to dylink.
-    /// 
-    /// If the library is already bound, the bound handle will be used for loading the function.
-    fn load_and_bind(&self, lib_name: &'static CStr, fn_name: &'static CStr) -> FnAddr
-    where
-    	L::Data: 'static + Send,
-    {
-    	let fn_addr: FnAddr;
-    	let lib_handle: LibHandle::<L::Data>;
-    	let mut lock = self.hlib.lock().unwrap();
-    	match lock.binary_search_by_key(&lib_name, |(k, _)| k) {
-    		Ok(index) => {
-    			lib_handle = LibHandle::from_opaque(&lock[index].1);
-    			fn_addr = L::load_sym(&lib_handle, fn_name)
-    		}
-    		Err(index) => {
-    			lib_handle = L::load_lib(lib_name);
-    			if lib_handle.is_invalid() {
-    				return std::ptr::null();
-    			} else {
-    				fn_addr = L::load_sym(&lib_handle, fn_name);
-    				lock.insert(index, (lib_name, lib_handle.to_opaque()));
-    			}
-    		}
-    	}
-    	fn_addr
-    }
 }

@@ -36,7 +36,9 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 					.items
 					.iter()
 					.map(|item| match item {
-						ForeignItem::Fn(fn_item) => parse_fn::<true>(Some(abi), fn_item, &attr_data),
+						ForeignItem::Fn(fn_item) => {
+							parse_fn::<true>(Some(abi), fn_item, &attr_data)
+						}
 						other => quote!(#abi {#other}),
 					})
 					.collect::<TokenStream2>()
@@ -57,11 +59,16 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	attr_data: &AttrData,
 ) -> TokenStream2 {
 	let abi = abi.to_token_stream();
-	let fn_name = fn_item.sig.ident.to_token_stream();	
+	let fn_name = fn_item.sig.ident.to_token_stream();
 	let vis = fn_item.vis.to_token_stream();
 	let output = fn_item.sig.output.to_token_stream();
-	let link_ty = &attr_data.link_ty;
-	let library = &attr_data.library;
+	let library = match attr_data.library {
+		Ok(ref path) => path,
+		Err(span) => {
+			return syn::Error::new(span, "`link_name` should be applied to a foreign function")
+				.to_compile_error()
+		}
+	};
 
 	let fn_attrs: Vec<TokenStream2> = fn_item
 		.attrs
@@ -137,61 +144,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		}
 	}
 
-	
-	let caller_name = quote! {pfn};
-
-	let std_transmute = quote! {std::mem::transmute};
-
-	let call_dyn_func = if *link_ty == LinkType::Vulkan {
-		match fn_name.to_string().as_str() {
-			"vkCreateInstance" => {
-				let inst_param = &param_list[2];
-				quote! {
-					let result = #caller_name(#(#param_list),*);
-					unsafe {
-						dylink::Global.insert_instance(
-							*#std_transmute::<_, *mut dylink::vk::Instance>(#inst_param)
-						);
-					}
-					result
-				}
-			}
-			"vkDestroyInstance" => {
-				let inst_param = &param_list[0];
-				quote! {
-					let result = #caller_name(#(#param_list),*);
-					unsafe {
-						dylink::Global.remove_instance(&#std_transmute::<_, dylink::vk::Instance>(#inst_param));
-					}
-					result
-				}
-			}
-			"vkCreateDevice" => {				
-				let inst_param = &param_list[3];
-				quote! {
-					let result = #caller_name(#(#param_list),*);
-					unsafe {
-						dylink::Global.insert_device(*#std_transmute::<_, *mut dylink::vk::Device>(#inst_param));
-					}
-					result
-				}
-			}
-			"vkDestroyDevice" => {				
-				let inst_param = &param_list[0];
-				quote! {
-					let result = #caller_name(#(#param_list),*);
-					unsafe {
-						dylink::Global.remove_device(&#std_transmute::<_, dylink::vk::Device>(#inst_param));
-					}
-					result
-				}
-			}
-			_ => quote!(#caller_name(#(#param_list),*)),
-		}
-	} else {
-		quote!(#caller_name(#(#param_list),*))
-	};
-
 	let lint;
 	let link_name = match &attr_data.link_name {
 		Some((name, _)) => {
@@ -203,10 +155,9 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			fn_name.to_string()
 		}
 	};
-	
+
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
-	
 	quote! {
 		#(#fn_attrs)*
 		#lint
@@ -219,7 +170,9 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 
 			unsafe #abi fn initializer (#(#internal_param_ty_list),*) #output {
 				let symbol : *const () = #library.find_sym(
-					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())}
+					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
+					initializer as *const (),
+					&FUNC
 				);
 				if symbol.is_null() {
 					panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name));
@@ -232,7 +185,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			let symbol: *mut () = FUNC.load(Ordering::Relaxed);
 			std::sync::atomic::compiler_fence(Ordering::Acquire);
 			let pfn : #abi fn (#(#internal_param_ty_list),*) #output = std::mem::transmute(symbol);
-			#call_dyn_func
+			pfn(#(#param_list),*)
 		}
 	}
 }

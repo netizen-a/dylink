@@ -19,3 +19,8 @@ path="./dylink_macro"
 
 [dependencies]
 once_cell = "1.17"
+
+[features]
+default =["unload"]
+# super unsafe feature
+unload = []

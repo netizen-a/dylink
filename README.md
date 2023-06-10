@@ -34,12 +34,15 @@ dylink = "0.7"
 ## Example
 
 Below is a basic working example on how to use the macro on windows.
-For windows, the `.dll` file extension is *optional*, but still recommended.
 
 ```rust
-use dylink::dylink;
+use dylink::*;
+use std::ffi::CStr;
 
-#[dylink(name = "Kernel32.dll")]
+const KERNEL32_STR: &'static CStr = unsafe {CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")};
+static KERNEL32: LazyLib = LazyLib::new([KERNEL32_STR]);
+
+#[dylink(library=KERNEL32)]
 extern "stdcall" {
     fn GetLastError() -> u32;
     fn SetLastError(_: u32);

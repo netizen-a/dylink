@@ -4,41 +4,20 @@ use syn::punctuated::Punctuated;
 use syn::{spanned::Spanned, *};
 
 pub struct AttrData {
-	pub link_ty: LinkType,
-	pub library: Option<syn::Path>,
+	pub library: std::result::Result<syn::Path, Span>,
 	pub link_name: Option<(String, Span)>,
-}
-
-#[derive(PartialEq)]
-pub enum LinkType {
-	Vulkan,
-	// note: dylink_macro must use an owned string instead of `&'static [u8]` since it's reading from the source code.
-	General,
 }
 
 impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 	type Error = syn::Error;
 	fn try_from(value: Punctuated<Expr, Token!(,)>) -> Result<Self> {
-		let mut maybe_link_ty: Option<LinkType> = None;
-		let mut library: Option<syn::Path> = None;
+		let mut maybe_library: Option<syn::Path> = None;
 		let mut link_name: Option<(String, Span)> = None;
 		let mut errors = vec![];
-		const EXPECTED_KW: &str = "Expected `vulkan`, `link_name`, or `library`.";
+		const EXPECTED_KW: &str = "Expected `library`, or `link_name`.";
 
 		for expr in value.iter() {
 			match expr {
-				// Branch for syntax: #[dylink(vulkan)]
-				Expr::Path(ExprPath { path, .. }) => {
-					if path.is_ident("vulkan") {
-						if maybe_link_ty.is_none() {
-							maybe_link_ty = Some(LinkType::Vulkan);
-						} else {
-							errors.push(Error::new(path.span(), "Library already defined."));
-						}
-					} else {
-						errors.push(Error::new(path.span(), EXPECTED_KW));
-					}
-				}
 				Expr::Assign(assign) => {
 					let (assign_left, assign_right) = (assign.left.as_ref(), assign.right.as_ref());
 
@@ -48,10 +27,9 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 					if path.is_ident("library") {
 						// Branch for syntax: #[dylink(library = <path>)]
 						match assign_right {
-							Expr::Path(ExprPath{path, .. }) => {
-								if library.is_none() {
-									maybe_link_ty = Some(LinkType::General);
-									library = Some(path.clone());
+							Expr::Path(ExprPath { path, .. }) => {
+								if maybe_library.is_none() {
+									maybe_library = Some(path.clone());
 								} else {
 									errors.push(Error::new(
 										assign.span(),
@@ -82,16 +60,15 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 						errors.push(Error::new(assign_left.span(), EXPECTED_KW));
 					}
 				}
-				
+
 				// Branch for everything else.
 				expr => errors.push(Error::new(expr.span(), EXPECTED_KW)),
 			}
 		}
-
-		if maybe_link_ty.is_none() {
+		if maybe_library.is_none() {
 			errors.push(Error::new(
 				value.span(),
-				"No library detected. Suggested: use `vulkan` or `library = <path>`.",
+				"No library detected. Suggest using: `library = <path>`.",
 			));
 		}
 
@@ -108,8 +85,7 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 			}
 		} else {
 			Ok(Self {
-				link_ty: maybe_link_ty.unwrap(),
-				library,
+				library: maybe_library.ok_or(value.span()),
 				link_name,
 			})
 		}
