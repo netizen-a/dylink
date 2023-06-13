@@ -1,3 +1,5 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
+
 use crate::loader;
 use crate::loader::LibHandle;
 use crate::loader::Loader;
@@ -12,7 +14,7 @@ pub(crate) struct FnAddrWrapper(pub FnAddr);
 unsafe impl Send for FnAddrWrapper {}
 
 #[derive(Debug)]
-pub struct LazyLib<'a, L: Loader<'a> = loader::System> {
+pub struct LazyLib<'a, L: Loader<'a> = loader::SystemLoader> {
 	libs: &'a [&'static CStr],
 	// library handles sorted by name
 	pub(crate) hlib: Mutex<Option<L::Handle>>,

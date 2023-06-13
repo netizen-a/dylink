@@ -1,14 +1,14 @@
 use dylink::*;
 
 #[cfg(windows)]
-static KERNEL32: lazylib::LazyLib<loader::System> = lazylib::LazyLib::new(unsafe {
+static KERNEL32: LazyLib = LazyLib::new(unsafe {
 	&[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"Kernel32.dll\0",
 	)]
 });
 
 #[cfg(target_os = "linux")]
-static LIB_X11: lazylib::LazyLib<loader::System> = lazylib::LazyLib::new(unsafe {
+static LIB_X11: LazyLib = LazyLib::new(unsafe {
 	&[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"libX11.so.6\0",
 	)]
@@ -84,7 +84,7 @@ fn test_linux_x11() {
 #[cfg(unix)]
 #[test]
 fn test_unix_libc() {
-	use dylink::loader::SelfLoader;
+	use dylink::*;
 	use std::ffi::{c_char, c_int, CStr};
 
 	const LIBC_SO: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"libX11.so.6\0") };

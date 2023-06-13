@@ -1,4 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
+
 use super::*;
 use crate::os::*;
 use std::{ffi::CStr, marker::PhantomData};
@@ -7,17 +8,17 @@ use std::{ffi::CStr, marker::PhantomData};
 pub struct SelfHandle<'a>(*mut std::ffi::c_void, PhantomData<&'a std::ffi::c_void>);
 unsafe impl Send for SelfHandle<'_> {}
 
-#[cfg(windows)]
 impl crate::loader::LibHandle for SelfHandle<'_> {
 	fn is_invalid(&self) -> bool {
-		self.0.is_null()
-	}
-}
-#[cfg(unix)]
-impl crate::loader::LibHandle for SelfHandle {
-	fn is_invalid(&self) -> bool {
-		// lib handle is ignored, so is_invalid must always return false
-		false
+		if cfg!(windows) {
+			self.0.is_null()
+		} else if cfg!(unix) {
+			false
+		} else if cfg!(target_family = "wasm") {
+			todo!("wasm is not implemented")
+		} else {
+			unreachable!("unknown platform")
+		}
 	}
 }
 
@@ -25,7 +26,7 @@ impl<'a> Loader<'a> for SelfLoader {
 	type Handle = SelfHandle<'a>;
 	#[cfg(unix)]
 	fn load_lib(_: &CStr) -> Self::Handle {
-		SelfHandle(unix::RTLD_DEFAULT)
+		SelfHandle(unix::RTLD_DEFAULT, PhantomData)
 	}
 	#[cfg(windows)]
 	fn load_lib(lib_name: &'static CStr) -> Self::Handle {

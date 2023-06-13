@@ -1,6 +1,7 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
+
 use std::marker::PhantomData;
 
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use super::*;
 
 #[doc(hidden)]
@@ -12,14 +13,14 @@ impl crate::loader::LibHandle for SystemHandle<'_> {
 	}
 }
 
-impl<'a> Loader<'a> for System {
+impl<'a> Loader<'a> for SystemLoader {
 	type Handle = SystemHandle<'a>;
 
 	fn load_lib(lib_name: &'static ffi::CStr) -> Self::Handle {
 		#[cfg(unix)]
 		unsafe {
 			use crate::os::unix::*;
-			SystemHandle(dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL))
+			SystemHandle(dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL), PhantomData)
 		}
 		#[cfg(windows)]
 		unsafe {
@@ -39,6 +40,10 @@ impl<'a> Loader<'a> for System {
 				PhantomData,
 			)
 		}
+		#[cfg(wasm)]
+		{
+			todo!()
+		}
 	}
 
 	fn load_sym(lib_handle: &Self::Handle, fn_name: &'static ffi::CStr) -> crate::FnAddr {
@@ -46,7 +51,7 @@ impl<'a> Loader<'a> for System {
 	}
 }
 
-impl System {
+impl SystemLoader {
 	#[cfg(feature = "unload")]
 	pub unsafe fn unload(library: &lazylib::LazyLib<Self>) -> std::io::Result<()> {
 		use std::{io::Error, sync::atomic::Ordering};

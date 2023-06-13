@@ -1,11 +1,10 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-#![allow(clippy::upper_case_acronyms)]
 
 use crate::*;
 use std::ffi;
 
-mod selfloader;
-mod system;
+mod self_loader;
+mod sys_loader;
 
 // self documenting hidden trait
 // TODO: add `Clone` trait on next version bump
@@ -17,7 +16,7 @@ pub trait LibHandle: Send {
 	fn is_invalid(&self) -> bool;
 }
 
-/// Used to specify a custom run-time linker loader for [LazyFn]
+/// Used to specify the run-time linker loader constraint for [LazyLib]
 pub trait Loader<'a>
 where
 	Self::Handle: LibHandle + 'a,
@@ -27,9 +26,9 @@ where
 	fn load_sym(lib_handle: &Self::Handle, fn_name: &'static ffi::CStr) -> FnAddr;
 }
 
-/// Default system linker used in [LazyFn]
+/// Default system loader used in [LazyLib]
 #[cfg(not(wasm))]
-pub struct System;
+pub struct SystemLoader;
 
 #[cfg(not(wasm))]
 pub struct SelfLoader;
