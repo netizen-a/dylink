@@ -6,7 +6,7 @@ extern "system" {
 	#[cfg_attr(windows, link_name = "GetProcAddress")]
 	#[cfg_attr(unix, link_name = "dlsym")]
 	pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> crate::FnAddr;
-	#[cfg(feature="unload")]
+	#[cfg(feature = "unload")]
 	#[cfg_attr(windows, link_name = "FreeLibrary")]
 	#[cfg_attr(unix, link_name = "dlclose")]
 	pub fn dlclose(hlibmodule: *mut c_void) -> std::ffi::c_int;

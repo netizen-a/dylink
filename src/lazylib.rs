@@ -1,5 +1,6 @@
 use crate::loader;
-use crate::loader::{LibHandle, Loader};
+use crate::loader::LibHandle;
+use crate::loader::Loader;
 use crate::FnAddr;
 use std::ffi::CStr;
 use std::sync::atomic::AtomicPtr;
@@ -14,9 +15,9 @@ unsafe impl Send for FnAddrWrapper {}
 pub struct LazyLib<'a, L: Loader<'a> = loader::System> {
 	libs: &'a [&'static CStr],
 	// library handles sorted by name
-	pub(crate) hlib: Mutex<Option<LibHandle<'a, L::Data>>>,	
+	pub(crate) hlib: Mutex<Option<L::Handle>>,
 	// reset lock vector
-	#[cfg(feature="unload")]
+	#[cfg(feature = "unload")]
 	pub(crate) rstl: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
 }
 
@@ -25,7 +26,7 @@ impl<'a, L: Loader<'a>> LazyLib<'a, L> {
 		Self {
 			libs,
 			hlib: Mutex::new(None),
-			#[cfg(feature="unload")]
+			#[cfg(feature = "unload")]
 			rstl: Mutex::new(Vec::new()),
 		}
 	}
@@ -37,10 +38,7 @@ impl<'a, L: Loader<'a>> LazyLib<'a, L> {
 		sym: &'static CStr,
 		_init: FnAddr,
 		_atom: &'static AtomicPtr<()>,
-	) -> crate::FnAddr
-	where
-		L::Data: 'static + Send,
-	{
+	) -> crate::FnAddr {
 		let mut lock = self.hlib.lock().unwrap();
 		if let None = *lock {
 			for lib_name in self.libs {
@@ -51,8 +49,11 @@ impl<'a, L: Loader<'a>> LazyLib<'a, L> {
 			}
 		}
 		if let Some(ref lib_handle) = *lock {
-			#[cfg(feature="unload")]
-			self.rstl.lock().unwrap().push((_atom, FnAddrWrapper(_init)));
+			#[cfg(feature = "unload")]
+			self.rstl
+				.lock()
+				.unwrap()
+				.push((_atom, FnAddrWrapper(_init)));
 			L::load_sym(&lib_handle, sym)
 		} else {
 			std::ptr::null()
