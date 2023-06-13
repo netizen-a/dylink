@@ -1,17 +1,19 @@
+use std::marker::PhantomData;
+
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use super::*;
 
 #[doc(hidden)]
-pub struct SystemHandle(*mut std::ffi::c_void);
-unsafe impl Send for SystemHandle {}
-impl crate::loader::LibHandle for SystemHandle {
+pub struct SystemHandle<'a>(*mut std::ffi::c_void, PhantomData<&'a std::ffi::c_void>);
+unsafe impl Send for SystemHandle<'_> {}
+impl crate::loader::LibHandle for SystemHandle<'_> {
 	fn is_invalid(&self) -> bool {
 		self.0.is_null()
 	}
 }
 
-impl Loader<'_> for System {
-	type Handle = SystemHandle;
+impl<'a> Loader<'a> for System {
+	type Handle = SystemHandle<'a>;
 
 	fn load_lib(lib_name: &'static ffi::CStr) -> Self::Handle {
 		#[cfg(unix)]
@@ -28,11 +30,14 @@ impl Loader<'_> for System {
 				.chain(std::iter::once(0u16))
 				.collect();
 
-			SystemHandle(crate::os::win32::LoadLibraryExW(
-				wide_str.as_ptr().cast(),
-				std::ptr::null_mut(),
-				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SAFE_CURRENT_DIRS,
-			))
+			SystemHandle(
+				crate::os::win32::LoadLibraryExW(
+					wide_str.as_ptr().cast(),
+					std::ptr::null_mut(),
+					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SAFE_CURRENT_DIRS,
+				),
+				PhantomData,
+			)
 		}
 	}
 

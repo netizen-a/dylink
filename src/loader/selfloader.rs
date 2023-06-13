@@ -1,14 +1,14 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use super::*;
 use crate::os::*;
-use std::ffi::CStr;
+use std::{ffi::CStr, marker::PhantomData};
 
 #[doc(hidden)]
-pub struct SelfHandle(*mut std::ffi::c_void);
-unsafe impl Send for SelfHandle {}
+pub struct SelfHandle<'a>(*mut std::ffi::c_void, PhantomData<&'a std::ffi::c_void>);
+unsafe impl Send for SelfHandle<'_> {}
 
 #[cfg(windows)]
-impl crate::loader::LibHandle for SelfHandle {
+impl crate::loader::LibHandle for SelfHandle<'_> {
 	fn is_invalid(&self) -> bool {
 		self.0.is_null()
 	}
@@ -21,8 +21,8 @@ impl crate::loader::LibHandle for SelfHandle {
 	}
 }
 
-impl Loader<'_> for SelfLoader {
-	type Handle = SelfHandle;
+impl<'a> Loader<'a> for SelfLoader {
+	type Handle = SelfHandle<'a>;
 	#[cfg(unix)]
 	fn load_lib(_: &CStr) -> Self::Handle {
 		SelfHandle(unix::RTLD_DEFAULT)
@@ -31,14 +31,14 @@ impl Loader<'_> for SelfLoader {
 	fn load_lib(lib_name: &'static CStr) -> Self::Handle {
 		// FIXME: when `CStr::is_empty` is stable, replace `to_bytes().is_empty()`.
 		if lib_name.to_bytes().is_empty() {
-			unsafe { SelfHandle(win32::GetModuleHandleW(std::ptr::null_mut())) }
+			unsafe { SelfHandle(win32::GetModuleHandleW(std::ptr::null_mut()), PhantomData) }
 		} else {
 			let wide_str: Vec<u16> = lib_name
 				.to_string_lossy()
 				.encode_utf16()
 				.chain(std::iter::once(0u16))
 				.collect();
-			unsafe { SelfHandle(win32::GetModuleHandleW(wide_str.as_ptr())) }
+			unsafe { SelfHandle(win32::GetModuleHandleW(wide_str.as_ptr()), PhantomData) }
 		}
 	}
 	fn load_sym(lib_handle: &Self::Handle, fn_name: &CStr) -> FnAddr {
