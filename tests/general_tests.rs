@@ -2,7 +2,7 @@ use dylink::*;
 
 #[cfg(windows)]
 static KERNEL32: LazyLib = LazyLib::new(unsafe {
-	&[std::ffi::CStr::from_bytes_with_nul_unchecked(
+	[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"Kernel32.dll\0",
 	)]
 });
@@ -90,7 +90,7 @@ fn test_unix_libc() {
 	const LIBC_SO: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"libX11.so.6\0") };
 	const LIBC_DYLIB: &'static CStr =
 		unsafe { CStr::from_bytes_with_nul_unchecked(b"libc.dylib\0") };
-	static LIBC: LazyLib<SelfLoader> = LazyLib::new(&[LIBC_SO, LIBC_DYLIB]);
+	static LIBC: LazyLib<SelfLoader, 2> = LazyLib::new([LIBC_SO, LIBC_DYLIB]);
 	#[dylink(library=LIBC)]
 	extern "C" {
 		fn atoi(s: *const c_char) -> c_int;

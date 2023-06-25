@@ -69,6 +69,15 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				.to_compile_error()
 		}
 	};
+	// constness makes no sense in this context
+	match &fn_item.sig.constness {
+		None => (),
+		Some(kw) => return syn::Error::new(
+			kw.span(),
+			"`const` functions are unsupported",
+		)
+		.into_compile_error(),
+	}
 
 	let fn_attrs: Vec<TokenStream2> = fn_item
 		.attrs
@@ -76,6 +85,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		.map(syn::Attribute::to_token_stream)
 		.collect();
 
+	// `self` can be used, but not inferred, so it's conditionally useful.
 	if let syn::ReturnType::Type(_, ret_type) = &fn_item.sig.output {
 		if let syn::Type::Path(syn::TypePath { path, .. }) = ret_type.as_ref() {
 			if path.is_ident("Self") {
@@ -155,6 +165,22 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			fn_name.to_string()
 		}
 	};
+	
+	// This is mainly useful for applying lifetimes.
+	let generics = &fn_item.sig.generics;
+
+	// variadic compatible ABIs can use this
+	let variadic = match &fn_item.sig.variadic {
+		None => TokenStream2::default(),
+		Some(token) => quote!(, #token),
+	};
+
+	// The Rust ABI can use this token.
+	let asyncness = match &fn_item.sig.asyncness {
+		None => TokenStream2::default(),
+		Some(token) => token.to_token_stream(),
+	};
+	
 
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
@@ -162,13 +188,13 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		#(#fn_attrs)*
 		#lint
 		#[inline]
-		#vis unsafe #abi fn #fn_name (#(#param_ty_list),*) #output {
+		#vis #asyncness unsafe #abi fn #generics #fn_name (#(#param_ty_list),* #variadic) #output {
 			use std::sync::atomic::{AtomicPtr, Ordering};
 			static FUNC: AtomicPtr<()> = AtomicPtr::new(
 				initializer as *mut ()
 			);
 
-			unsafe #abi fn initializer (#(#internal_param_ty_list),*) #output {
+			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
 				let symbol : *const () = #library.find_sym(
 					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
 					initializer as *const (),

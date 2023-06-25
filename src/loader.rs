@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use crate::*;
-use std::ffi;
+use core::ffi;
 
 mod self_loader;
 mod sys_loader;
@@ -17,9 +17,9 @@ pub trait LibHandle: Send {
 }
 
 /// Used to specify the run-time linker loader constraint for [LazyLib]
-pub trait Loader<'a>
+pub trait Loader
 where
-	Self::Handle: LibHandle + 'a,
+	Self::Handle: LibHandle,
 {
 	type Handle;
 	fn load_lib(lib_name: &'static ffi::CStr) -> Self::Handle;
@@ -27,8 +27,8 @@ where
 }
 
 /// Default system loader used in [LazyLib]
-#[cfg(not(wasm))]
-pub struct SystemLoader;
+//#[cfg(not(wasm))]
+pub struct SysLoader;
 
-#[cfg(not(wasm))]
+//#[cfg(not(wasm))]
 pub struct SelfLoader;

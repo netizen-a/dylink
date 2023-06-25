@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["ffi", "macro", "macros", "attribute"]
 description = "Run-time dynamic linking loader attribute"
 repository = "https://github.com/Razordor/dylink.git"
-publish = true
+publish = false
 
 [lib]
 proc-macro = true

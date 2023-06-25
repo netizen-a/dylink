@@ -8,7 +8,7 @@ keywords = ["ffi", "dlopen", "load", "shared", "lazy"]
 categories = ["api-bindings"]
 description = "Run-time dynamic linking loader utilities"
 repository = "https://github.com/Razordor/dylink.git"
-publish = true
+publish = false
 
 [workspace]
 members = ["dylink_macro"]
@@ -17,10 +17,6 @@ members = ["dylink_macro"]
 version = "0.8"
 path="./dylink_macro"
 
-[dependencies]
-once_cell = "1.17"
-
 [features]
-#default =["unload"]
 # super unsafe feature
 unload = []

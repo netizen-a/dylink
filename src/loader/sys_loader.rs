@@ -1,26 +1,25 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::marker::PhantomData;
-
 use super::*;
+use alloc::vec::Vec;
 
 #[doc(hidden)]
-pub struct SystemHandle<'a>(*mut std::ffi::c_void, PhantomData<&'a std::ffi::c_void>);
-unsafe impl Send for SystemHandle<'_> {}
-impl crate::loader::LibHandle for SystemHandle<'_> {
+pub struct SysHandle(*mut core::ffi::c_void);
+unsafe impl Send for SysHandle {}
+impl crate::loader::LibHandle for SysHandle {
 	fn is_invalid(&self) -> bool {
 		self.0.is_null()
 	}
 }
 
-impl<'a> Loader<'a> for SystemLoader {
-	type Handle = SystemHandle<'a>;
+impl Loader for SysLoader {
+	type Handle = SysHandle;
 
 	fn load_lib(lib_name: &'static ffi::CStr) -> Self::Handle {
 		#[cfg(unix)]
 		unsafe {
 			use crate::os::unix::*;
-			SystemHandle(dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL), PhantomData)
+			SysHandle(dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL), PhantomData)
 		}
 		#[cfg(windows)]
 		unsafe {
@@ -28,16 +27,15 @@ impl<'a> Loader<'a> for SystemLoader {
 			let wide_str: Vec<u16> = lib_name
 				.to_string_lossy()
 				.encode_utf16()
-				.chain(std::iter::once(0u16))
+				.chain(core::iter::once(0u16))
 				.collect();
 
-			SystemHandle(
+			SysHandle(
 				crate::os::win32::LoadLibraryExW(
 					wide_str.as_ptr().cast(),
-					std::ptr::null_mut(),
+					core::ptr::null_mut(),
 					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SAFE_CURRENT_DIRS,
-				),
-				PhantomData,
+				)
 			)
 		}
 		#[cfg(wasm)]
@@ -51,29 +49,30 @@ impl<'a> Loader<'a> for SystemLoader {
 	}
 }
 
-impl SystemLoader {
-	#[cfg(feature = "unload")]
-	pub unsafe fn unload(library: &lazylib::LazyLib<Self>) -> std::io::Result<()> {
-		use std::{io::Error, sync::atomic::Ordering};
-		let mut wlock = library.hlib.lock().unwrap();
-		if let Some(handle) = wlock.take() {
-			let mut rstl_lock = library.rstl.lock().unwrap();
-			for (pfn, FnAddrWrapper(init_pfn)) in rstl_lock.drain(..) {
+impl SysLoader {
+	/// Unloads the library and resets all associated function pointers to uninitialized state.
+	/// 
+	/// # Errors
+	/// This may error if library is uninitialized.
+	#[cfg(any(feature = "unload", doc))]
+	pub unsafe fn unload(library: &lazylib::LazyLib<Self>) -> Result<(), ()> {
+		use core::sync::atomic::Ordering;
+		let maybe_handle = library.hlib.swap(core::ptr::null_mut(), Ordering::SeqCst).as_ref();
+		if let Some(handle) = maybe_handle {
+			let mut rstv_lock = library.rstv.lock().unwrap();
+			for (pfn, FnAddrWrapper(init_pfn)) in rstv_lock.drain(..) {
 				pfn.store(init_pfn.cast_mut(), Ordering::Release);
 			}
-			drop(rstl_lock);
+			drop(rstv_lock);
 
 			let result = crate::os::dlclose(handle.0);
 			if (cfg!(windows) && result == 0) || (cfg!(unix) && result != 0) {
-				Err(Error::last_os_error())
+				Err(())
 			} else {
 				Ok(())
 			}
 		} else {
-			Err(Error::new(
-				std::io::ErrorKind::Other,
-				"Dylink Error: library not initialized",
-			))
+			Err(())
 		}
 	}
 }

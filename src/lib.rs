@@ -1,9 +1,14 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
+#![cfg_attr(not(feature = "unload"), no_std)]
+#![cfg_attr(doc, feature(doc_auto_cfg))]
+#![cfg_attr(doc, feature(doc_cfg))]
 
 mod os;
 mod lazylib;
 /// custom linker module
 mod loader;
+
+extern crate alloc;
 
 pub use lazylib::*;
 pub use loader::*;
@@ -22,7 +27,7 @@ pub type FnAddr = *const ();
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
-pub struct ReadmeDoctests;
+struct ReadmeDoctests;
 
 #[cfg(not(target_has_atomic = "ptr"))]
 compile_error!("`AtomicPtr` is missing from this platform. `dylink` cannot function without this type.");

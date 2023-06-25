@@ -11,16 +11,16 @@ as the thunk is replaced by the loaded function.
 
 Related links:
 
-* [API Documentation](https://docs.rs/dylink)
+* [Documentation](https://docs.rs/dylink)
 * [Release notes](https://github.com/Razordor/dylink/releases)
 
 ## Supported platforms
 
 Dylink has been implemented for all 3 major platforms.
 
-| Windows | Linux | MacOS | WASM |
-|:-------:|:-----:|:-----:|------|
-| YES     | YES   | YES   | NO   |
+| Windows | Linux | MacOS |
+|:-------:|:-----:|:-----:|
+| YES     | YES   | YES   |
 
 ## Usage
 
@@ -31,6 +31,10 @@ Add this to your `Cargo.toml`
 dylink = "0.7"
 ```
 
+## Features
+
+* `no_std` is supported
+
 ## Example
 
 Below is a basic working example on how to use the macro on windows.
@@ -39,7 +43,7 @@ Below is a basic working example on how to use the macro on windows.
 use dylink::*;
 use std::ffi::CStr;
 
-static KERNEL32: LazyLib = LazyLib::new(&[
+static KERNEL32: LazyLib = LazyLib::new([
    unsafe {CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")}
 ]);
 
