@@ -17,6 +17,8 @@ pub trait LibHandle: Send {
 }
 
 /// Used to specify the run-time linker loader constraint for [LazyLib]
+/// 
+/// This trait must never panic, or a potential deadlock may occur when used with [LazyLib].
 pub trait Loader
 where
 	Self::Handle: LibHandle,

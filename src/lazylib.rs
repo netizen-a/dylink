@@ -5,6 +5,7 @@ use crate::loader::LibHandle;
 use crate::loader::Loader;
 use crate::FnAddr;
 use core::ffi::CStr;
+use core::sync::atomic::AtomicBool;
 use core::sync::atomic::AtomicPtr;
 use core::sync::atomic::Ordering;
 use alloc::boxed::Box;
@@ -20,6 +21,8 @@ unsafe impl Send for FnAddrWrapper {}
 
 #[derive(Debug)]
 pub struct LazyLib<L: Loader = loader::SysLoader, const N: usize = 1> {
+	// atomic lock
+	atml: AtomicBool,
 	libs: [&'static CStr; N],
 	// library handle
 	pub(crate) hlib: AtomicPtr<L::Handle>,
@@ -31,6 +34,7 @@ pub struct LazyLib<L: Loader = loader::SysLoader, const N: usize = 1> {
 impl<L: Loader, const N: usize> LazyLib<L, N> {
 	pub const fn new(libs: [&'static CStr; N]) -> Self {
 		Self {
+			atml: AtomicBool::new(false),
 			libs,
 			hlib: AtomicPtr::new(core::ptr::null_mut()),
 			#[cfg(feature = "unload")]
@@ -46,14 +50,22 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 		_init: FnAddr,
 		_atom: &'static AtomicPtr<()>,
 	) -> crate::FnAddr {
+		//lock
+		while self.atml.swap(true, Ordering::Acquire) {}
+
 		if let None = self.hlib.load(Ordering::Acquire).as_ref() {
 			for lib_name in self.libs {
+				// TODO: handle panic
 				let handle = L::load_lib(lib_name);
 				if !handle.is_invalid() {
 					self.hlib.store(Box::into_raw(Box::new(handle)), Ordering::Release);
+					break;
 				}
 			}
 		}
+		// unlock
+		self.atml.store(false, Ordering::Release);
+
 		if let Some(lib_handle) = self.hlib.load(Ordering::Acquire).as_ref() {
 			#[cfg(feature = "unload")]
 			self.rstv
