@@ -50,7 +50,7 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 			for lib_name in self.libs {
 				let handle = L::load_lib(lib_name);
 				if !handle.is_invalid() {
-					self.hlib.store(Box::leak(Box::new(handle)), Ordering::Release);
+					self.hlib.store(Box::into_raw(Box::new(handle)), Ordering::Release);
 				}
 			}
 		}
@@ -63,6 +63,17 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 			L::load_sym(&lib_handle, sym)
 		} else {
 			core::ptr::null()
+		}
+	}
+}
+
+impl <L: Loader, const N: usize> Drop for LazyLib<L, N> {
+	fn drop(&mut self) {
+		let maybe_handle = self.hlib.load(Ordering::Relaxed);
+		if !maybe_handle.is_null() {
+			unsafe {				
+				drop(Box::from_raw(maybe_handle));
+			}
 		}
 	}
 }
