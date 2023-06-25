@@ -51,7 +51,9 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 		_atom: &'static AtomicPtr<()>,
 	) -> crate::FnAddr {
 		//lock
-		while self.atml.swap(true, Ordering::Acquire) {}
+		while self.atml.swap(true, Ordering::Acquire) {
+			core::hint::spin_loop()
+		}
 
 		if let None = self.hlib.load(Ordering::Acquire).as_ref() {
 			for lib_name in self.libs {
