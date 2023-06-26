@@ -19,7 +19,10 @@ impl Loader for SysLoader {
 		#[cfg(unix)]
 		unsafe {
 			use crate::os::unix::*;
-			SysHandle(dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL), PhantomData)
+			SysHandle(
+				dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL),
+				PhantomData,
+			)
 		}
 		#[cfg(windows)]
 		unsafe {
@@ -30,13 +33,11 @@ impl Loader for SysLoader {
 				.chain(core::iter::once(0u16))
 				.collect();
 
-			SysHandle(
-				crate::os::win32::LoadLibraryExW(
-					wide_str.as_ptr().cast(),
-					core::ptr::null_mut(),
-					LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SAFE_CURRENT_DIRS,
-				)
-			)
+			SysHandle(crate::os::win32::LoadLibraryExW(
+				wide_str.as_ptr().cast(),
+				core::ptr::null_mut(),
+				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SAFE_CURRENT_DIRS,
+			))
 		}
 		#[cfg(wasm)]
 		{
@@ -51,14 +52,22 @@ impl Loader for SysLoader {
 
 impl SysLoader {
 	/// Unloads the library and resets all associated function pointers to uninitialized state.
-	/// 
+	///
 	/// # Errors
 	/// This may error if library is uninitialized.
 	#[cfg(any(feature = "unload", doc))]
-	pub unsafe fn unload(library: &lazylib::LazyLib<Self>) -> Result<(), ()> {
+	pub unsafe fn unload<const N: usize>(library: &lazylib::LazyLib<Self, N>) -> Result<(), ()> {
 		use core::sync::atomic::Ordering;
-		let maybe_handle = library.hlib.swap(core::ptr::null_mut(), Ordering::SeqCst).as_ref();
-		if let Some(handle) = maybe_handle {
+		// lock
+		while library.atml.swap(true, Ordering::Acquire) {
+			core::hint::spin_loop()
+		}
+
+		let maybe_handle = library
+			.hlib
+			.swap(core::ptr::null_mut(), Ordering::SeqCst)
+			.as_ref();
+		let result = if let Some(handle) = maybe_handle {
 			let mut rstv_lock = library.rstv.lock().unwrap();
 			for (pfn, FnAddrWrapper(init_pfn)) in rstv_lock.drain(..) {
 				pfn.store(init_pfn.cast_mut(), Ordering::Release);
@@ -73,6 +82,9 @@ impl SysLoader {
 			}
 		} else {
 			Err(())
-		}
+		};
+		// unlock
+		library.atml.store(false, Ordering::Release);
+		result
 	}
 }

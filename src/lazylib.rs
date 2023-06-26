@@ -1,17 +1,13 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use crate::loader;
 use crate::loader::LibHandle;
 use crate::loader::Loader;
 use crate::FnAddr;
-use core::ffi::CStr;
-use core::sync::atomic::AtomicBool;
-use core::sync::atomic::AtomicPtr;
-use core::sync::atomic::Ordering;
 use alloc::boxed::Box;
+use core::ffi::CStr;
+use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
 
-
-#[cfg(feature="unload")]
+#[cfg(feature = "unload")]
 use std::sync::Mutex;
 
 // this wrapper struct is the bane of my existance...
@@ -20,9 +16,9 @@ pub(crate) struct FnAddrWrapper(pub FnAddr);
 unsafe impl Send for FnAddrWrapper {}
 
 #[derive(Debug)]
-pub struct LazyLib<L: Loader = loader::SysLoader, const N: usize = 1> {
+pub struct LazyLib<L: Loader, const N: usize> {
 	// atomic lock
-	atml: AtomicBool,
+	pub(crate) atml: AtomicBool,
 	libs: [&'static CStr; N],
 	// library handle
 	pub(crate) hlib: AtomicPtr<L::Handle>,
@@ -50,17 +46,29 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 		_init: FnAddr,
 		_atom: &'static AtomicPtr<()>,
 	) -> crate::FnAddr {
-		//lock
+		// lock
 		while self.atml.swap(true, Ordering::Acquire) {
-			core::hint::spin_loop()
+			#[cfg(feature = "std")]
+			{
+				// thread isn't doing anything, so we have time to decide whether to yield or spin.
+				if self.hlib.load(Ordering::Acquire).is_null() {
+					std::thread::yield_now()
+				} else {
+					core::hint::spin_loop()
+				}
+			}
+			#[cfg(not(feature = "std"))]
+			{
+				core::hint::spin_loop()
+			}
 		}
 
 		if let None = self.hlib.load(Ordering::Acquire).as_ref() {
 			for lib_name in self.libs {
-				// TODO: handle panic
 				let handle = L::load_lib(lib_name);
 				if !handle.is_invalid() {
-					self.hlib.store(Box::into_raw(Box::new(handle)), Ordering::Release);
+					self.hlib
+						.store(Box::into_raw(Box::new(handle)), Ordering::Release);
 					break;
 				}
 			}
@@ -81,11 +89,11 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 	}
 }
 
-impl <L: Loader, const N: usize> Drop for LazyLib<L, N> {
+impl<L: Loader, const N: usize> Drop for LazyLib<L, N> {
 	fn drop(&mut self) {
 		let maybe_handle = self.hlib.load(Ordering::Relaxed);
 		if !maybe_handle.is_null() {
-			unsafe {				
+			unsafe {
 				drop(Box::from_raw(maybe_handle));
 			}
 		}

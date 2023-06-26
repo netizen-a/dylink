@@ -1,5 +1,5 @@
 #[cfg(not(miri))]
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 #[test]
 #[ignore = "this is just instrumentation"]
 fn test_win32_alloc_instrumentation() {
@@ -24,7 +24,7 @@ fn test_win32_alloc_instrumentation() {
 
 	#[global_allocator]
 	static GLOBAL: MyAllocator = MyAllocator(AtomicUsize::new(0));
-	static LIB: LazyLib =
+	static LIB: LazyLib<SysLoader, 1> =
 		LazyLib::new(unsafe { [CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")] });
 
 	// macro output: function

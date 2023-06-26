@@ -3,7 +3,9 @@
 use crate::*;
 use core::ffi;
 
+#[cfg(feature = "std")]
 mod self_loader;
+#[cfg(feature = "std")]
 mod sys_loader;
 
 // self documenting hidden trait
@@ -17,7 +19,7 @@ pub trait LibHandle: Send {
 }
 
 /// Used to specify the run-time linker loader constraint for [LazyLib]
-/// 
+///
 /// This trait must never panic, or a potential deadlock may occur when used with [LazyLib].
 pub trait Loader
 where
@@ -29,8 +31,8 @@ where
 }
 
 /// Default system loader used in [LazyLib]
-//#[cfg(not(wasm))]
+#[cfg(feature = "std")]
 pub struct SysLoader;
 
-//#[cfg(not(wasm))]
+#[cfg(feature = "std")]
 pub struct SelfLoader;

@@ -72,11 +72,10 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	// constness makes no sense in this context
 	match &fn_item.sig.constness {
 		None => (),
-		Some(kw) => return syn::Error::new(
-			kw.span(),
-			"`const` functions are unsupported",
-		)
-		.into_compile_error(),
+		Some(kw) => {
+			return syn::Error::new(kw.span(), "`const` functions are unsupported")
+				.into_compile_error()
+		}
 	}
 
 	let fn_attrs: Vec<TokenStream2> = fn_item
@@ -165,7 +164,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			fn_name.to_string()
 		}
 	};
-	
+
 	// This is mainly useful for applying lifetimes.
 	let generics = &fn_item.sig.generics;
 
@@ -180,7 +179,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		None => TokenStream2::default(),
 		Some(token) => token.to_token_stream(),
 	};
-	
 
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`

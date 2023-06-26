@@ -2,8 +2,8 @@
 
 use super::*;
 use crate::os::*;
-use core::ffi::CStr;
 use alloc::vec::Vec;
+use core::ffi::CStr;
 
 #[doc(hidden)]
 pub struct SelfHandle(*mut core::ffi::c_void);
