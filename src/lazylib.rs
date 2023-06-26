@@ -50,15 +50,13 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 		while self.atml.swap(true, Ordering::Acquire) {
 			#[cfg(feature = "std")]
 			{
-				// thread isn't doing anything, so we have time to decide whether to yield or spin.
-				if self.hlib.load(Ordering::Acquire).is_null() {
-					std::thread::yield_now()
-				} else {
-					core::hint::spin_loop()
-				}
+				// Not doing anything, so yield time to other threads.
+				std::thread::yield_now()
 			}
 			#[cfg(not(feature = "std"))]
 			{
+				// `no_std` enviroments can't yield, so just use a busy wait.
+				// This isn't costly since loading is not expected to take long.
 				core::hint::spin_loop()
 			}
 		}

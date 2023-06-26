@@ -2,7 +2,6 @@
 
 use super::*;
 use crate::os::*;
-use alloc::vec::Vec;
 use core::ffi::CStr;
 
 #[doc(hidden)]
@@ -27,7 +26,7 @@ impl Loader for SelfLoader {
 	type Handle = SelfHandle;
 	#[cfg(unix)]
 	fn load_lib(_: &CStr) -> Self::Handle {
-		SelfHandle(unix::RTLD_DEFAULT, PhantomData)
+		SelfHandle(unix::RTLD_DEFAULT)
 	}
 	#[cfg(windows)]
 	fn load_lib(lib_name: &'static CStr) -> Self::Handle {

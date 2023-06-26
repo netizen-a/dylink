@@ -9,7 +9,7 @@ static KERNEL32: LazyLib<SysLoader, 1> = LazyLib::new(unsafe {
 
 #[cfg(target_os = "linux")]
 static LIB_X11: LazyLib<SysLoader, 1> = LazyLib::new(unsafe {
-	&[std::ffi::CStr::from_bytes_with_nul_unchecked(
+	[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"libX11.so.6\0",
 	)]
 });
@@ -77,7 +77,7 @@ fn test_linux_x11() {
 	}
 	#[cfg(feature = "unload")]
 	unsafe {
-		crate::loader::System::unload(&LIB_X11).expect("unload failed");
+		SysLoader::unload(&LIB_X11).expect("unload failed");
 	}
 }
 

@@ -1,7 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use super::*;
-use alloc::vec::Vec;
 
 #[doc(hidden)]
 pub struct SysHandle(*mut core::ffi::c_void);
@@ -20,8 +19,7 @@ impl Loader for SysLoader {
 		unsafe {
 			use crate::os::unix::*;
 			SysHandle(
-				dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL),
-				PhantomData,
+				dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL)
 			)
 		}
 		#[cfg(windows)]
