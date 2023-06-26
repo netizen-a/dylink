@@ -8,8 +8,6 @@ mod self_loader;
 #[cfg(feature = "std")]
 mod sys_loader;
 
-// self documenting hidden trait
-// TODO: add `Clone` trait on next version bump
 #[doc(hidden)]
 pub trait FnPtr: Copy + Clone {}
 impl<T: Copy + Clone> FnPtr for T {}
@@ -34,5 +32,29 @@ where
 #[cfg(feature = "std")]
 pub struct SysLoader;
 
+/// `SelfLoader` is a special structure that retrieves symbols from libraries already
+/// loaded before hand such as `libc` or `kernel32`
+///
+/// # Example
+///
+/// ```rust
+/// use dylink::*;
+/// use std::ffi::{c_char, c_int, CStr};
+///
+/// static LIBC_LIB: LazyLib<SelfLoader, 1> = LazyLib::new([
+///   // dummy value for LazyLib
+///   unsafe { CStr::from_bytes_with_nul_unchecked(b"libc\0") }
+/// ]);
+///
+/// #[dylink(library=LIBC_LIB)]
+/// extern "C" {
+/// 	fn atoi(s: *const c_char) -> c_int;
+/// }
+///
+/// # #[cfg(unix)] {
+/// let five = unsafe { atoi(b"5\0".as_ptr().cast()) };
+/// assert_eq!(five, 5);
+/// # }
+/// ```
 #[cfg(feature = "std")]
 pub struct SelfLoader;

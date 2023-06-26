@@ -3,8 +3,29 @@
 #![cfg_attr(doc, feature(doc_auto_cfg))]
 #![cfg_attr(doc, feature(doc_cfg))]
 
+//! Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
+//! When functions are loaded they are evaluated through a thunk for first time calls, which loads the function
+//! from its respective library. Preceeding calls after initialization have no overhead or additional branching
+//! checks, since the thunk is replaced by the loaded function.
+//!
+//! # Basic Example
+//!
+//! ```rust
+//! use dylink::*;
+//! use std::ffi::CStr;
+//!
+//! static KERNEL32: LazyLib<SysLoader, 1> = LazyLib::new([
+//!    unsafe {CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")}
+//! ]);
+//!
+//! #[dylink(library=KERNEL32)]
+//! extern "system" {
+//!     fn GetLastError() -> u32;
+//!     fn SetLastError(_: u32);
+//! }
+//! ```
+
 mod lazylib;
-/// custom linker module
 mod loader;
 #[cfg(feature = "std")]
 mod os;
@@ -14,7 +35,7 @@ extern crate alloc;
 pub use lazylib::*;
 pub use loader::*;
 
-/// Macro for generating dynamically linked functions procedurally.
+/// Macro for generating shared symbol thunks procedurally.
 ///
 /// Refer to crate level documentation for more information.
 pub use dylink_macro::dylink;

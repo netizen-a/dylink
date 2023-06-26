@@ -3,9 +3,7 @@
 ![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink) [![dylink-rs](https://github.com/Razordor/dylink/actions/workflows/rust.yml/badge.svg)](https://github.com/Razordor/dylink/actions/workflows/rust.yml) ![unsafe:yes](https://img.shields.io/badge/unsafe-yes-red)
 
 Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
-When functions are loaded they are evaluated through a thunk for first time calls, which loads the function from
-its respective library. Preceeding calls after initialization have no overhead or additional branching checks,
-as the thunk is replaced by the loaded function.
+When functions are loaded they are evaluated through a thunk for first time calls, which loads the function from its respective library. Preceeding calls after initialization have no overhead or additional branching checks, since the thunk is replaced by the loaded function.
 
 ----
 

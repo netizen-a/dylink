@@ -28,7 +28,10 @@ pub struct LazyLib<L: Loader, const N: usize> {
 }
 
 impl<L: Loader, const N: usize> LazyLib<L, N> {
+	/// # Panic
+	/// Will panic if `libs` is an empty array.
 	pub const fn new(libs: [&'static CStr; N]) -> Self {
+		assert!(N > 0, "`libs` array cannot be empty.");
 		Self {
 			atml: AtomicBool::new(false),
 			libs,

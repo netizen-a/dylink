@@ -80,22 +80,3 @@ fn test_linux_x11() {
 		SysLoader::unload(&LIB_X11).expect("unload failed");
 	}
 }
-
-#[cfg(unix)]
-#[test]
-fn test_unix_libc() {
-	use dylink::*;
-	use std::ffi::{c_char, c_int, CStr};
-
-	const LIBC_SO: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"libX11.so.6\0") };
-	const LIBC_DYLIB: &'static CStr =
-		unsafe { CStr::from_bytes_with_nul_unchecked(b"libc.dylib\0") };
-	static LIBC: LazyLib<SelfLoader, 2> = LazyLib::new([LIBC_SO, LIBC_DYLIB]);
-	#[dylink(library=LIBC)]
-	extern "C" {
-		fn atoi(s: *const c_char) -> c_int;
-	}
-
-	let num = unsafe { atoi(b"5\0".as_ptr().cast()) };
-	assert!(num == 5);
-}

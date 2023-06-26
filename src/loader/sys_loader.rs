@@ -18,9 +18,7 @@ impl Loader for SysLoader {
 		#[cfg(unix)]
 		unsafe {
 			use crate::os::unix::*;
-			SysHandle(
-				dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL)
-			)
+			SysHandle(dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL))
 		}
 		#[cfg(windows)]
 		unsafe {
