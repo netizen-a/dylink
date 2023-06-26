@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use crate::loader::LibHandle;
+//use crate::loader::LibHandle;
 use crate::loader::Loader;
 use crate::FnAddr;
 use alloc::boxed::Box;
@@ -21,7 +21,7 @@ pub struct LazyLib<L: Loader, const N: usize> {
 	pub(crate) atml: AtomicBool,
 	libs: [&'static CStr; N],
 	// library handle
-	pub(crate) hlib: AtomicPtr<L::Handle>,
+	pub(crate) hlib: AtomicPtr<L>,
 	// reset vector
 	#[cfg(feature = "unload")]
 	pub(crate) rstv: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,

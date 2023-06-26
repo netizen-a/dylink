@@ -12,25 +12,20 @@ mod sys_loader;
 pub trait FnPtr: Copy + Clone {}
 impl<T: Copy + Clone> FnPtr for T {}
 
-pub trait LibHandle: Send {
-	fn is_invalid(&self) -> bool;
-}
-
 /// Used to specify the run-time linker loader constraint for [LazyLib]
 ///
 /// This trait must never panic, or a potential deadlock may occur when used with [LazyLib].
-pub trait Loader
-where
-	Self::Handle: LibHandle,
-{
-	type Handle;
-	fn load_lib(lib_name: &'static ffi::CStr) -> Self::Handle;
-	fn load_sym(lib_handle: &Self::Handle, fn_name: &'static ffi::CStr) -> FnAddr;
+pub trait Loader: Send {
+	fn is_invalid(&self) -> bool;
+	fn load_lib(lib_name: &'static ffi::CStr) -> Self;
+	fn load_sym(&self, fn_name: &'static ffi::CStr) -> FnAddr;
 }
 
 /// Default system loader used in [LazyLib]
 #[cfg(feature = "std")]
-pub struct SysLoader;
+pub struct SysLoader(*mut core::ffi::c_void);
+// internal type is opaque and managed by OS, so it's `Send` safe
+unsafe impl Send for SysLoader {}
 
 /// `SelfLoader` is a special structure that retrieves symbols from libraries already
 /// loaded before hand such as `libc` or `kernel32`
@@ -57,4 +52,6 @@ pub struct SysLoader;
 /// # }
 /// ```
 #[cfg(feature = "std")]
-pub struct SelfLoader;
+pub struct SelfLoader(*mut core::ffi::c_void);
+// internal type is opaque and managed by OS, so it's `Send` safe
+unsafe impl Send for SelfLoader {}
