@@ -18,9 +18,6 @@ version = "0.8"
 path="./dylink_macro"
 
 [features]
-default = ["std", "unload"]
-# enables useful structures to use with the `Loader` trait, 
-# and feature gates against `no_std` support.
-std = []
+default = ["unload"]
 # super unsafe feature. implicitly enables `loader`.
-unload = ["std"]
+unload = []

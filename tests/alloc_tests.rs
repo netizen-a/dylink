@@ -1,5 +1,5 @@
 #[cfg(not(miri))]
-#[cfg(all(windows, feature = "std"))]
+#[cfg(windows)]
 #[test]
 #[ignore = "this is just instrumentation"]
 fn test_win32_alloc_instrumentation() {

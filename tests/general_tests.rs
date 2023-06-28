@@ -1,6 +1,6 @@
 use dylink::*;
 
-#[cfg(all(windows, feature = "std"))]
+#[cfg(windows)]
 static KERNEL32: LazyLib<SysLoader, 1> = LazyLib::new(unsafe {
 	[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"Kernel32.dll\0",
@@ -14,7 +14,7 @@ static LIB_X11: LazyLib<SysLoader, 1> = LazyLib::new(unsafe {
 	)]
 });
 
-#[cfg(all(windows, feature = "std"))]
+#[cfg(windows)]
 #[test]
 fn test_win32_kernel32() {
 	#[dylink(library = KERNEL32)]
@@ -32,7 +32,7 @@ fn test_win32_kernel32() {
 	}
 }
 
-#[cfg(all(windows, feature = "std"))]
+#[cfg(windows)]
 #[test]
 fn test_win32_impl() {
 	#[repr(transparent)]

@@ -12,16 +12,9 @@ Related links:
 * [Documentation](https://docs.rs/dylink)
 * [Release notes](https://github.com/Razordor/dylink/releases)
 
-## Optional Features
+## Optional Feature
 
-The crate comes with a variaty of useful features.
-
-* `std` - enabled by default; Adds useful structures to use with the `Loader` trait.
-  * If this feature is disabled, `no_std` is compatible.
-
-* `unload` - enables support for unloading `SysLoader` defined libraries.
-  * this enables unloading `SysLoader` loaded functions.
-  * This feature is well defined, but considered super unsafe. Use at your own discretion.
+* `unload` - enables support for unloading utilities
 
 ## Supported platforms
 

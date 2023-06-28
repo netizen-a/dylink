@@ -1,14 +1,13 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-//use crate::loader::LibHandle;
 use crate::loader::Loader;
-use crate::{FnAddr, Unloadable};
-use alloc::boxed::Box;
-use core::ffi::CStr;
-use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+use crate::FnAddr;
+use std::ffi::CStr;
+use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::Mutex;
 
 #[cfg(feature = "unload")]
-use std::sync::Mutex;
+use crate::loader::Unloadable;
 
 // this wrapper struct is the bane of my existance...
 #[derive(Debug)]
@@ -17,11 +16,9 @@ unsafe impl Send for FnAddrWrapper {}
 
 #[derive(Debug)]
 pub struct LazyLib<L: Loader, const N: usize> {
-	// atomic lock
-	pub(crate) atml: AtomicBool,
 	libs: [&'static CStr; N],
 	// library handle
-	pub(crate) hlib: AtomicPtr<L>,
+	pub(crate) hlib: Mutex<Option<L>>,
 }
 
 impl<L: Loader, const N: usize> LazyLib<L, N> {
@@ -30,68 +27,37 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 	pub const fn new(libs: [&'static CStr; N]) -> Self {
 		assert!(N > 0, "`libs` array cannot be empty.");
 		Self {
-			atml: AtomicBool::new(false),
 			libs,
-			hlib: AtomicPtr::new(core::ptr::null_mut()),
+			hlib: Mutex::new(None),
 		}
 	}
-	/// loads function from library synchronously and binds library handle internally to dylink.
-	///
-	/// If the library is already bound, the bound handle will be used for loading the function.
-	pub unsafe fn find_sym(
+	
+	pub fn swap_sym(
 		&self,
 		sym_name: &'static CStr,
 		atom: &AtomicPtr<()>,
+		order: Ordering,
 	) -> Option<*const ()> {
-		// lock
-		while self.atml.swap(true, Ordering::Acquire) {
-			#[cfg(feature = "std")]
-			{
-				// Not doing anything, so yield time to other threads.
-				std::thread::yield_now()
-			}
-			#[cfg(not(feature = "std"))]
-			{
-				// `no_std` enviroments can't yield, so just use a busy wait.
-				// This isn't costly since loading is not expected to take long.
-				core::hint::spin_loop()
-			}
-		}
-
-		if let None = self.hlib.load(Ordering::Acquire).as_ref() {
+		let mut lock = self.hlib.lock().unwrap();
+		if let None = *lock {
 			for lib_name in self.libs {
 				let handle = L::load_lib(lib_name);
 				if !handle.is_invalid() {
-					self.hlib
-						.store(Box::into_raw(Box::new(handle)), Ordering::Release);
+					*lock = Some(handle);
 					break;
 				}
 			}
 		}
-		// unlock
-		self.atml.store(false, Ordering::Release);
 
-		if let Some(lib_handle) = self.hlib.load(Ordering::Acquire).as_ref() {
+		if let Some(ref lib_handle) = *lock {
 			let sym = L::load_sym(&lib_handle, sym_name);
 			if sym.is_null() {
 				None
 			} else {
-				atom.store(sym.cast_mut(), Ordering::Release);
-				Some(sym)
+				Some(atom.swap(sym.cast_mut(), order))
 			}
 		} else {
 			None
-		}
-	}
-}
-
-impl<L: Loader, const N: usize> Drop for LazyLib<L, N> {
-	fn drop(&mut self) {
-		let maybe_handle = self.hlib.load(Ordering::Relaxed);
-		if !maybe_handle.is_null() {
-			unsafe {
-				drop(Box::from_raw(maybe_handle));
-			}
 		}
 	}
 }
@@ -112,22 +78,20 @@ impl <L: Loader + Unloadable, const N: usize> UnloadableLazyLib<L, N> {
 			reset_vec: Mutex::new(Vec::new()),
 		}
 	}
-	/// loads function from library synchronously and binds library handle internally to dylink.
-	///
-	/// If the library is already bound, the bound handle will be used for loading the function.
-	pub unsafe fn find_sym(
+	// finds symbol, loads library if not loaded, and does an atomic swap
+	pub fn swap_sym(
 		&self,
 		sym_name: &'static CStr,
 		atom: &'static AtomicPtr<()>,
+		order: Ordering,
 	) -> Option<*const ()> {
-		let init = atom.load(Ordering::Acquire);
-		match self.inner.find_sym(sym_name, atom) {
+		match self.inner.swap_sym(sym_name, atom, order) {
 			None => None,
 			Some(function) => {
 				self.reset_vec
 					.lock()
 					.unwrap()
-					.push((atom, FnAddrWrapper(init)));
+					.push((atom, FnAddrWrapper(function)));
 				Some(function)
 			}
 		}
@@ -138,22 +102,16 @@ impl <L: Loader + Unloadable, const N: usize> UnloadableLazyLib<L, N> {
 	/// # Errors
 	/// This may error if library is uninitialized.
 	pub unsafe fn unload(&self) -> Result<(), ()> {
-		// lock
-		while self.inner.atml.swap(true, Ordering::Acquire) {
-			core::hint::spin_loop()
-		}
-
-		let phandle = self.inner.hlib.swap(core::ptr::null_mut(), Ordering::SeqCst);
-		if !phandle.is_null() {
+		let lock = self.inner.hlib.lock().unwrap();
+		
+		if let Some(ref handle) = *lock {
 			let mut rstv_lock = self.reset_vec.lock().unwrap();
 			for (pfn, FnAddrWrapper(init_pfn)) in rstv_lock.drain(..) {
 				pfn.store(init_pfn.cast_mut(), Ordering::Release);
 			}
 			drop(rstv_lock);
-			let handle = Box::from_raw(phandle);
 			// decrement reference count on lib handle
-			let result = handle.unload();
-			match result {
+			match handle.unload() {
 				Ok(()) => Ok(()),
 				Err(_) => Err(()),
 			}

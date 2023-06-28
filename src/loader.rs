@@ -3,9 +3,7 @@
 use crate::*;
 use core::ffi;
 
-#[cfg(feature = "std")]
 mod self_loader;
-#[cfg(feature = "std")]
 mod sys_loader;
 
 #[doc(hidden)]
@@ -20,15 +18,12 @@ pub trait Unloadable {
 
 
 /// Used to specify the run-time linker loader constraint for [LazyLib]
-///
-/// This trait must never panic, or a deadlock may occur when used with [LazyLib].
 pub trait Loader: Send {
 	fn is_invalid(&self) -> bool;
 	fn load_lib(lib_name: &'static ffi::CStr) -> Self;
 	fn load_sym(&self, fn_name: &'static ffi::CStr) -> FnAddr;
 }
 
-#[cfg(feature = "std")]
 pub struct SysLoader(*mut core::ffi::c_void);
 
 
@@ -56,5 +51,4 @@ pub struct SysLoader(*mut core::ffi::c_void);
 /// assert_eq!(five, 5);
 /// # }
 /// ```
-#[cfg(feature = "std")]
 pub struct SelfLoader(*mut core::ffi::c_void);
