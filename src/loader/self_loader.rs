@@ -4,16 +4,17 @@ use super::*;
 use crate::os::*;
 use core::ffi::CStr;
 
+// internal type is opaque and managed by OS, so it's `Send` safe
+unsafe impl Send for SelfLoader {}
+
 impl Loader for SelfLoader {
 	fn is_invalid(&self) -> bool {
 		if cfg!(windows) {
 			self.0.is_null()
 		} else if cfg!(unix) {
 			false
-		} else if cfg!(target_family = "wasm") {
-			todo!("wasm is not implemented")
 		} else {
-			unreachable!("unknown platform")
+			unreachable!("platform unsupported")
 		}
 	}
 	/// Does not increment reference count to handle.

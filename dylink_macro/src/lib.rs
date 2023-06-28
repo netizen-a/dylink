@@ -200,8 +200,8 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 					&FUNC
 				);
 				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = match symbol {
-					Err(()) => panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name)),
-					Ok(function) => unsafe {core::mem::transmute(function)},
+					None => panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name)),
+					Some(function) => unsafe {core::mem::transmute(function)},
 				};
 				pfn(#(#internal_param_list),*)
 			}

@@ -4,6 +4,9 @@ use core::ffi::c_int;
 
 use super::*;
 
+// internal type is opaque and managed by OS, so it's `Send` safe
+unsafe impl Send for SysLoader {}
+
 impl Loader for SysLoader {
 	fn is_invalid(&self) -> bool {
 		self.0.is_null()
@@ -30,10 +33,6 @@ impl Loader for SysLoader {
 				core::ptr::null_mut(),
 				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SAFE_CURRENT_DIRS,
 			))
-		}
-		#[cfg(wasm)]
-		{
-			todo!()
 		}
 	}
 

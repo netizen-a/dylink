@@ -42,7 +42,7 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 		&self,
 		sym_name: &'static CStr,
 		atom: &AtomicPtr<()>,
-	) -> Result<*const (), ()> {
+	) -> Option<*const ()> {
 		// lock
 		while self.atml.swap(true, Ordering::Acquire) {
 			#[cfg(feature = "std")]
@@ -74,13 +74,13 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 		if let Some(lib_handle) = self.hlib.load(Ordering::Acquire).as_ref() {
 			let sym = L::load_sym(&lib_handle, sym_name);
 			if sym.is_null() {
-				Err(())
+				None
 			} else {
 				atom.store(sym.cast_mut(), Ordering::Release);
-				Ok(sym)
+				Some(sym)
 			}
 		} else {
-			Err(())
+			None
 		}
 	}
 }
@@ -119,16 +119,16 @@ impl <L: Loader + Unloadable, const N: usize> UnloadableLazyLib<L, N> {
 		&self,
 		sym_name: &'static CStr,
 		atom: &'static AtomicPtr<()>,
-	) -> Result<*const (), ()> {
+	) -> Option<*const ()> {
 		let init = atom.load(Ordering::Acquire);
 		match self.inner.find_sym(sym_name, atom) {
-			Err(()) => Err(()),
-			Ok(function) => {
+			None => None,
+			Some(function) => {
 				self.reset_vec
 					.lock()
 					.unwrap()
 					.push((atom, FnAddrWrapper(init)));
-				Ok(function)
+				Some(function)
 			}
 		}
 	}
