@@ -1,5 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
+use core::ffi::c_int;
+
 use super::*;
 
 impl Loader for SysLoader {
@@ -40,41 +42,15 @@ impl Loader for SysLoader {
 	}
 }
 
-impl SysLoader {
-	/// Unloads the library and resets all associated function pointers to uninitialized state.
-	///
-	/// # Errors
-	/// This may error if library is uninitialized.
-	#[cfg(any(feature = "unload", doc))]
-	pub unsafe fn unload<const N: usize>(library: &lazylib::LazyLib<Self, N>) -> Result<(), ()> {
-		use core::sync::atomic::Ordering;
-		// lock
-		while library.atml.swap(true, Ordering::Acquire) {
-			core::hint::spin_loop()
-		}
-
-		let phandle = library.hlib.swap(core::ptr::null_mut(), Ordering::SeqCst);
-		let result = if !phandle.is_null() {
-			let mut rstv_lock = library.rstv.lock().unwrap();
-			for (pfn, FnAddrWrapper(init_pfn)) in rstv_lock.drain(..) {
-				pfn.store(init_pfn.cast_mut(), Ordering::Release);
-			}
-			drop(rstv_lock);
-			let handle = Box::from_raw(phandle);
-			// decrement reference count on lib handle
-			let result = crate::os::dlclose(handle.0);
-			drop(handle);
-
-			if (cfg!(windows) && result == 0) || (cfg!(unix) && result != 0) {
-				Err(())
-			} else {
-				Ok(())
-			}
+#[cfg(any(feature = "unload", doc))]
+impl Unloadable for SysLoader {
+	type Error = c_int;
+	unsafe fn unload(&self) -> Result<(), Self::Error> {
+		let result = crate::os::dlclose(self.0);
+		if (cfg!(windows) && result == 0) || (cfg!(unix) && result != 0) {
+			Err(result)
 		} else {
-			Err(())
-		};
-		// unlock
-		library.atml.store(false, Ordering::Release);
-		result
+			Ok(())
+		}
 	}
 }

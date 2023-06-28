@@ -12,6 +12,13 @@ mod sys_loader;
 pub trait FnPtr: Copy + Clone {}
 impl<T: Copy + Clone> FnPtr for T {}
 
+
+pub trait Unloadable {
+	type Error;
+	unsafe fn unload(&self) -> Result<(), Self::Error>;
+}
+
+
 /// Used to specify the run-time linker loader constraint for [LazyLib]
 ///
 /// This trait must never panic, or a potential deadlock may occur when used with [LazyLib].

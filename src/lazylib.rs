@@ -2,7 +2,7 @@
 
 //use crate::loader::LibHandle;
 use crate::loader::Loader;
-use crate::FnAddr;
+use crate::{FnAddr, Unloadable};
 use alloc::boxed::Box;
 use core::ffi::CStr;
 use core::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
@@ -22,9 +22,6 @@ pub struct LazyLib<L: Loader, const N: usize> {
 	libs: [&'static CStr; N],
 	// library handle
 	pub(crate) hlib: AtomicPtr<L>,
-	// reset vector
-	#[cfg(feature = "unload")]
-	pub(crate) rstv: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
 }
 
 impl<L: Loader, const N: usize> LazyLib<L, N> {
@@ -36,8 +33,6 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 			atml: AtomicBool::new(false),
 			libs,
 			hlib: AtomicPtr::new(core::ptr::null_mut()),
-			#[cfg(feature = "unload")]
-			rstv: Mutex::new(Vec::new()),
 		}
 	}
 	/// loads function from library synchronously and binds library handle internally to dylink.
@@ -45,10 +40,9 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 	/// If the library is already bound, the bound handle will be used for loading the function.
 	pub unsafe fn find_sym(
 		&self,
-		sym: &'static CStr,
-		_init: FnAddr,
-		_atom: &'static AtomicPtr<()>,
-	) -> crate::FnAddr {
+		sym_name: &'static CStr,
+		atom: &AtomicPtr<()>,
+	) -> Result<*const (), ()> {
 		// lock
 		while self.atml.swap(true, Ordering::Acquire) {
 			#[cfg(feature = "std")]
@@ -78,14 +72,15 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 		self.atml.store(false, Ordering::Release);
 
 		if let Some(lib_handle) = self.hlib.load(Ordering::Acquire).as_ref() {
-			#[cfg(feature = "unload")]
-			self.rstv
-				.lock()
-				.unwrap()
-				.push((_atom, FnAddrWrapper(_init)));
-			L::load_sym(&lib_handle, sym)
+			let sym = L::load_sym(&lib_handle, sym_name);
+			if sym.is_null() {
+				Err(())
+			} else {
+				atom.store(sym.cast_mut(), Ordering::Release);
+				Ok(sym)
+			}
 		} else {
-			core::ptr::null()
+			Err(())
 		}
 	}
 }
@@ -97,6 +92,73 @@ impl<L: Loader, const N: usize> Drop for LazyLib<L, N> {
 			unsafe {
 				drop(Box::from_raw(maybe_handle));
 			}
+		}
+	}
+}
+
+#[cfg(feature = "unload")]
+pub struct UnloadableLazyLib<L: Loader + Unloadable, const N: usize> {
+	inner: LazyLib<L, N>,
+	reset_vec: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
+}
+#[cfg(feature = "unload")]
+impl <L: Loader + Unloadable, const N: usize> UnloadableLazyLib<L, N> {
+	/// # Panic
+	/// Will panic if `libs` is an empty array.
+	pub const fn new(libs: [&'static CStr; N]) -> Self {
+		assert!(N > 0, "`libs` array cannot be empty.");
+		Self {
+			inner: LazyLib::new(libs),
+			reset_vec: Mutex::new(Vec::new()),
+		}
+	}
+	/// loads function from library synchronously and binds library handle internally to dylink.
+	///
+	/// If the library is already bound, the bound handle will be used for loading the function.
+	pub unsafe fn find_sym(
+		&self,
+		sym_name: &'static CStr,
+		atom: &'static AtomicPtr<()>,
+	) -> Result<*const (), ()> {
+		let init = atom.load(Ordering::Acquire);
+		match self.inner.find_sym(sym_name, atom) {
+			Err(()) => Err(()),
+			Ok(function) => {
+				self.reset_vec
+					.lock()
+					.unwrap()
+					.push((atom, FnAddrWrapper(init)));
+				Ok(function)
+			}
+		}
+	}
+
+	/// Unloads the library and resets all associated function pointers to uninitialized state.
+	///
+	/// # Errors
+	/// This may error if library is uninitialized.
+	pub unsafe fn unload(&self) -> Result<(), ()> {
+		// lock
+		while self.inner.atml.swap(true, Ordering::Acquire) {
+			core::hint::spin_loop()
+		}
+
+		let phandle = self.inner.hlib.swap(core::ptr::null_mut(), Ordering::SeqCst);
+		if !phandle.is_null() {
+			let mut rstv_lock = self.reset_vec.lock().unwrap();
+			for (pfn, FnAddrWrapper(init_pfn)) in rstv_lock.drain(..) {
+				pfn.store(init_pfn.cast_mut(), Ordering::Release);
+			}
+			drop(rstv_lock);
+			let handle = Box::from_raw(phandle);
+			// decrement reference count on lib handle
+			let result = handle.unload();
+			match result {
+				Ok(()) => Ok(()),
+				Err(_) => Err(()),
+			}
+		} else {
+			Err(())
 		}
 	}
 }

@@ -193,16 +193,16 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			);
 
 			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
-				let symbol : *const () = #library.find_sym(
+				extern crate core;
+
+				let symbol = #library.find_sym(
 					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
-					initializer as *const (),
 					&FUNC
 				);
-				if symbol.is_null() {
-					panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name));
-				}
-				FUNC.store(symbol as *mut (), Ordering::Release);
-				let pfn : #abi fn (#(#internal_param_ty_list),*) #output = std::mem::transmute(symbol);
+				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = match symbol {
+					Err(()) => panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name)),
+					Ok(function) => unsafe {core::mem::transmute(function)},
+				};
 				pfn(#(#internal_param_list),*)
 			}
 
