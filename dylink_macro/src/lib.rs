@@ -193,7 +193,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			);
 
 			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
-				let symbol = #library.swap_sym(
+				let symbol = #library.lock_and_swap(
 					std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes()),
 					&FUNC,
 					std::sync::atomic::Ordering::SeqCst

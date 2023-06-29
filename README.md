@@ -5,6 +5,8 @@
 Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
 When functions are loaded they are evaluated through a thunk for first time calls, which loads the function from its respective library. Preceeding calls after initialization have no overhead or additional branching checks, since the thunk is replaced by the loaded function.
 
+This crate can be used with other library loaders by making a wrapper around your favorite loader and implementing the `Loader` trait.
+
 ----
 
 Related links:
@@ -12,13 +14,19 @@ Related links:
 * [Documentation](https://docs.rs/dylink)
 * [Release notes](https://github.com/Razordor/dylink/releases)
 
-## Optional Feature
+## Features
 
-* `unload` - enables support for unloading utilities
+* Thread-safe library loading.
+* Fearless unloading - Unloading never invalidates symbols.
+* Branchless symbols - loaded symbols have zero overhead.
+
+## Optional Features
+
+* `unload` - enables support for unloading utilities.
 
 ## Supported platforms
 
-Dylink has been implemented for all 3 major platforms.
+Implemented for all major platforms.
 
 | Windows | Linux | MacOS |
 |:-------:|:-----:|:-----:|

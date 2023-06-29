@@ -11,17 +11,23 @@ use crate::loader::Unloadable;
 
 // this wrapper struct is the bane of my existance...
 #[derive(Debug)]
-pub(crate) struct FnAddrWrapper(pub FnAddr);
+struct FnAddrWrapper(pub FnAddr);
 unsafe impl Send for FnAddrWrapper {}
 
 #[derive(Debug)]
 pub struct LazyLib<L: Loader, const N: usize> {
 	libs: [&'static CStr; N],
 	// library handle
-	pub(crate) hlib: Mutex<Option<L>>,
+	hlib: Mutex<Option<L>>,
 }
+// `Send` and `Sync` constraints are already implied, but rustdoc doesn't document this.
+unsafe impl<L: Loader + Send, const N: usize> Send for LazyLib<L, N> {}
+unsafe impl<L: Loader + Send, const N: usize> Sync for LazyLib<L, N> {}
 
 impl<L: Loader, const N: usize> LazyLib<L, N> {
+	/// Constructs a new `LazyLib`.
+	/// 
+	/// The [`LazyLib`] will not load the library until [`lock_and_swap`](LazyLib::lock_and_swap) is called.
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
 	pub const fn new(libs: [&'static CStr; N]) -> Self {
@@ -31,8 +37,14 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 			hlib: Mutex::new(None),
 		}
 	}
-	
-	pub fn swap_sym(
+	/// Acquires a lock to load the library if not already loaded.
+	/// Finds and stores a symbol into the `atom` pointer, returning the previous value.
+	/// 
+	/// `lock_and_swap` takes an `Ordering` argument which describes the memory ordering of this operation. All ordering modes are possible. Note that using `Acquire` makes the store part of this operation `Relaxed`, and using `Release` makes the load part `Relaxed`.
+	/// 
+	/// Note: This method is only available on platforms that support atomic operations on pointers.
+	#[cfg(target_has_atomic = "ptr")]
+	pub fn lock_and_swap(
 		&self,
 		sym_name: &'static CStr,
 		atom: &AtomicPtr<()>,
@@ -50,7 +62,7 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 		}
 
 		if let Some(ref lib_handle) = *lock {
-			let sym = L::load_sym(&lib_handle, sym_name);
+			let sym = L::load_sym(lib_handle, sym_name);
 			if sym.is_null() {
 				None
 			} else {
@@ -67,6 +79,13 @@ pub struct UnloadableLazyLib<L: Loader + Unloadable, const N: usize> {
 	inner: LazyLib<L, N>,
 	reset_vec: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
 }
+
+// `Send` and `Sync` constraints are already implied, but rustdoc doesn't document this.
+#[cfg(feature = "unload")]
+unsafe impl<L: Loader + Unloadable + Send, const N: usize> Send for UnloadableLazyLib<L, N> {}
+#[cfg(feature = "unload")]
+unsafe impl<L: Loader + Unloadable + Send, const N: usize> Sync for UnloadableLazyLib<L, N> {}
+
 #[cfg(feature = "unload")]
 impl <L: Loader + Unloadable, const N: usize> UnloadableLazyLib<L, N> {
 	/// # Panic
@@ -78,14 +97,14 @@ impl <L: Loader + Unloadable, const N: usize> UnloadableLazyLib<L, N> {
 			reset_vec: Mutex::new(Vec::new()),
 		}
 	}
-	// finds symbol, loads library if not loaded, and does an atomic swap
-	pub fn swap_sym(
+	#[cfg(target_has_atomic = "ptr")]
+	pub fn lock_and_swap(
 		&self,
 		sym_name: &'static CStr,
 		atom: &'static AtomicPtr<()>,
 		order: Ordering,
 	) -> Option<*const ()> {
-		match self.inner.swap_sym(sym_name, atom, order) {
+		match self.inner.lock_and_swap(sym_name, atom, order) {
 			None => None,
 			Some(function) => {
 				self.reset_vec
