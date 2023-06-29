@@ -120,16 +120,13 @@ impl <L: Loader + Unloadable, const N: usize> UnloadableLazyLib<L, N> {
 	///
 	/// # Errors
 	/// This may error if library is uninitialized.
-	pub unsafe fn unload(&self) -> Result<(), ()> {
-		let lock = self.inner.hlib.lock().unwrap();
-		
-		if let Some(ref handle) = *lock {
+	pub unsafe fn unload(&self) -> Result<(), ()> {		
+		if let Some(handle) = self.inner.hlib.lock().unwrap().take() {
 			let mut rstv_lock = self.reset_vec.lock().unwrap();
 			for (pfn, FnAddrWrapper(init_pfn)) in rstv_lock.drain(..) {
 				pfn.store(init_pfn.cast_mut(), Ordering::Release);
 			}
 			drop(rstv_lock);
-			// decrement reference count on lib handle
 			match handle.unload() {
 				Ok(()) => Ok(()),
 				Err(_) => Err(()),
