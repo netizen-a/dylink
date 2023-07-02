@@ -17,31 +17,31 @@ unsafe impl Send for FnAddrWrapper {}
 mod sealed {
 	use super::*;
 	pub trait Sealed {}
-	impl <L: Loader, const N: usize> Sealed for LazyLib<L, N> {}
-	impl <L: Loader + Unloadable, const N: usize> Sealed for UnloadableLazyLib<L, N> {}
+	impl <L: Loader, const N: usize> Sealed for Library<L, N> {}
+	impl <L: Loader + Unloadable, const N: usize> Sealed for UnloadableLibrary<L, N> {}
 }
 
-pub trait LockAndSwap<'a>: sealed::Sealed {
-	fn lock_and_swap(
+pub trait FindAndSwap<'a>: sealed::Sealed {
+	fn find_and_swap(
 		&self,
-		sym_name: &'static CStr,
-		atom: &'a AtomicPtr<()>,
+		sym: &'static CStr,
+		ppfn: &'a AtomicPtr<()>,
 		order: Ordering,
 	) -> Option<*const ()>;
 }
 
 #[derive(Debug)]
-pub struct LazyLib<L: Loader, const N: usize> {
+pub struct Library<L: Loader, const N: usize> {
 	libs: [&'static CStr; N],
 	// library handle
 	hlib: Mutex<Option<L>>,
 }
 // `Send` and `Sync` constraints are already implied, but rustdoc doesn't document this.
-unsafe impl<L: Loader + Send, const N: usize> Send for LazyLib<L, N> {}
-unsafe impl<L: Loader + Send, const N: usize> Sync for LazyLib<L, N> {}
+unsafe impl<L: Loader + Send, const N: usize> Send for Library<L, N> {}
+unsafe impl<L: Loader + Send, const N: usize> Sync for Library<L, N> {}
 
-impl<L: Loader, const N: usize> LazyLib<L, N> {
-	/// Constructs a new `LazyLib`.
+impl<L: Loader, const N: usize> Library<L, N> {
+	/// Constructs a new `Library`.
 	/// 
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
@@ -55,17 +55,17 @@ impl<L: Loader, const N: usize> LazyLib<L, N> {
 }
 
 #[cfg(target_has_atomic = "ptr")]
-impl <'a, L: Loader, const N: usize> LockAndSwap<'a> for LazyLib<L, N> {
+impl <'a, L: Loader, const N: usize> FindAndSwap<'a> for Library<L, N> {
 	/// Acquires a lock to load the library if not already loaded.
 	/// Finds and stores a symbol into the `atom` pointer, returning the previous value.
 	/// 
-	/// `lock_and_swap` takes an `Ordering` argument which describes the memory ordering of this operation. All ordering modes are possible. Note that using `Acquire` makes the store part of this operation `Relaxed`, and using `Release` makes the load part `Relaxed`.
+	/// `find_and_swap` takes an `Ordering` argument which describes the memory ordering of this operation. All ordering modes are possible. Note that using `Acquire` makes the store part of this operation `Relaxed`, and using `Release` makes the load part `Relaxed`.
 	/// 
 	/// Note: This method is only available on platforms that support atomic operations on pointers.
-	fn lock_and_swap(
+	fn find_and_swap(
 		&self,
-		sym_name: &'static CStr,
-		atom: &AtomicPtr<()>,
+		sym: &'static CStr,
+		ppfn: &AtomicPtr<()>,
 		order: Ordering,
 	) -> Option<*const ()> {
 		let mut lock = self.hlib.lock().unwrap();
@@ -80,11 +80,11 @@ impl <'a, L: Loader, const N: usize> LockAndSwap<'a> for LazyLib<L, N> {
 		}
 
 		if let Some(ref lib_handle) = *lock {
-			let sym = L::load_sym(lib_handle, sym_name);
+			let sym = L::load_sym(lib_handle, sym);
 			if sym.is_null() {
 				None
 			} else {
-				Some(atom.swap(sym.cast_mut(), order))
+				Some(ppfn.swap(sym.cast_mut(), order))
 			}
 		} else {
 			None
@@ -93,25 +93,25 @@ impl <'a, L: Loader, const N: usize> LockAndSwap<'a> for LazyLib<L, N> {
 }
 
 #[cfg(feature = "unload")]
-pub struct UnloadableLazyLib<L: Loader + Unloadable, const N: usize> {
-	inner: LazyLib<L, N>,
+pub struct UnloadableLibrary<L: Loader + Unloadable, const N: usize> {
+	inner: Library<L, N>,
 	reset_vec: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
 }
 
 // `Send` and `Sync` constraints are already implied, but rustdoc doesn't document this.
 #[cfg(feature = "unload")]
-unsafe impl<L: Loader + Unloadable + Send, const N: usize> Send for UnloadableLazyLib<L, N> {}
+unsafe impl<L: Loader + Unloadable + Send, const N: usize> Send for UnloadableLibrary<L, N> {}
 #[cfg(feature = "unload")]
-unsafe impl<L: Loader + Unloadable + Send, const N: usize> Sync for UnloadableLazyLib<L, N> {}
+unsafe impl<L: Loader + Unloadable + Send, const N: usize> Sync for UnloadableLibrary<L, N> {}
 
 #[cfg(feature = "unload")]
-impl <L: Loader + Unloadable, const N: usize> UnloadableLazyLib<L, N> {
+impl <L: Loader + Unloadable, const N: usize> UnloadableLibrary<L, N> {
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
 	pub const fn new(libs: [&'static CStr; N]) -> Self {
 		assert!(N > 0, "`libs` array cannot be empty.");
 		Self {
-			inner: LazyLib::new(libs),
+			inner: Library::new(libs),
 			reset_vec: Mutex::new(Vec::new()),
 		}
 	}
@@ -137,20 +137,20 @@ impl <L: Loader + Unloadable, const N: usize> UnloadableLazyLib<L, N> {
 	}
 }
 
-impl <'a, L: Loader + Unloadable, const N: usize> LockAndSwap<'static> for UnloadableLazyLib<L, N> {
-	fn lock_and_swap(
+impl <'a, L: Loader + Unloadable, const N: usize> FindAndSwap<'static> for UnloadableLibrary<L, N> {
+	fn find_and_swap(
 		&self,
-		sym_name: &'static CStr,
-		atom: &'static AtomicPtr<()>,
+		sym: &'static CStr,
+		ppfn: &'static AtomicPtr<()>,
 		order: Ordering,
 	) -> Option<*const ()> {
-		match self.inner.lock_and_swap(sym_name, atom, order) {
+		match self.inner.find_and_swap(sym, ppfn, order) {
 			None => None,
 			Some(function) => {
 				self.reset_vec
 					.lock()
 					.unwrap()
-					.push((atom, FnAddrWrapper(function)));
+					.push((ppfn, FnAddrWrapper(function)));
 				Some(function)
 			}
 		}

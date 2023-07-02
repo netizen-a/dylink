@@ -13,7 +13,7 @@
 //! use dylink::*;
 //! use std::ffi::CStr;
 //!
-//! static KERNEL32: LazyLib<SysLoader, 1> = LazyLib::new([
+//! static KERNEL32: Library<SysLoader, 1> = Library::new([
 //!    unsafe {CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")}
 //! ]);
 //!
@@ -24,11 +24,11 @@
 //! }
 //! ```
 
-mod lazylib;
+mod library;
 mod loader;
 mod os;
 
-pub use lazylib::*;
+pub use library::*;
 pub use loader::*;
 
 /// Macro for generating shared symbol thunks procedurally.

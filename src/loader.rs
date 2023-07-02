@@ -17,7 +17,7 @@ pub trait Unloadable {
 }
 
 
-/// Used to specify the run-time linker loader constraint for [LazyLib]
+/// Used to specify the run-time linker loader constraint for [Library]
 pub trait Loader: Send {
 	fn is_invalid(&self) -> bool;
 	fn load_lib(lib_name: &'static ffi::CStr) -> Self;
@@ -36,8 +36,8 @@ pub struct SysLoader(*mut core::ffi::c_void);
 /// use dylink::*;
 /// use std::ffi::{c_char, c_int, CStr};
 ///
-/// static LIBC_LIB: LazyLib<SelfLoader, 1> = LazyLib::new([
-///   // dummy value for LazyLib
+/// static LIBC_LIB: Library<SelfLoader, 1> = Library::new([
+///   // dummy value for Library
 ///   unsafe { CStr::from_bytes_with_nul_unchecked(b"libc\0") }
 /// ]);
 ///
