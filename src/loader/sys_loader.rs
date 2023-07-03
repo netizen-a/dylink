@@ -1,7 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use core::ffi::c_int;
-
+use std::io;
 use super::*;
 
 // internal type is opaque and managed by OS, so it's `Send` safe
@@ -41,13 +40,22 @@ impl Loader for SysLoader {
 	}
 }
 
-#[cfg(any(feature = "unload", doc))]
-impl Unloadable for SysLoader {
-	type Error = c_int;
-	unsafe fn unload(&self) -> Result<(), Self::Error> {
+#[cfg(any(feature = "close", doc))]
+impl Closeable for SysLoader {
+	/// decrements reference counter
+	unsafe fn close(self) -> io::Result<()> {
 		let result = crate::os::dlclose(self.0);
 		if (cfg!(windows) && result == 0) || (cfg!(unix) && result != 0) {
-			Err(result)
+			#[cfg(windows)] {
+				Err(io::Error::last_os_error())
+			}
+			#[cfg(unix)] {
+				// dlerror should be here, but POSIX spec doesn't guarantee MT-safety.
+				Err(io::Error::new(
+					io::ErrorKind::Other,
+					"Unknown Error. Call `dlerror` for more information"
+				))
+			}
 		} else {
 			Ok(())
 		}

@@ -49,12 +49,3 @@ struct ReadmeDoctests;
 compile_error!(
 	"`AtomicPtr` is missing from this platform. `dylink` cannot function without this type."
 );
-
-/*#[doc(hidden)]
-pub trait InnerImpl {
-	pub unsafe fn find_sym(
-		&self,
-		sym_name: &'static CStr,
-		atom: &'static AtomicPtr<()>,
-	) -> Option<*const ()>;
-}*/

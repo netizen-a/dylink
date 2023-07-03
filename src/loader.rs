@@ -1,7 +1,9 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use crate::*;
-use core::ffi;
+use std::ffi;
+use std::io;
+
 
 #[cfg(any(windows, unix, doc))]
 mod self_loader;
@@ -12,10 +14,9 @@ mod sys_loader;
 pub trait FnPtr: Copy + Clone {}
 impl<T: Copy + Clone> FnPtr for T {}
 
-#[cfg(any(feature = "unload", doc))]
-pub trait Unloadable {
-	type Error;
-	unsafe fn unload(&self) -> Result<(), Self::Error>;
+#[cfg(any(feature = "close", doc))]
+pub trait Closeable {
+	unsafe fn close(self) -> io::Result<()>;
 }
 
 

@@ -8,7 +8,7 @@ static KERNEL32: Library<SysLoader, 1> = Library::new(unsafe {
 });
 
 #[cfg(target_os = "linux")]
-static LIB_X11: UnloadableLibrary<SysLoader, 1> = UnloadableLibrary::new(unsafe {
+static LIB_X11: CloseableLibrary<SysLoader, 1> = CloseableLibrary::new(unsafe {
 	[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"libX11.so.6\0",
 	)]
@@ -75,8 +75,8 @@ fn test_linux_x11() {
 			XCloseDisplay(disp);
 		}
 	}
-	#[cfg(feature = "unload")]
+	#[cfg(feature = "close")]
 	{
-		LIB_X11.unload().expect("unload failed");
+		LIB_X11.close().expect("close failed");
 	}
 }

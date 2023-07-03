@@ -5,9 +5,10 @@ use crate::FnAddr;
 use std::ffi::CStr;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::Mutex;
+use std::io;
 
-#[cfg(feature = "unload")]
-use crate::loader::Unloadable;
+#[cfg(feature = "close")]
+use crate::loader::Closeable;
 
 // this wrapper struct is the bane of my existance...
 #[derive(Debug)]
@@ -18,11 +19,13 @@ mod sealed {
 	use super::*;
 	pub trait Sealed {}
 	impl <L: Loader, const N: usize> Sealed for Library<L, N> {}
-	impl <L: Loader + Unloadable, const N: usize> Sealed for UnloadableLibrary<L, N> {}
+	impl <L: Loader + Closeable, const N: usize> Sealed for CloseableLibrary<L, N> {}
 }
 
 /// Implements constraint to use the [`dylink`](crate::dylink) attribute macro `library` parameter.
 pub trait FindAndSwap<'a>: sealed::Sealed {
+	// I'd prefer if this made locking explicit, but then I'd need 2-4 structures for a sane API.
+	/// Finds the address for `sym`, and returns the last address in `ppfn`.
 	fn find_and_swap(
 		&self,
 		sym: &'static CStr,
@@ -96,19 +99,19 @@ impl <'a, L: Loader, const N: usize> FindAndSwap<'a> for Library<L, N> {
 	}
 }
 
-#[cfg(feature = "unload")]
-pub struct UnloadableLibrary<L: Loader + Unloadable, const N: usize> {
+#[cfg(feature = "close")]
+pub struct CloseableLibrary<L: Loader + Closeable, const N: usize> {
 	inner: Library<L, N>,
 	reset_vec: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
 }
 
-#[cfg(feature = "unload")]
-unsafe impl<L: Loader + Unloadable + Send, const N: usize> Send for UnloadableLibrary<L, N> {}
-#[cfg(feature = "unload")]
-unsafe impl<L: Loader + Unloadable + Send, const N: usize> Sync for UnloadableLibrary<L, N> {}
+#[cfg(feature = "close")]
+unsafe impl<L: Loader + Closeable + Send, const N: usize> Send for CloseableLibrary<L, N> {}
+#[cfg(feature = "close")]
+unsafe impl<L: Loader + Closeable + Send, const N: usize> Sync for CloseableLibrary<L, N> {}
 
-#[cfg(feature = "unload")]
-impl <L: Loader + Unloadable, const N: usize> UnloadableLibrary<L, N> {
+#[cfg(feature = "close")]
+impl <L: Loader + Closeable, const N: usize> CloseableLibrary<L, N> {
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
 	pub const fn new(libs: [&'static CStr; N]) -> Self {
@@ -119,28 +122,28 @@ impl <L: Loader + Unloadable, const N: usize> UnloadableLibrary<L, N> {
 		}
 	}
 
-	/// Unloads the library and resets all associated function pointers to uninitialized state.
+	/// closes the library and resets all associated function pointers to uninitialized state.
 	///
 	/// # Errors
 	/// This may error if library is uninitialized.
-	pub fn unload(&self) -> Result<(), ()> {		
+	pub fn close(&self) -> io::Result<()> {		
 		if let Some(handle) = self.inner.hlib.lock().unwrap().take() {
 			let mut rstv_lock = self.reset_vec.lock().unwrap();
 			for (pfn, FnAddrWrapper(init_pfn)) in rstv_lock.drain(..) {
 				pfn.store(init_pfn.cast_mut(), Ordering::Release);
 			}
 			drop(rstv_lock);
-			match unsafe {handle.unload()} {
+			match unsafe {handle.close()} {
 				Ok(()) => Ok(()),
-				Err(_) => Err(()),
+				Err(e) => Err(e),
 			}
 		} else {
-			Err(())
+			Err(io::Error::new(io::ErrorKind::InvalidInput, "`CloseableLibrary` is uninitialized."))
 		}
 	}
 }
 
-impl <'a, L: Loader + Unloadable, const N: usize> FindAndSwap<'static> for UnloadableLibrary<L, N> {
+impl <'a, L: Loader + Closeable, const N: usize> FindAndSwap<'static> for CloseableLibrary<L, N> {
 	fn find_and_swap(
 		&self,
 		sym: &'static CStr,

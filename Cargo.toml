@@ -18,6 +18,6 @@ version = "0.8"
 path="./dylink_macro"
 
 [features]
-default = ["unload"]
+default = ["close"]
 # super unsafe feature.
-unload = []
+close = []

@@ -17,12 +17,12 @@ Related links:
 ## Features
 
 * Thread-safe library loading.
-* Fearless unloading - Unloading never invalidates symbols.
+* Fearless closing - closing never invalidates symbols.
 * Branchless symbols - loaded symbols have zero overhead.
 
 ## Optional Features
 
-* `unload` - enables support for unloading utilities.
+* `close` - enables support for closing handles.
 
 ## Supported platforms
 
