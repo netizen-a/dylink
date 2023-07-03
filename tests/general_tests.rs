@@ -8,7 +8,7 @@ static KERNEL32: Library<SysLoader, 1> = Library::new(unsafe {
 });
 
 #[cfg(target_os = "linux")]
-static LIB_X11: Library<SysLoader, 1> = Library::new(unsafe {
+static LIB_X11: UnloadableLibrary<SysLoader, 1> = UnloadableLibrary::new(unsafe {
 	[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"libX11.so.6\0",
 	)]
@@ -76,7 +76,7 @@ fn test_linux_x11() {
 		}
 	}
 	#[cfg(feature = "unload")]
-	unsafe {
-		SysLoader::unload(&LIB_X11).expect("unload failed");
+	{
+		LIB_X11.unload().expect("unload failed");
 	}
 }

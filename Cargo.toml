@@ -19,5 +19,5 @@ path="./dylink_macro"
 
 [features]
 default = ["unload"]
-# super unsafe feature. implicitly enables `loader`.
+# super unsafe feature.
 unload = []

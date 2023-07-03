@@ -3,7 +3,9 @@
 use crate::*;
 use core::ffi;
 
+#[cfg(any(windows, unix, doc))]
 mod self_loader;
+#[cfg(any(windows, unix, doc))]
 mod sys_loader;
 
 #[doc(hidden)]
@@ -20,10 +22,11 @@ pub trait Unloadable {
 /// Used to specify the run-time linker loader constraint for [Library]
 pub trait Loader: Send {
 	fn is_invalid(&self) -> bool;
-	fn load_lib(lib_name: &'static ffi::CStr) -> Self;
-	fn load_sym(&self, fn_name: &'static ffi::CStr) -> FnAddr;
+	unsafe fn load_library(lib_name: &'static ffi::CStr) -> Self;
+	unsafe fn find_symbol(&self, fn_name: &'static ffi::CStr) -> FnAddr;
 }
 
+#[cfg(any(windows, unix, doc))]
 pub struct SysLoader(*mut core::ffi::c_void);
 
 
@@ -51,4 +54,5 @@ pub struct SysLoader(*mut core::ffi::c_void);
 /// assert_eq!(five, 5);
 /// # }
 /// ```
+#[cfg(any(windows, unix, doc))]
 pub struct SelfLoader(*mut core::ffi::c_void);

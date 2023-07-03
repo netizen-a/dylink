@@ -23,27 +23,28 @@ impl Loader for SelfLoader {
 	///
 	/// ### Windows Platform
 	/// On windows, `_lib_name` is used to load the library handle.
-	fn load_lib(_lib_name: &'static CStr) -> Self {
+	unsafe fn load_library(lib_name: &'static CStr) -> Self {
 		#[cfg(unix)]
 		{
+			let _ = lib_name;
 			Self(unix::RTLD_DEFAULT)
 		}
 		#[cfg(windows)]
 		{
 			// FIXME: when `CStr::is_empty` is stable, replace `to_bytes().is_empty()`.
-			if _lib_name.to_bytes().is_empty() {
-				unsafe { Self(win32::GetModuleHandleW(core::ptr::null_mut())) }
+			if lib_name.to_bytes().is_empty() {
+				Self(win32::GetModuleHandleW(core::ptr::null_mut()))
 			} else {
-				let wide_str: Vec<u16> = _lib_name
+				let wide_str: Vec<u16> = lib_name
 					.to_string_lossy()
 					.encode_utf16()
 					.chain(core::iter::once(0u16))
 					.collect();
-				unsafe { Self(win32::GetModuleHandleW(wide_str.as_ptr())) }
+				Self(win32::GetModuleHandleW(wide_str.as_ptr()))
 			}
 		}
 	}
-	fn load_sym(&self, fn_name: &CStr) -> FnAddr {
-		unsafe { dlsym(self.0, fn_name.as_ptr()) }
+	unsafe fn find_symbol(&self, fn_name: &CStr) -> FnAddr {
+		dlsym(self.0, fn_name.as_ptr())
 	}
 }

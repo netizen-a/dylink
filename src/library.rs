@@ -21,6 +21,7 @@ mod sealed {
 	impl <L: Loader + Unloadable, const N: usize> Sealed for UnloadableLibrary<L, N> {}
 }
 
+/// Implements constraint to use the [`dylink`](crate::dylink) attribute macro `library` parameter.
 pub trait FindAndSwap<'a>: sealed::Sealed {
 	fn find_and_swap(
 		&self,
@@ -30,13 +31,16 @@ pub trait FindAndSwap<'a>: sealed::Sealed {
 	) -> Option<*const ()>;
 }
 
+/// A library handle.
+/// 
+/// 
 #[derive(Debug)]
 pub struct Library<L: Loader, const N: usize> {
 	libs: [&'static CStr; N],
 	// library handle
 	hlib: Mutex<Option<L>>,
 }
-// `Send` and `Sync` constraints are already implied, but rustdoc doesn't document this.
+
 unsafe impl<L: Loader + Send, const N: usize> Send for Library<L, N> {}
 unsafe impl<L: Loader + Send, const N: usize> Sync for Library<L, N> {}
 
@@ -71,7 +75,7 @@ impl <'a, L: Loader, const N: usize> FindAndSwap<'a> for Library<L, N> {
 		let mut lock = self.hlib.lock().unwrap();
 		if let None = *lock {
 			for lib_name in self.libs {
-				let handle = L::load_lib(lib_name);
+				let handle = unsafe {L::load_library(lib_name)};
 				if !handle.is_invalid() {
 					*lock = Some(handle);
 					break;
@@ -80,7 +84,7 @@ impl <'a, L: Loader, const N: usize> FindAndSwap<'a> for Library<L, N> {
 		}
 
 		if let Some(ref lib_handle) = *lock {
-			let sym = L::load_sym(lib_handle, sym);
+			let sym = unsafe {L::find_symbol(lib_handle, sym)};
 			if sym.is_null() {
 				None
 			} else {
@@ -98,7 +102,6 @@ pub struct UnloadableLibrary<L: Loader + Unloadable, const N: usize> {
 	reset_vec: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
 }
 
-// `Send` and `Sync` constraints are already implied, but rustdoc doesn't document this.
 #[cfg(feature = "unload")]
 unsafe impl<L: Loader + Unloadable + Send, const N: usize> Send for UnloadableLibrary<L, N> {}
 #[cfg(feature = "unload")]
@@ -120,14 +123,14 @@ impl <L: Loader + Unloadable, const N: usize> UnloadableLibrary<L, N> {
 	///
 	/// # Errors
 	/// This may error if library is uninitialized.
-	pub unsafe fn unload(&self) -> Result<(), ()> {		
+	pub fn unload(&self) -> Result<(), ()> {		
 		if let Some(handle) = self.inner.hlib.lock().unwrap().take() {
 			let mut rstv_lock = self.reset_vec.lock().unwrap();
 			for (pfn, FnAddrWrapper(init_pfn)) in rstv_lock.drain(..) {
 				pfn.store(init_pfn.cast_mut(), Ordering::Release);
 			}
 			drop(rstv_lock);
-			match handle.unload() {
+			match unsafe {handle.unload()} {
 				Ok(()) => Ok(()),
 				Err(_) => Err(()),
 			}

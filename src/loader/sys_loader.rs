@@ -13,14 +13,14 @@ impl Loader for SysLoader {
 	}
 	//type Handle = SysHandle;
 	/// Increments reference count to handle, and returns handle if successful.
-	fn load_lib(lib_name: &'static ffi::CStr) -> Self {
+	unsafe fn load_library(lib_name: &'static ffi::CStr) -> Self {
 		#[cfg(unix)]
-		unsafe {
+		{
 			use crate::os::unix::*;
 			Self(dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL))
 		}
 		#[cfg(windows)]
-		unsafe {
+		{
 			use crate::os::win32::*;
 			let wide_str: Vec<u16> = lib_name
 				.to_string_lossy()
@@ -36,8 +36,8 @@ impl Loader for SysLoader {
 		}
 	}
 
-	fn load_sym(&self, fn_name: &'static ffi::CStr) -> crate::FnAddr {
-		unsafe { crate::os::dlsym(self.0, fn_name.as_ptr().cast()) }
+	unsafe fn find_symbol(&self, fn_name: &'static ffi::CStr) -> crate::FnAddr {
+		crate::os::dlsym(self.0, fn_name.as_ptr().cast())
 	}
 }
 
