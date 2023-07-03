@@ -28,7 +28,7 @@ pub trait Loader: Send {
 }
 
 #[cfg(any(windows, unix, doc))]
-pub struct SysLoader(*mut core::ffi::c_void);
+pub struct SystemLoader(*mut core::ffi::c_void);
 
 
 /// `SelfLoader` is a special structure that retrieves symbols from libraries already

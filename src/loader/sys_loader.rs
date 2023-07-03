@@ -4,9 +4,9 @@ use std::io;
 use super::*;
 
 // internal type is opaque and managed by OS, so it's `Send` safe
-unsafe impl Send for SysLoader {}
+unsafe impl Send for SystemLoader {}
 
-impl Loader for SysLoader {
+impl Loader for SystemLoader {
 	fn is_invalid(&self) -> bool {
 		self.0.is_null()
 	}
@@ -41,7 +41,7 @@ impl Loader for SysLoader {
 }
 
 #[cfg(any(feature = "close", doc))]
-impl Closeable for SysLoader {
+impl Closeable for SystemLoader {
 	/// decrements reference counter
 	unsafe fn close(self) -> io::Result<()> {
 		let result = crate::os::dlclose(self.0);

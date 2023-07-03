@@ -31,7 +31,7 @@ pub trait FindAndSwap<'a>: sealed::Sealed {
 		sym: &'static CStr,
 		ppfn: &'a AtomicPtr<()>,
 		order: Ordering,
-	) -> Option<*const ()>;
+	) -> Option<FnAddr>;
 }
 
 /// A library handle.
@@ -74,7 +74,7 @@ impl <'a, L: Loader, const N: usize> FindAndSwap<'a> for Library<L, N> {
 		sym: &'static CStr,
 		ppfn: &AtomicPtr<()>,
 		order: Ordering,
-	) -> Option<*const ()> {
+	) -> Option<FnAddr> {
 		let mut lock = self.hlib.lock().unwrap();
 		if let None = *lock {
 			for lib_name in self.libs {
@@ -149,7 +149,7 @@ impl <'a, L: Loader + Closeable, const N: usize> FindAndSwap<'static> for Closea
 		sym: &'static CStr,
 		ppfn: &'static AtomicPtr<()>,
 		order: Ordering,
-	) -> Option<*const ()> {
+	) -> Option<FnAddr> {
 		match self.inner.find_and_swap(sym, ppfn, order) {
 			None => None,
 			Some(function) => {

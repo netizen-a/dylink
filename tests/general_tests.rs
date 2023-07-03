@@ -1,14 +1,14 @@
 use dylink::*;
 
 #[cfg(windows)]
-static KERNEL32: Library<SysLoader, 1> = Library::new(unsafe {
+static KERNEL32: Library<SystemLoader, 1> = Library::new(unsafe {
 	[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"Kernel32.dll\0",
 	)]
 });
 
 #[cfg(target_os = "linux")]
-static LIB_X11: CloseableLibrary<SysLoader, 1> = CloseableLibrary::new(unsafe {
+static LIB_X11: CloseableLibrary<SystemLoader, 1> = CloseableLibrary::new(unsafe {
 	[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"libX11.so.6\0",
 	)]

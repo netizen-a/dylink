@@ -49,7 +49,7 @@ Below is a basic working example on how to use the macro on windows.
 use dylink::*;
 use std::ffi::CStr;
 
-static KERNEL32: Library<SysLoader, 1> = Library::new([
+static KERNEL32: Library<SystemLoader, 1> = Library::new([
    unsafe {CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")}
 ]);
 
