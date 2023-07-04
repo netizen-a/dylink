@@ -11,9 +11,8 @@
 //!
 //! ```rust
 //! use dylink::*;
-//! use std::ffi::CStr;
 //!
-//! static KERNEL32: Library<SystemLoader> = Library::new(&["Kernel32.dll\0"]);
+//! static KERNEL32: Library<SystemLoader> = Library::new(&["Kernel32.dll"]);
 //!
 //! #[dylink(library=KERNEL32)]
 //! extern "system" {
@@ -31,7 +30,26 @@ pub use loader::*;
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
-/// Refer to crate level documentation for more information.
+/// May currently be used in 2 patterns:
+/// * foreign modules
+/// * foreign functionS
+///
+/// More may patterns may be added in the future if needed.
+/// # Examples
+///```rust
+/// # use dylink::*;
+/// static FOOBAR: Library<SystemLoader> = Library::new(&["foobar.dll"]);
+///
+/// // foreign module pattern
+/// #[dylink(library=FOOBAR)]
+/// extern "system" {
+///     fn foo();
+/// }
+///
+/// // foreign function pattern
+/// #[dylink(library=FOOBAR)]
+/// extern "system" fn bar();
+///```
 pub use dylink_macro::dylink;
 
 /// Raw function address.
@@ -42,8 +60,3 @@ pub type FnAddr = *const ();
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
-
-#[cfg(not(target_has_atomic = "ptr"))]
-compile_error!(
-	"`AtomicPtr` is missing from this platform. `dylink` cannot function without this type."
-);

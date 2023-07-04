@@ -52,8 +52,14 @@ impl<'a, L: Loader> Library<'a, L> {
 	///
 	/// *Note: Symbols used in the libraries **must** be the same in all fallback paths.*
 	///
-	/// # Panic
+	/// # Panics
 	/// Will panic if `libs` is an empty array.
+	///
+	/// # Examples
+	/// ```rust
+	/// # use dylink::*;
+	/// static KERNEL32: Library<SelfLoader> = Library::new(&["kernel32.dll"]);
+	/// ```
 	pub const fn new(libs: &'a [&'a str]) -> Self {
 		assert!(!libs.is_empty());
 		Self {
@@ -68,8 +74,6 @@ impl <'a, L: Loader> FindAndSwap<'a> for Library<'a, L> {
 	/// Finds and stores a symbol into the `atom` pointer, returning the previous value.
 	///
 	/// `find_and_swap` takes an `Ordering` argument which describes the memory ordering of this operation. All ordering modes are possible. Note that using `Acquire` makes the store part of this operation `Relaxed`, and using `Release` makes the load part `Relaxed`.
-	///
-	/// Note: This method is only available on platforms that support atomic operations on pointers.
 	fn find_and_swap(
 		&self,
 		sym: &str,

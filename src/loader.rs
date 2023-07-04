@@ -23,8 +23,8 @@ pub unsafe trait Close {
 /// Used to specify the run-time linker loader constraint for [`Library`]
 pub unsafe trait Loader: Send {
 	fn is_invalid(&self) -> bool;
-	unsafe fn load_library(lib_name: &str) -> Self;
-	unsafe fn find_symbol(&self, fn_name: &str) -> FnAddr;
+	unsafe fn load_library(path: &str) -> Self;
+	unsafe fn find_symbol(&self, symbol: &str) -> FnAddr;
 }
 
 /// A system library loader.
@@ -38,13 +38,13 @@ pub struct SystemLoader(*mut core::ffi::c_void);
 ///
 /// This loader is responsible for retrieving symbols from libraries already loaded.
 ///
-/// ## Unix Platform
+/// # Unix Platform
 ///
 /// The unix implementation uses `RTLD_DEFAULT`, which does not require additional input.
 /// Since `Library` and `CloseableLibrary` still require at least one library name, so a dummy
 /// value must be used.
 ///
-/// ## Windows Platform
+/// # Windows Platform
 ///
 /// The windows implementation must specify, which libraries the `SelfLoader` shall attempt to load from.
 ///

@@ -11,16 +11,17 @@ unsafe impl Loader for SystemLoader {
 		self.0.is_null()
 	}
 	/// Increments reference count to handle, and returns handle if successful.
-	unsafe fn load_library(lib_name: &str) -> Self {
+	unsafe fn load_library(path: &str) -> Self {
 		#[cfg(unix)]
 		{
 			use crate::os::unix::*;
-			Self(dlopen(lib_name.as_ptr(), RTLD_NOW | RTLD_LOCAL))
+			let c_str = CString::new(path).unwrap();
+			Self(dlopen(c_str.as_ptr(), RTLD_NOW | RTLD_LOCAL))
 		}
 		#[cfg(windows)]
 		{
 			use crate::os::win32::*;
-			let wide_str: Vec<u16> = lib_name
+			let wide_str: Vec<u16> = path
 				.encode_utf16()
 				.chain(core::iter::once(0u16))
 				.collect();
@@ -33,8 +34,8 @@ unsafe impl Loader for SystemLoader {
 		}
 	}
 
-	unsafe fn find_symbol(&self, fn_name: &str) -> crate::FnAddr {
-		let c_str = CString::new(fn_name).unwrap();
+	unsafe fn find_symbol(&self, symbol: &str) -> crate::FnAddr {
+		let c_str = CString::new(symbol).unwrap();
 		crate::os::dlsym(self.0, c_str.as_ptr().cast())
 	}
 }
