@@ -24,8 +24,8 @@ fn test_win32_alloc_instrumentation() {
 
 	#[global_allocator]
 	static GLOBAL: MyAllocator = MyAllocator(AtomicUsize::new(0));
-	static LIB: Library<SystemLoader, 1> =
-		Library::new(unsafe { [CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")] });
+	static LIB: Library<SystemLoader> =
+		Library::new(unsafe { &[CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")] });
 
 	// macro output: function
 	#[dylink(library = LIB)]

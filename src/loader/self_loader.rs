@@ -19,10 +19,10 @@ unsafe impl Loader for SelfLoader {
 	}
 	/// Does not increment reference count to handle.
 	/// ### Unix Platform
-	/// On unix,  `_lib_name` is ignored, and a default library handle is returned.
+	/// On unix,  `lib_name` is ignored, and a default library handle is returned.
 	///
 	/// ### Windows Platform
-	/// On windows, `_lib_name` is used to load the library handle.
+	/// On windows, `lib_name` is used to load the library handle.
 	unsafe fn load_library(lib_name: &'static CStr) -> Self {
 		#[cfg(unix)]
 		{

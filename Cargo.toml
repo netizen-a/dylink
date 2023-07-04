@@ -16,11 +16,3 @@ members = ["dylink_macro"]
 [dependencies.dylink_macro]
 version = "0.8"
 path="./dylink_macro"
-
-[features]
-#default = ["close"]
-# super unsafe feature.
-close = []
-
-[package.metadata.docs.rs]
-features = ["close"]

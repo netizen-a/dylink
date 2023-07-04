@@ -20,10 +20,6 @@ Related links:
 * Fearless closing - closing never invalidates symbols.
 * Branchless symbols - loaded symbols have zero overhead.
 
-## Optional Features
-
-* `close` - enables support for closing handles.
-
 ## Supported platforms
 
 Implemented for all major platforms.
@@ -49,7 +45,7 @@ Below is a basic working example on how to use the macro on windows.
 use dylink::*;
 use std::ffi::CStr;
 
-static KERNEL32: Library<SystemLoader, 1> = Library::new([
+static KERNEL32: Library<SystemLoader> = Library::new(&[
    unsafe {CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")}
 ]);
 

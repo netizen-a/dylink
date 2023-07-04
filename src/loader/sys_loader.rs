@@ -39,8 +39,8 @@ unsafe impl Loader for SystemLoader {
 	}
 }
 
-#[cfg(any(feature = "close", doc))]
-impl Close for SystemLoader {
+
+unsafe impl Close for SystemLoader {
 	/// Decrements reference counter to shared library. When reference counter hits zero the library is unloaded.
 	/// ## Errors
 	/// May error depending on system call.
@@ -52,7 +52,7 @@ impl Close for SystemLoader {
 				Err(io::Error::last_os_error())
 			}
 			#[cfg(unix)] {
-				// unix uses dlerror to for error handling, but it's 
+				// unix uses dlerror to for error handling, but it's
 				// not MT-safety guarenteed, so I can't use it.
 				Err(io::Error::new(
 					io::ErrorKind::Other,

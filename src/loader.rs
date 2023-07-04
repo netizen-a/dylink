@@ -13,14 +13,13 @@ mod sys_loader;
 /// This trait is similar to the `Drop` trait, which frees resources.
 /// Unlike the `Drop` trait, `Close` must assume there side affects when closing a library.
 /// As a consequence of these side affects `close` is marked as `unsafe`.
-/// 
+///
 /// This trait should not be used directly, and instead be used in conjunction with `CloseableLibrary`,
 /// so that the lifetimes of retrieved symbols are not invalidated.
-#[cfg(any(feature = "close", doc))]
-pub trait Close {
+
+pub unsafe trait Close {
 	unsafe fn close(self) -> io::Result<()>;
 }
-
 
 /// Used to specify the run-time linker loader constraint for [`Library`]
 pub unsafe trait Loader: Send {
@@ -30,7 +29,7 @@ pub unsafe trait Loader: Send {
 }
 
 /// A system library loader.
-/// 
+///
 /// This is a basic library loader primitive designed to be used with [`Library`].
 #[cfg(any(windows, unix, doc))]
 pub struct SystemLoader(*mut core::ffi::c_void);
@@ -45,7 +44,7 @@ pub struct SystemLoader(*mut core::ffi::c_void);
 /// use dylink::*;
 /// use std::ffi::{c_char, c_int, CStr};
 ///
-/// static LIBC_LIB: Library<SelfLoader, 1> = Library::new([
+/// static LIBC_LIB: Library<SelfLoader> = Library::new(&[
 ///   // dummy value for Library
 ///   unsafe { CStr::from_bytes_with_nul_unchecked(b"libc\0") }
 /// ]);

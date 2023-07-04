@@ -1,15 +1,15 @@
 use dylink::*;
 
 #[cfg(windows)]
-static KERNEL32: Library<SystemLoader, 1> = Library::new(unsafe {
-	[std::ffi::CStr::from_bytes_with_nul_unchecked(
+static KERNEL32: Library<SystemLoader> = Library::new(unsafe {
+	&[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"Kernel32.dll\0",
 	)]
 });
 
 #[cfg(target_os = "linux")]
-static LIB_X11: CloseableLibrary<SystemLoader, 1> = CloseableLibrary::new(unsafe {
-	[std::ffi::CStr::from_bytes_with_nul_unchecked(
+static LIB_X11: CloseableLibrary<SystemLoader> = CloseableLibrary::new(unsafe {
+	&[std::ffi::CStr::from_bytes_with_nul_unchecked(
 		b"libX11.so.6\0",
 	)]
 });
@@ -74,9 +74,6 @@ fn test_linux_x11() {
 			println!("display created successfully.\nnow destroying...");
 			XCloseDisplay(disp);
 		}
-	}
-	#[cfg(any(feature = "close", doc))]
-	{
 		LIB_X11.close().expect("close failed");
 	}
 }

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::Mutex;
 use std::io;
 
-#[cfg(any(feature = "close", doc))]
+
 use crate::loader::Close;
 
 // this wrapper struct is the bane of my existance...
@@ -18,9 +18,8 @@ unsafe impl Send for FnAddrWrapper {}
 mod sealed {
 	use super::*;
 	pub trait Sealed {}
-	impl <L: Loader, const N: usize> Sealed for Library<L, N> {}
-	#[cfg(any(feature = "close", doc))]
-	impl <L: Loader + Close, const N: usize> Sealed for CloseableLibrary<L, N> {}
+	impl <L: Loader> Sealed for Library<'_, L> {}
+	impl <L: Loader + Close> Sealed for CloseableLibrary<'_, L> {}
 }
 
 /// Implements constraint to use the [`dylink`](crate::dylink) attribute macro `library` parameter.
@@ -36,25 +35,20 @@ pub trait FindAndSwap<'a>: sealed::Sealed {
 }
 
 /// A library handle.
-/// 
-/// 
 #[derive(Debug)]
-pub struct Library<L: Loader, const N: usize> {
-	libs: [&'static CStr; N],
+pub struct Library<'a, L: Loader> {
+	libs: &'a [&'static CStr],
 	// library handle
 	hlib: Mutex<Option<L>>,
 }
 
-unsafe impl<L: Loader + Send, const N: usize> Send for Library<L, N> {}
-unsafe impl<L: Loader + Send, const N: usize> Sync for Library<L, N> {}
-
-impl<L: Loader, const N: usize> Library<L, N> {
+impl<'a, L: Loader> Library<'a, L> {
 	/// Constructs a new `Library`.
-	/// 
+	///
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
-	pub const fn new(libs: [&'static CStr; N]) -> Self {
-		assert!(N > 0, "`libs` array cannot be empty.");
+	pub const fn new(libs: &'a [&'static CStr]) -> Self {
+		assert!(!libs.is_empty(), "`libs` array cannot be empty.");
 		Self {
 			libs,
 			hlib: Mutex::new(None),
@@ -63,12 +57,12 @@ impl<L: Loader, const N: usize> Library<L, N> {
 }
 
 #[cfg(target_has_atomic = "ptr")]
-impl <'a, L: Loader, const N: usize> FindAndSwap<'a> for Library<L, N> {
+impl <'a, L: Loader> FindAndSwap<'a> for Library<'a, L> {
 	/// Acquires a lock to load the library if not already loaded.
 	/// Finds and stores a symbol into the `atom` pointer, returning the previous value.
-	/// 
+	///
 	/// `find_and_swap` takes an `Ordering` argument which describes the memory ordering of this operation. All ordering modes are possible. Note that using `Acquire` makes the store part of this operation `Relaxed`, and using `Release` makes the load part `Relaxed`.
-	/// 
+	///
 	/// Note: This method is only available on platforms that support atomic operations on pointers.
 	fn find_and_swap(
 		&self,
@@ -100,23 +94,17 @@ impl <'a, L: Loader, const N: usize> FindAndSwap<'a> for Library<L, N> {
 	}
 }
 
-#[cfg(any(feature = "close", doc))]
-pub struct CloseableLibrary<L: Loader + Close, const N: usize> {
-	inner: Library<L, N>,
+
+pub struct CloseableLibrary<'a, L: Loader + Close> {
+	inner: Library<'a, L>,
 	reset_vec: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
 }
 
-#[cfg(any(feature = "close", doc))]
-unsafe impl<L: Loader + Close + Send, const N: usize> Send for CloseableLibrary<L, N> {}
-#[cfg(any(feature = "close", doc))]
-unsafe impl<L: Loader + Close + Send, const N: usize> Sync for CloseableLibrary<L, N> {}
-
-#[cfg(any(feature = "close", doc))]
-impl <L: Loader + Close, const N: usize> CloseableLibrary<L, N> {
+impl <'a, L: Loader + Close> CloseableLibrary<'a, L> {
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
-	pub const fn new(libs: [&'static CStr; N]) -> Self {
-		assert!(N > 0, "`libs` array cannot be empty.");
+	pub const fn new(libs: &'a [&'static CStr]) -> Self {
+		assert!(!libs.is_empty(), "`libs` array cannot be empty.");
 		Self {
 			inner: Library::new(libs),
 			reset_vec: Mutex::new(Vec::new()),
@@ -127,7 +115,7 @@ impl <L: Loader + Close, const N: usize> CloseableLibrary<L, N> {
 	///
 	/// # Errors
 	/// This may error if library is uninitialized.
-	pub fn close(&self) -> io::Result<()> {		
+	pub unsafe fn close(&self) -> io::Result<()> {
 		if let Some(handle) = self.inner.hlib.lock().unwrap().take() {
 			let mut rstv_lock = self.reset_vec.lock().unwrap();
 			for (pfn, FnAddrWrapper(init_pfn)) in rstv_lock.drain(..) {
@@ -144,8 +132,7 @@ impl <L: Loader + Close, const N: usize> CloseableLibrary<L, N> {
 	}
 }
 
-#[cfg(feature="close")]
-impl <'a, L: Loader + Close, const N: usize> FindAndSwap<'static> for CloseableLibrary<L, N> {
+impl <L: Loader + Close> FindAndSwap<'static> for CloseableLibrary<'_, L> {
 	fn find_and_swap(
 		&self,
 		sym: &'static CStr,
