@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::os::*;
-use core::ffi::CStr;
+use std::ffi;
 
 // internal type is opaque and managed by OS, so it's `Send` safe
 unsafe impl Send for SelfLoader {}
@@ -23,7 +23,7 @@ unsafe impl Loader for SelfLoader {
 	///
 	/// ### Windows Platform
 	/// On windows, `lib_name` is used to load the library handle.
-	unsafe fn load_library(lib_name: &'static CStr) -> Self {
+	unsafe fn load_library(lib_name: &str) -> Self {
 		#[cfg(unix)]
 		{
 			let _ = lib_name;
@@ -31,12 +31,10 @@ unsafe impl Loader for SelfLoader {
 		}
 		#[cfg(windows)]
 		{
-			// FIXME: when `CStr::is_empty` is stable, replace `to_bytes().is_empty()`.
-			if lib_name.to_bytes().is_empty() {
+			if lib_name.is_empty() {
 				Self(win32::GetModuleHandleW(core::ptr::null_mut()))
 			} else {
 				let wide_str: Vec<u16> = lib_name
-					.to_string_lossy()
 					.encode_utf16()
 					.chain(core::iter::once(0u16))
 					.collect();
@@ -44,7 +42,8 @@ unsafe impl Loader for SelfLoader {
 			}
 		}
 	}
-	unsafe fn find_symbol(&self, fn_name: &CStr) -> FnAddr {
-		dlsym(self.0, fn_name.as_ptr())
+	unsafe fn find_symbol(&self, fn_name: &str) -> FnAddr {
+		let c_str = ffi::CString::new(fn_name).unwrap();
+		dlsym(self.0, c_str.as_ptr())
 	}
 }

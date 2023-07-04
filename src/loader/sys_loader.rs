@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::io;
+use std::{io, ffi::CString};
 use super::*;
 
 // internal type is opaque and managed by OS, so it's `Send` safe
@@ -11,7 +11,7 @@ unsafe impl Loader for SystemLoader {
 		self.0.is_null()
 	}
 	/// Increments reference count to handle, and returns handle if successful.
-	unsafe fn load_library(lib_name: &'static ffi::CStr) -> Self {
+	unsafe fn load_library(lib_name: &str) -> Self {
 		#[cfg(unix)]
 		{
 			use crate::os::unix::*;
@@ -21,7 +21,6 @@ unsafe impl Loader for SystemLoader {
 		{
 			use crate::os::win32::*;
 			let wide_str: Vec<u16> = lib_name
-				.to_string_lossy()
 				.encode_utf16()
 				.chain(core::iter::once(0u16))
 				.collect();
@@ -34,8 +33,9 @@ unsafe impl Loader for SystemLoader {
 		}
 	}
 
-	unsafe fn find_symbol(&self, fn_name: &'static ffi::CStr) -> crate::FnAddr {
-		crate::os::dlsym(self.0, fn_name.as_ptr().cast())
+	unsafe fn find_symbol(&self, fn_name: &str) -> crate::FnAddr {
+		let c_str = CString::new(fn_name).unwrap();
+		crate::os::dlsym(self.0, c_str.as_ptr().cast())
 	}
 }
 

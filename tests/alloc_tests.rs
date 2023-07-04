@@ -5,7 +5,6 @@
 fn test_win32_alloc_instrumentation() {
 	use dylink::*;
 	use std::alloc::{self, GlobalAlloc, Layout};
-	use std::ffi::CStr;
 	use std::sync::atomic::AtomicUsize;
 	use std::sync::atomic::Ordering;
 
@@ -25,7 +24,7 @@ fn test_win32_alloc_instrumentation() {
 	#[global_allocator]
 	static GLOBAL: MyAllocator = MyAllocator(AtomicUsize::new(0));
 	static LIB: Library<SystemLoader> =
-		Library::new(unsafe { &[CStr::from_bytes_with_nul_unchecked(b"Kernel32.dll\0")] });
+		Library::new(&["Kernel32.dll"]);
 
 	// macro output: function
 	#[dylink(library = LIB)]

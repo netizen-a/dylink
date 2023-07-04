@@ -1,7 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use crate::*;
-use std::ffi;
 use std::io;
 
 
@@ -24,8 +23,8 @@ pub unsafe trait Close {
 /// Used to specify the run-time linker loader constraint for [`Library`]
 pub unsafe trait Loader: Send {
 	fn is_invalid(&self) -> bool;
-	unsafe fn load_library(lib_name: &'static ffi::CStr) -> Self;
-	unsafe fn find_symbol(&self, fn_name: &'static ffi::CStr) -> FnAddr;
+	unsafe fn load_library(lib_name: &str) -> Self;
+	unsafe fn find_symbol(&self, fn_name: &str) -> FnAddr;
 }
 
 /// A system library loader.
@@ -44,10 +43,7 @@ pub struct SystemLoader(*mut core::ffi::c_void);
 /// use dylink::*;
 /// use std::ffi::{c_char, c_int, CStr};
 ///
-/// static LIBC_LIB: Library<SelfLoader> = Library::new(&[
-///   // dummy value for Library
-///   unsafe { CStr::from_bytes_with_nul_unchecked(b"libc\0") }
-/// ]);
+/// static LIBC_LIB: Library<SelfLoader> = Library::new(&["libc"]);
 ///
 /// #[dylink(library=LIBC_LIB)]
 /// extern "C" {

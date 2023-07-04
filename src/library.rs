@@ -2,7 +2,6 @@
 
 use crate::loader::Loader;
 use crate::FnAddr;
-use std::ffi::CStr;
 use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::Mutex;
 use std::io;
@@ -28,7 +27,7 @@ pub trait FindAndSwap<'a>: sealed::Sealed {
 	/// Finds the address for `sym`, and returns the last address in `ppfn`.
 	fn find_and_swap(
 		&self,
-		sym: &'static CStr,
+		sym: &str,
 		ppfn: &'a AtomicPtr<()>,
 		order: Ordering,
 	) -> Option<FnAddr>;
@@ -37,7 +36,7 @@ pub trait FindAndSwap<'a>: sealed::Sealed {
 /// A library handle.
 #[derive(Debug)]
 pub struct Library<'a, L: Loader> {
-	libs: &'a [&'static CStr],
+	libs: &'a [&'static str],
 	// library handle
 	hlib: Mutex<Option<L>>,
 }
@@ -47,7 +46,7 @@ impl<'a, L: Loader> Library<'a, L> {
 	///
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
-	pub const fn new(libs: &'a [&'static CStr]) -> Self {
+	pub const fn new(libs: &'a [&'static str]) -> Self {
 		assert!(!libs.is_empty(), "`libs` array cannot be empty.");
 		Self {
 			libs,
@@ -56,7 +55,6 @@ impl<'a, L: Loader> Library<'a, L> {
 	}
 }
 
-#[cfg(target_has_atomic = "ptr")]
 impl <'a, L: Loader> FindAndSwap<'a> for Library<'a, L> {
 	/// Acquires a lock to load the library if not already loaded.
 	/// Finds and stores a symbol into the `atom` pointer, returning the previous value.
@@ -66,7 +64,7 @@ impl <'a, L: Loader> FindAndSwap<'a> for Library<'a, L> {
 	/// Note: This method is only available on platforms that support atomic operations on pointers.
 	fn find_and_swap(
 		&self,
-		sym: &'static CStr,
+		sym: &str,
 		ppfn: &AtomicPtr<()>,
 		order: Ordering,
 	) -> Option<FnAddr> {
@@ -103,7 +101,7 @@ pub struct CloseableLibrary<'a, L: Loader + Close> {
 impl <'a, L: Loader + Close> CloseableLibrary<'a, L> {
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
-	pub const fn new(libs: &'a [&'static CStr]) -> Self {
+	pub const fn new(libs: &'a [&'static str]) -> Self {
 		assert!(!libs.is_empty(), "`libs` array cannot be empty.");
 		Self {
 			inner: Library::new(libs),
@@ -135,7 +133,7 @@ impl <'a, L: Loader + Close> CloseableLibrary<'a, L> {
 impl <L: Loader + Close> FindAndSwap<'static> for CloseableLibrary<'_, L> {
 	fn find_and_swap(
 		&self,
-		sym: &'static CStr,
+		sym: &str,
 		ppfn: &'static AtomicPtr<()>,
 		order: Ordering,
 	) -> Option<FnAddr> {
