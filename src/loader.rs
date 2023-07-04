@@ -34,8 +34,19 @@ pub unsafe trait Loader: Send {
 pub struct SystemLoader(*mut core::ffi::c_void);
 
 
-/// `SelfLoader` is a special structure that retrieves symbols from libraries already
-/// loaded before hand such as `libc` or `kernel32`
+/// A retroactive system loader.
+///
+/// This loader is responsible for retrieving symbols from libraries already loaded.
+///
+/// ## Unix Platform
+///
+/// The unix implementation uses `RTLD_DEFAULT`, which does not require additional input.
+/// Since `Library` and `CloseableLibrary` still require at least one library name, so a dummy
+/// value must be used.
+///
+/// ## Windows Platform
+///
+/// The windows implementation must specify, which libraries the `SelfLoader` shall attempt to load from.
 ///
 /// # Example
 ///

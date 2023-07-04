@@ -11,7 +11,7 @@ use crate::loader::Close;
 
 // this wrapper struct is the bane of my existance...
 #[derive(Debug)]
-struct FnAddrWrapper(pub FnAddr);
+struct FnAddrWrapper(FnAddr);
 unsafe impl Send for FnAddrWrapper {}
 
 mod sealed {
@@ -36,7 +36,7 @@ pub trait FindAndSwap<'a>: sealed::Sealed {
 /// A library handle.
 #[derive(Debug)]
 pub struct Library<'a, L: Loader> {
-	libs: &'a [&'static str],
+	libs: &'a [&'a str],
 	// library handle
 	hlib: Mutex<Option<L>>,
 }
@@ -44,10 +44,18 @@ pub struct Library<'a, L: Loader> {
 impl<'a, L: Loader> Library<'a, L> {
 	/// Constructs a new `Library`.
 	///
+	/// This function accepts a slice of paths the Library will attempt to load from
+	/// by priority (where `0..n`, index `0` is highest, and `n` is lowest), but only the first
+	/// library successfully loaded will be used. The reason is to provide fallback
+	/// mechanism in case the shared library is in a seperate directory or may have a variety
+	/// of names.
+	///
+	/// *Note: Symbols used in the libraries **must** be the same in all fallback paths.*
+	///
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
-	pub const fn new(libs: &'a [&'static str]) -> Self {
-		assert!(!libs.is_empty(), "`libs` array cannot be empty.");
+	pub const fn new(libs: &'a [&'a str]) -> Self {
+		assert!(!libs.is_empty());
 		Self {
 			libs,
 			hlib: Mutex::new(None),
@@ -99,10 +107,20 @@ pub struct CloseableLibrary<'a, L: Loader + Close> {
 }
 
 impl <'a, L: Loader + Close> CloseableLibrary<'a, L> {
+	/// Constructs a new `CloseableLibrary`.
+	///
+	/// This function accepts a slice of paths the Library will attempt to load from
+	/// by priority (where `0..n`, index `0` is highest, and `n` is lowest), but only the first
+	/// library successfully loaded will be used. The reason is to provide fallback
+	/// mechanism in case the shared library is in a seperate directory or may have a variety
+	/// of names.
+	///
+	/// *Note: Symbols used in the libraries **must** be the same in all fallback paths.*
+	///
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
-	pub const fn new(libs: &'a [&'static str]) -> Self {
-		assert!(!libs.is_empty(), "`libs` array cannot be empty.");
+	pub const fn new(libs: &'a [&'a str]) -> Self {
+		assert!(!libs.is_empty());
 		Self {
 			inner: Library::new(libs),
 			reset_vec: Mutex::new(Vec::new()),
