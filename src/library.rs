@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::Mutex;
 use std::io;
 
-#[cfg(feature = "close")]
-use crate::loader::Closeable;
+#[cfg(any(feature = "close", doc))]
+use crate::loader::Close;
 
 // this wrapper struct is the bane of my existance...
 #[derive(Debug)]
@@ -19,7 +19,8 @@ mod sealed {
 	use super::*;
 	pub trait Sealed {}
 	impl <L: Loader, const N: usize> Sealed for Library<L, N> {}
-	impl <L: Loader + Closeable, const N: usize> Sealed for CloseableLibrary<L, N> {}
+	#[cfg(any(feature = "close", doc))]
+	impl <L: Loader + Close, const N: usize> Sealed for CloseableLibrary<L, N> {}
 }
 
 /// Implements constraint to use the [`dylink`](crate::dylink) attribute macro `library` parameter.
@@ -99,19 +100,19 @@ impl <'a, L: Loader, const N: usize> FindAndSwap<'a> for Library<L, N> {
 	}
 }
 
-#[cfg(feature = "close")]
-pub struct CloseableLibrary<L: Loader + Closeable, const N: usize> {
+#[cfg(any(feature = "close", doc))]
+pub struct CloseableLibrary<L: Loader + Close, const N: usize> {
 	inner: Library<L, N>,
 	reset_vec: Mutex<Vec<(&'static AtomicPtr<()>, FnAddrWrapper)>>,
 }
 
-#[cfg(feature = "close")]
-unsafe impl<L: Loader + Closeable + Send, const N: usize> Send for CloseableLibrary<L, N> {}
-#[cfg(feature = "close")]
-unsafe impl<L: Loader + Closeable + Send, const N: usize> Sync for CloseableLibrary<L, N> {}
+#[cfg(any(feature = "close", doc))]
+unsafe impl<L: Loader + Close + Send, const N: usize> Send for CloseableLibrary<L, N> {}
+#[cfg(any(feature = "close", doc))]
+unsafe impl<L: Loader + Close + Send, const N: usize> Sync for CloseableLibrary<L, N> {}
 
-#[cfg(feature = "close")]
-impl <L: Loader + Closeable, const N: usize> CloseableLibrary<L, N> {
+#[cfg(any(feature = "close", doc))]
+impl <L: Loader + Close, const N: usize> CloseableLibrary<L, N> {
 	/// # Panic
 	/// Will panic if `libs` is an empty array.
 	pub const fn new(libs: [&'static CStr; N]) -> Self {
@@ -143,7 +144,8 @@ impl <L: Loader + Closeable, const N: usize> CloseableLibrary<L, N> {
 	}
 }
 
-impl <'a, L: Loader + Closeable, const N: usize> FindAndSwap<'static> for CloseableLibrary<L, N> {
+#[cfg(feature="close")]
+impl <'a, L: Loader + Close, const N: usize> FindAndSwap<'static> for CloseableLibrary<L, N> {
 	fn find_and_swap(
 		&self,
 		sym: &'static CStr,

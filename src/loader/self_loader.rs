@@ -7,7 +7,7 @@ use core::ffi::CStr;
 // internal type is opaque and managed by OS, so it's `Send` safe
 unsafe impl Send for SelfLoader {}
 
-impl Loader for SelfLoader {
+unsafe impl Loader for SelfLoader {
 	fn is_invalid(&self) -> bool {
 		if cfg!(windows) {
 			self.0.is_null()

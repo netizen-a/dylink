@@ -6,11 +6,10 @@ use super::*;
 // internal type is opaque and managed by OS, so it's `Send` safe
 unsafe impl Send for SystemLoader {}
 
-impl Loader for SystemLoader {
+unsafe impl Loader for SystemLoader {
 	fn is_invalid(&self) -> bool {
 		self.0.is_null()
 	}
-	//type Handle = SysHandle;
 	/// Increments reference count to handle, and returns handle if successful.
 	unsafe fn load_library(lib_name: &'static ffi::CStr) -> Self {
 		#[cfg(unix)]
@@ -41,16 +40,20 @@ impl Loader for SystemLoader {
 }
 
 #[cfg(any(feature = "close", doc))]
-impl Closeable for SystemLoader {
-	/// decrements reference counter
+impl Close for SystemLoader {
+	/// Decrements reference counter to shared library. When reference counter hits zero the library is unloaded.
+	/// ## Errors
+	/// May error depending on system call.
 	unsafe fn close(self) -> io::Result<()> {
 		let result = crate::os::dlclose(self.0);
 		if (cfg!(windows) && result == 0) || (cfg!(unix) && result != 0) {
 			#[cfg(windows)] {
+				// windows dumps *all* error info into this call.
 				Err(io::Error::last_os_error())
 			}
 			#[cfg(unix)] {
-				// dlerror should be here, but POSIX spec doesn't guarantee MT-safety.
+				// unix uses dlerror to for error handling, but it's 
+				// not MT-safety guarenteed, so I can't use it.
 				Err(io::Error::new(
 					io::ErrorKind::Other,
 					"Unknown Error. Call `dlerror` for more information"

@@ -75,7 +75,7 @@ fn test_linux_x11() {
 			XCloseDisplay(disp);
 		}
 	}
-	#[cfg(feature = "close")]
+	#[cfg(any(feature = "close", doc))]
 	{
 		LIB_X11.close().expect("close failed");
 	}
