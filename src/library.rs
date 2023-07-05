@@ -12,6 +12,7 @@ use crate::loader::Close;
 // this wrapper struct is the bane of my existance...
 #[derive(Debug)]
 struct FnAddrWrapper(FnAddr);
+// functions are inherently Send and Sync, so this is safe.
 unsafe impl Send for FnAddrWrapper {}
 
 mod sealed {
@@ -168,6 +169,16 @@ impl <L: Loader + Close> FindAndSwap<'static> for CloseableLibrary<'_, L> {
 					.push((ppfn, FnAddrWrapper(function)));
 				Some(function)
 			}
+		}
+	}
+}
+
+// This is safe because Library discards `Close`, and `From` cannot be used when `Drop` can't be used.
+impl <'a, L: Loader + Close> From<CloseableLibrary<'a, L>> for Library<'a, L> {
+	fn from(value: CloseableLibrary<'a, L>) -> Self {
+		Self {
+			libs: value.inner.libs,
+			hlib: value.inner.hlib,
 		}
 	}
 }
