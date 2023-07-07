@@ -31,10 +31,7 @@ unsafe impl Loader for SelfLoader {
 		}
 		#[cfg(windows)]
 		{
-			let wide_str: Vec<u16> = path
-					.encode_utf16()
-					.chain(core::iter::once(0u16))
-					.collect();
+			let wide_str: Vec<u16> = path.encode_utf16().chain(core::iter::once(0u16)).collect();
 			let wide_ptr = if path.is_empty() {
 				std::ptr::null()
 			} else {
@@ -44,7 +41,7 @@ unsafe impl Loader for SelfLoader {
 			let _ = win32::GetModuleHandleExW(
 				win32::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
 				wide_ptr,
-				handle.as_mut_ptr()
+				handle.as_mut_ptr(),
 			);
 			Self(handle.assume_init())
 		}

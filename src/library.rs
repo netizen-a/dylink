@@ -2,10 +2,9 @@
 
 use crate::loader::Loader;
 use crate::SymAddr;
-use std::sync::atomic::{AtomicPtr, Ordering};
-use std::sync::{Mutex, LockResult, MutexGuard, PoisonError};
 use std::io;
-
+use std::sync::atomic::{AtomicPtr, Ordering};
+use std::sync::{LockResult, Mutex, MutexGuard, PoisonError};
 
 use crate::loader::Close;
 
@@ -16,11 +15,11 @@ pub struct LibraryGuard<'a, L: Loader> {
 	guard: MutexGuard<'a, Option<L>>,
 }
 
-impl <L: Loader> LibraryGuard<'_, L> {
+impl<L: Loader> LibraryGuard<'_, L> {
 	pub fn find_and_swap(&mut self, psym: &AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
 		if let None = *self.guard {
 			for lib_name in self.libs {
-				let handle = unsafe {L::load_library(lib_name)};
+				let handle = unsafe { L::load_library(lib_name) };
 				if !handle.is_invalid() {
 					*self.guard = Some(handle);
 					break;
@@ -29,7 +28,7 @@ impl <L: Loader> LibraryGuard<'_, L> {
 		}
 
 		if let Some(ref lib_handle) = *self.guard {
-			let sym = unsafe {L::find_symbol(lib_handle, symbol)};
+			let sym = unsafe { L::find_symbol(lib_handle, symbol) };
 			if sym.is_null() {
 				None
 			} else {
@@ -46,12 +45,12 @@ pub struct CloseableLibraryGuard<'a, L: Loader> {
 	guard: MutexGuard<'a, (Option<L>, Vec<(&'static AtomicPtr<()>, SymAddrWrapper)>)>,
 }
 
-impl <L: Loader> CloseableLibraryGuard<'_, L> {
+impl<L: Loader> CloseableLibraryGuard<'_, L> {
 	/// will also record the last symbol in the atomic variable
-	pub fn find_and_swap(&mut self, psym: &'static AtomicPtr<()>, symbol: &str) -> Option<SymAddr>{
+	pub fn find_and_swap(&mut self, psym: &'static AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
 		if let None = self.guard.0 {
 			for lib_name in self.libs {
-				let handle = unsafe {L::load_library(lib_name)};
+				let handle = unsafe { L::load_library(lib_name) };
 				if !handle.is_invalid() {
 					self.guard.0 = Some(handle);
 					break;
@@ -60,7 +59,7 @@ impl <L: Loader> CloseableLibraryGuard<'_, L> {
 		}
 
 		if let Some(ref lib_handle) = self.guard.0 {
-			let sym = unsafe {L::find_symbol(lib_handle, symbol)};
+			let sym = unsafe { L::find_symbol(lib_handle, symbol) };
 			if sym.is_null() {
 				None
 			} else {
@@ -71,7 +70,6 @@ impl <L: Loader> CloseableLibraryGuard<'_, L> {
 		} else {
 			None
 		}
-
 	}
 }
 
@@ -83,8 +81,8 @@ unsafe impl Send for SymAddrWrapper {}
 mod sealed {
 	use super::*;
 	pub trait Sealed {}
-	impl <L: Loader> Sealed for Library<'_, L> {}
-	impl <L: Loader + Close> Sealed for CloseableLibrary<'_, L> {}
+	impl<L: Loader> Sealed for Library<'_, L> {}
+	impl<L: Close> Sealed for CloseableLibrary<'_, L> {}
 }
 
 /// Implements constraint to use the [`dylink`](crate::dylink) attribute macro `library` parameter.
@@ -129,59 +127,31 @@ impl<'a, L: Loader> Library<'a, L> {
 	}
 }
 
-impl <'a, L: Loader + 'a> LibraryLock<'a> for Library<'a, L> {
+impl<'a, L: Loader + 'a> LibraryLock<'a> for Library<'a, L> {
 	type Guard = LibraryGuard<'a, L>;
-	/// acquires lock and attempts to load the library
-	fn lock(&'a self) -> LockResult<Self::Guard>{
-		self.hlib.lock().map(
-		|guard| {
-			LibraryGuard{libs: self.libs, guard}
-		}).or_else(|poison|{
-    		Err(PoisonError::new(LibraryGuard{libs: self.libs, guard: poison.into_inner()
-			}))
-		})
+	/// acquires lock
+	fn lock(&'a self) -> LockResult<Self::Guard> {
+		self.hlib
+			.lock()
+			.map(|guard| LibraryGuard {
+				libs: self.libs,
+				guard,
+			})
+			.or_else(|poison| {
+				Err(PoisonError::new(LibraryGuard {
+					libs: self.libs,
+					guard: poison.into_inner(),
+				}))
+			})
 	}
-	// Acquires a lock to load the library if not already loaded.
-	// Finds and stores a symbol into the `atom` pointer, returning the previous value.
-	//
-	// `find_and_swap` takes an `Ordering` argument which describes the memory ordering of this operation. All ordering modes are possible. Note that using `Acquire` makes the store part of this operation `Relaxed`, and using `Release` makes the load part `Relaxed`.
-	/*fn find_and_swap(
-		&self,
-		sym: &str,
-		ppfn: &AtomicPtr<()>,
-		order: Ordering,
-	) -> Option<FnAddr> {
-		let mut lock = self.hlib.lock().unwrap();
-		if let None = *lock {
-			for lib_name in self.libs {
-				let handle = unsafe {L::load_library(lib_name)};
-				if !handle.is_invalid() {
-					*lock = Some(handle);
-					break;
-				}
-			}
-		}
-
-		if let Some(ref lib_handle) = *lock {
-			let sym = unsafe {L::find_symbol(lib_handle, sym)};
-			if sym.is_null() {
-				None
-			} else {
-				Some(ppfn.swap(sym.cast_mut(), order))
-			}
-		} else {
-			None
-		}
-	}*/
 }
 
-
-pub struct CloseableLibrary<'a, L: Loader + Close> {
+pub struct CloseableLibrary<'a, L: Close> {
 	libs: &'a [&'a str],
 	inner: Mutex<(Option<L>, Vec<(&'static AtomicPtr<()>, SymAddrWrapper)>)>,
 }
 
-impl <'a, L: Loader + Close> CloseableLibrary<'a, L> {
+impl<'a, L: Close> CloseableLibrary<'a, L> {
 	/// Constructs a new `CloseableLibrary`.
 	///
 	/// This function accepts a slice of paths the Library will attempt to load from
@@ -214,43 +184,52 @@ impl <'a, L: Loader + Close> CloseableLibrary<'a, L> {
 				pfn.store(init_addr.cast_mut(), Ordering::Release);
 			}
 			drop(guard);
-			match unsafe {handle.close()} {
+			match unsafe { handle.close() } {
 				Ok(()) => Ok(()),
 				Err(e) => Err(e),
 			}
 		} else {
-			Err(io::Error::new(io::ErrorKind::InvalidInput, "`CloseableLibrary` is uninitialized."))
+			Err(io::Error::new(
+				io::ErrorKind::InvalidInput,
+				"`CloseableLibrary` is uninitialized.",
+			))
 		}
 	}
 }
 
-impl <'a, L: Loader + Close + 'a> LibraryLock<'a> for CloseableLibrary<'a, L> {
+impl<'a, L: Close + 'a> LibraryLock<'a> for CloseableLibrary<'a, L> {
 	type Guard = CloseableLibraryGuard<'a, L>;
-	/// acquires lock and attempts to load the library
-	fn lock(&'a self) -> LockResult<Self::Guard>{
-		self.inner.lock().map(
-		|guard| {
-			CloseableLibraryGuard{libs: self.libs, guard}
-		}).or_else(|poison|{
-			Err(PoisonError::new(CloseableLibraryGuard{libs: self.libs, guard: poison.into_inner()
-			}))
-		})
+	/// acquires lock
+	fn lock(&'a self) -> LockResult<Self::Guard> {
+		self.inner
+			.lock()
+			.map(|guard| CloseableLibraryGuard {
+				libs: self.libs,
+				guard,
+			})
+			.or_else(|poison| {
+				Err(PoisonError::new(CloseableLibraryGuard {
+					libs: self.libs,
+					guard: poison.into_inner(),
+				}))
+			})
 	}
-	/*fn find_and_swap(
-		&self,
-		sym: &str,
-		ppfn: &'static AtomicPtr<()>,
-		order: Ordering,
-	) -> Option<FnAddr> {
-		match self.inner.find_and_swap(sym, ppfn, order) {
-			None => None,
-			Some(function) => {
-				self.reset_vec
-					.lock()
-					.unwrap()
-					.push((ppfn, FnAddrWrapper(function)));
-				Some(function)
-			}
+}
+
+impl<'a, L: Close + 'a> TryFrom<CloseableLibrary<'a, L>> for Library<'a, L> {
+	type Error = PoisonError<CloseableLibrary<'a, L>>;
+	fn try_from(value: CloseableLibrary<'a, L>) -> Result<Self, Self::Error> {
+		// this repackages `value` into `Self`
+		match value.inner.into_inner() {
+			Ok(inner) => Ok(Self {
+				libs: value.libs,
+				hlib: Mutex::new(inner.0),
+			}),
+			// this is redundant, but at least prevents inner from spilling into public.
+			Err(poison) => Err(PoisonError::new(CloseableLibrary {
+				libs: value.libs,
+				inner: Mutex::new(poison.into_inner()),
+			})),
 		}
-	}*/
+	}
 }

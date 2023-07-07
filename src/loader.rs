@@ -3,7 +3,6 @@
 use crate::*;
 use std::io;
 
-
 #[cfg(any(windows, unix, doc))]
 mod self_loader;
 #[cfg(any(windows, unix, doc))]
@@ -16,10 +15,6 @@ mod sys_loader;
 /// This trait should not be used directly, and instead be used in conjunction with `CloseableLibrary`,
 /// so that the lifetimes of retrieved symbols are not invalidated.
 
-pub unsafe trait Close {
-	unsafe fn close(self) -> io::Result<()>;
-}
-
 /// Used to specify the run-time linker loader constraint for [`Library`]
 pub unsafe trait Loader: Send {
 	fn is_invalid(&self) -> bool;
@@ -27,12 +22,15 @@ pub unsafe trait Loader: Send {
 	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr;
 }
 
+pub unsafe trait Close: Loader {
+	unsafe fn close(self) -> io::Result<()>;
+}
+
 /// A system library loader.
 ///
 /// This is a basic library loader primitive designed to be used with [`Library`].
 #[cfg(any(windows, unix, doc))]
 pub struct SystemLoader(*mut core::ffi::c_void);
-
 
 /// A retroactive system loader.
 ///

@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use core::ffi::{c_char, c_void};
 use crate::SymAddr;
+use core::ffi::{c_char, c_void};
 // yes this is cursed, and no I'm not changing it.
 extern "system" {
 	#[cfg_attr(windows, link_name = "GetProcAddress")]
@@ -24,7 +24,11 @@ pub mod win32 {
 	pub const LOAD_LIBRARY_SAFE_CURRENT_DIRS: u32 = 0x00002000u32;
 	extern "stdcall" {
 		pub fn LoadLibraryExW(lplibfilename: PCWSTR, hfile: HANDLE, dwflags: u32) -> HMODULE;
-		pub fn GetModuleHandleExW(dwFlags: u32, lpmodulename: PCWSTR, phModule: *mut HMODULE) -> BOOL;
+		pub fn GetModuleHandleExW(
+			dwFlags: u32,
+			lpmodulename: PCWSTR,
+			phModule: *mut HMODULE,
+		) -> BOOL;
 	}
 }
 

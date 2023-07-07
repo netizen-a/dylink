@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::{io, ffi::CString};
 use super::*;
+use std::{ffi::CString, io};
 
 // internal type is opaque and managed by OS, so it's `Send` safe
 unsafe impl Send for SystemLoader {}
@@ -21,10 +21,7 @@ unsafe impl Loader for SystemLoader {
 		#[cfg(windows)]
 		{
 			use crate::os::win32::*;
-			let wide_str: Vec<u16> = path
-				.encode_utf16()
-				.chain(core::iter::once(0u16))
-				.collect();
+			let wide_str: Vec<u16> = path.encode_utf16().chain(core::iter::once(0u16)).collect();
 
 			Self(crate::os::win32::LoadLibraryExW(
 				wide_str.as_ptr().cast(),
@@ -40,7 +37,6 @@ unsafe impl Loader for SystemLoader {
 	}
 }
 
-
 unsafe impl Close for SystemLoader {
 	/// Decrements reference counter to shared library. When reference counter hits zero the library is unloaded.
 	/// ## Errors
@@ -48,16 +44,18 @@ unsafe impl Close for SystemLoader {
 	unsafe fn close(self) -> io::Result<()> {
 		let result = crate::os::dlclose(self.0);
 		if (cfg!(windows) && result == 0) || (cfg!(unix) && result != 0) {
-			#[cfg(windows)] {
+			#[cfg(windows)]
+			{
 				// windows dumps *all* error info into this call.
 				Err(io::Error::last_os_error())
 			}
-			#[cfg(unix)] {
+			#[cfg(unix)]
+			{
 				// unix uses dlerror to for error handling, but it's
 				// not MT-safety guarenteed, so I can't use it.
 				Err(io::Error::new(
 					io::ErrorKind::Other,
-					"Unknown Error. Call `dlerror` for more information"
+					"Unknown Error. Call `dlerror` for more information",
 				))
 			}
 		} else {

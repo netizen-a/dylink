@@ -1,4 +1,2 @@
 use super::*;
-impl <L: Loader> LibraryGuard<'_, L> {
-
-}
+impl<L: Loader> LibraryGuard<'_, L> {}
