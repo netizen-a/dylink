@@ -52,10 +52,10 @@ pub use loader::*;
 ///```
 pub use dylink_macro::dylink;
 
-/// Raw function address.
+/// Raw symbol address.
 ///
-/// Must be cast into a function pointer to be useable.
-pub type FnAddr = *const ();
+/// Must be cast to be useable.
+pub type SymAddr = *const ();
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]

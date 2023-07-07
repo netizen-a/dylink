@@ -43,9 +43,8 @@ Below is a basic working example on how to use the macro on windows.
 
 ```rust
 use dylink::*;
-use std::ffi::CStr;
 
-static KERNEL32: Library<SystemLoader> = Library::new(&["Kernel32.dll\0"]);
+static KERNEL32: Library<SystemLoader> = Library::new(&["Kernel32.dll"]);
 
 #[dylink(library=KERNEL32)]
 extern "stdcall" {
@@ -53,11 +52,9 @@ extern "stdcall" {
     fn SetLastError(_: u32);
 }
 
-fn main() {
-   unsafe {
-      SetLastError(52);
-      assert_eq!(52, GetLastError());
-   }
+unsafe {
+   SetLastError(52);
+   assert_eq!(52, GetLastError());
 }
 ```
 

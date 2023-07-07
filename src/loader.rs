@@ -24,7 +24,7 @@ pub unsafe trait Close {
 pub unsafe trait Loader: Send {
 	fn is_invalid(&self) -> bool;
 	unsafe fn load_library(path: &str) -> Self;
-	unsafe fn find_symbol(&self, symbol: &str) -> FnAddr;
+	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr;
 }
 
 /// A system library loader.

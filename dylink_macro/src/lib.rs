@@ -193,11 +193,9 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			);
 
 			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
-				let symbol = ::dylink::FindAndSwap::find_and_swap(&#library,
-					#link_name,
-					&FUNC,
-					std::sync::atomic::Ordering::SeqCst
-				);
+				let symbol = ::dylink::LibraryLock::lock(&#library)
+					.unwrap()
+					.find_and_swap(&FUNC,#link_name);
 				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = match symbol {
 					None => panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name)),
 					Some(_) => std::mem::transmute(FUNC.load(Ordering::Relaxed)),

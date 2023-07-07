@@ -10,7 +10,7 @@ unsafe impl Loader for SystemLoader {
 	fn is_invalid(&self) -> bool {
 		self.0.is_null()
 	}
-	/// Increments reference count to handle, and returns handle if successful.
+	/// If successful, increments reference count to shared library handle, and constructs `SystemLoader`.
 	unsafe fn load_library(path: &str) -> Self {
 		#[cfg(unix)]
 		{
@@ -34,7 +34,7 @@ unsafe impl Loader for SystemLoader {
 		}
 	}
 
-	unsafe fn find_symbol(&self, symbol: &str) -> crate::FnAddr {
+	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr {
 		let c_str = CString::new(symbol).unwrap();
 		crate::os::dlsym(self.0, c_str.as_ptr().cast())
 	}
