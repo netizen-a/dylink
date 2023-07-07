@@ -8,70 +8,22 @@ use std::sync::{LockResult, Mutex, MutexGuard, PoisonError};
 
 use crate::loader::Close;
 
-mod lib_guard;
+mod guard;
 
+
+#[derive(Debug)]
 pub struct LibraryGuard<'a, L: Loader> {
 	libs: &'a [&'a str],
 	guard: MutexGuard<'a, Option<L>>,
 }
 
-impl<L: Loader> LibraryGuard<'_, L> {
-	pub fn find_and_swap(&mut self, psym: &AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
-		if let None = *self.guard {
-			for lib_name in self.libs {
-				let handle = unsafe { L::load_library(lib_name) };
-				if !handle.is_invalid() {
-					*self.guard = Some(handle);
-					break;
-				}
-			}
-		}
 
-		if let Some(ref lib_handle) = *self.guard {
-			let sym = unsafe { L::find_symbol(lib_handle, symbol) };
-			if sym.is_null() {
-				None
-			} else {
-				Some(psym.swap(sym.cast_mut(), Ordering::SeqCst))
-			}
-		} else {
-			None
-		}
-	}
-}
-
+#[derive(Debug)]
 pub struct CloseableLibraryGuard<'a, L: Loader> {
 	libs: &'a [&'a str],
 	guard: MutexGuard<'a, (Option<L>, Vec<(&'static AtomicPtr<()>, SymAddrWrapper)>)>,
 }
 
-impl<L: Loader> CloseableLibraryGuard<'_, L> {
-	/// will also record the last symbol in the atomic variable
-	pub fn find_and_swap(&mut self, psym: &'static AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
-		if let None = self.guard.0 {
-			for lib_name in self.libs {
-				let handle = unsafe { L::load_library(lib_name) };
-				if !handle.is_invalid() {
-					self.guard.0 = Some(handle);
-					break;
-				}
-			}
-		}
-
-		if let Some(ref lib_handle) = self.guard.0 {
-			let sym = unsafe { L::find_symbol(lib_handle, symbol) };
-			if sym.is_null() {
-				None
-			} else {
-				let last_symbol = psym.swap(sym.cast_mut(), Ordering::SeqCst);
-				self.guard.1.push((psym, SymAddrWrapper(last_symbol)));
-				Some(last_symbol)
-			}
-		} else {
-			None
-		}
-	}
-}
 
 // this wrapper struct is the bane of my existance...
 #[derive(Debug)]
@@ -171,30 +123,6 @@ impl<'a, L: Close> CloseableLibrary<'a, L> {
 			inner: Mutex::new((None, Vec::new())),
 		}
 	}
-
-	/// closes the library and resets all associated function pointers to uninitialized state.
-	///
-	/// # Errors
-	/// This may error if library is uninitialized.
-	pub unsafe fn close(&self) -> io::Result<()> {
-		let mut guard = self.inner.lock().unwrap();
-		let (hlib, rstv) = &mut *guard;
-		if let Some(handle) = hlib.take() {
-			for (pfn, SymAddrWrapper(init_addr)) in rstv.drain(..) {
-				pfn.store(init_addr.cast_mut(), Ordering::Release);
-			}
-			drop(guard);
-			match unsafe { handle.close() } {
-				Ok(()) => Ok(()),
-				Err(e) => Err(e),
-			}
-		} else {
-			Err(io::Error::new(
-				io::ErrorKind::InvalidInput,
-				"`CloseableLibrary` is uninitialized.",
-			))
-		}
-	}
 }
 
 impl<'a, L: Close + 'a> LibraryLock<'a> for CloseableLibrary<'a, L> {
@@ -213,23 +141,5 @@ impl<'a, L: Close + 'a> LibraryLock<'a> for CloseableLibrary<'a, L> {
 					guard: poison.into_inner(),
 				}))
 			})
-	}
-}
-
-impl<'a, L: Close + 'a> TryFrom<CloseableLibrary<'a, L>> for Library<'a, L> {
-	type Error = PoisonError<CloseableLibrary<'a, L>>;
-	fn try_from(value: CloseableLibrary<'a, L>) -> Result<Self, Self::Error> {
-		// this repackages `value` into `Self`
-		match value.inner.into_inner() {
-			Ok(inner) => Ok(Self {
-				libs: value.libs,
-				hlib: Mutex::new(inner.0),
-			}),
-			// this is redundant, but at least prevents inner from spilling into public.
-			Err(poison) => Err(PoisonError::new(CloseableLibrary {
-				libs: value.libs,
-				inner: Mutex::new(poison.into_inner()),
-			})),
-		}
 	}
 }

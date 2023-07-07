@@ -8,13 +8,6 @@ mod self_loader;
 #[cfg(any(windows, unix, doc))]
 mod sys_loader;
 
-/// This trait is similar to the `Drop` trait, which frees resources.
-/// Unlike the `Drop` trait, `Close` must assume there side affects when closing a library.
-/// As a consequence of these side affects `close` is marked as `unsafe`.
-///
-/// This trait should not be used directly, and instead be used in conjunction with `CloseableLibrary`,
-/// so that the lifetimes of retrieved symbols are not invalidated.
-
 /// Used to specify the run-time linker loader constraint for [`Library`]
 pub unsafe trait Loader: Send {
 	fn is_invalid(&self) -> bool;
@@ -22,6 +15,12 @@ pub unsafe trait Loader: Send {
 	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr;
 }
 
+/// This trait is similar to the `Drop` trait, which frees resources.
+/// Unlike the `Drop` trait, `Close` must assume there side affects when closing a library.
+/// As a consequence of these side affects `close` is marked as `unsafe`.
+///
+/// This trait should not be used directly, and instead be used in conjunction with `CloseableLibrary`,
+/// so that the lifetimes of retrieved symbols are not invalidated.
 pub unsafe trait Close: Loader {
 	unsafe fn close(self) -> io::Result<()>;
 }
