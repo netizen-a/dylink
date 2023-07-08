@@ -1,14 +1,5 @@
 use super::*;
 
-unsafe fn force_load<L: Loader>(libs: &[&str]) -> Option<L> {
-	for lib_name in libs {
-		let handle = L::load_library(lib_name);
-		if !handle.is_invalid() {
-			return Some(handle);
-		}
-	}
-	None
-}
 
 impl<L: Loader> LibraryGuard<'_, L> {
     /// Attempts to resolve lazily evaluated library handle, which if successful will also
@@ -17,7 +8,7 @@ impl<L: Loader> LibraryGuard<'_, L> {
     /// If successful the return value is Some with last address in `psym`, otherwise returns None.
 	pub fn find_and_swap(&mut self, psym: &AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
         if let None = *self.guard {
-			*self.guard = unsafe {force_load(self.libs)};
+			*self.guard = unsafe {self.libs.iter().find_map(|name| L::open(name))};
 		}
 
 		if let Some(ref lib_handle) = *self.guard {
@@ -43,7 +34,7 @@ impl<L: Close> CloseableLibraryGuard<'_, L> {
 	/// when [`close`](CloseableLibraryGuard::close) is called
 	pub fn find_and_swap(&mut self, psym: &'static AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
 		if let None = self.guard.0 {
-			self.guard.0 = unsafe {force_load(self.libs)};
+			self.guard.0 = unsafe {self.libs.iter().find_map(|name| L::open(name))};
 		}
 
 		if let Some(ref lib_handle) = self.guard.0 {
@@ -59,7 +50,9 @@ impl<L: Close> CloseableLibraryGuard<'_, L> {
 			None
 		}
 	}
-    /// closes the library and resets all associated function pointers to uninitialized state.
+    /// Closes, but does not `drop` the library.
+    ///
+    /// All associated function pointers are reset to initial state.
 	///
 	/// # Errors
 	/// This may error if library is uninitialized.

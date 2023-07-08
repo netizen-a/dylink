@@ -2,35 +2,27 @@
 
 use super::*;
 use crate::os::*;
-use std::{ffi, mem::MaybeUninit};
+use std::ffi;
 
 // internal type is opaque and managed by OS, so it's `Send` safe
 unsafe impl Send for SelfLoader {}
 
 unsafe impl Loader for SelfLoader {
-	fn is_invalid(&self) -> bool {
-		if cfg!(windows) {
-			self.0.is_null()
-		} else if cfg!(unix) {
-			false
-		} else {
-			unreachable!("platform unsupported")
-		}
-	}
 	/// Does not increment reference count to handle.
-	/// ### Unix Platform
+	/// # Unix Platform
 	/// On unix,  `path` is ignored, and a default library handle is returned.
 	///
-	/// ### Windows Platform
+	/// # Windows Platform
 	/// On windows, `path` is used to load the library handle.
-	unsafe fn load_library(path: &str) -> Self {
+	unsafe fn open(path: &str) -> Option<Self> {
 		#[cfg(unix)]
 		{
 			let _ = path;
-			Self(unix::RTLD_DEFAULT)
+			Some(Self(unix::RTLD_DEFAULT))
 		}
 		#[cfg(windows)]
 		{
+			use std::mem::MaybeUninit;
 			let wide_str: Vec<u16> = path.encode_utf16().chain(core::iter::once(0u16)).collect();
 			let wide_ptr = if path.is_empty() {
 				std::ptr::null()
@@ -38,12 +30,16 @@ unsafe impl Loader for SelfLoader {
 				wide_str.as_ptr()
 			};
 			let mut handle = MaybeUninit::zeroed();
-			let _ = win32::GetModuleHandleExW(
+			let result = win32::GetModuleHandleExW(
 				win32::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
 				wide_ptr,
 				handle.as_mut_ptr(),
 			);
-			Self(handle.assume_init())
+			if result != 0 {
+				Some(Self(handle.assume_init()))
+			} else {
+				None
+			}
 		}
 	}
 	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr {

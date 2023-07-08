@@ -8,10 +8,16 @@ mod self_loader;
 #[cfg(any(windows, unix, doc))]
 mod sys_loader;
 
-/// Used to specify the run-time linker loader constraint for [`Library`]
-pub unsafe trait Loader: Send {
-	fn is_invalid(&self) -> bool;
-	unsafe fn load_library(path: &str) -> Self;
+/// Used to specify the run-time linker loader constraint for [`Library`].
+/// `Loader` can also be used to make custom loaders.
+pub unsafe trait Loader: Send + Sized {
+	/// Opens a shared library at `path`.
+	///
+	/// Returns `Some` if success, otherwise `None`.
+	unsafe fn open(path: &str) -> Option<Self>;
+	/// Retrieves symbol from shared library.
+	///
+	/// If success [`SymAddr`] resolves to a valid pointer, otherwise is `null`.
 	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr;
 }
 
@@ -19,8 +25,7 @@ pub unsafe trait Loader: Send {
 /// Unlike the `Drop` trait, `Close` must assume there side affects when closing a library.
 /// As a consequence of these side affects `close` is marked as `unsafe`.
 ///
-/// This trait should not be used directly, and instead be used in conjunction with `CloseableLibrary`,
-/// so that the lifetimes of retrieved symbols are not invalidated.
+/// *Note: Closing a library is always considered super unsafe.*
 pub unsafe trait Close: Loader {
 	unsafe fn close(self) -> io::Result<()>;
 }
@@ -31,9 +36,9 @@ pub unsafe trait Close: Loader {
 #[cfg(any(windows, unix, doc))]
 pub struct SystemLoader(*mut core::ffi::c_void);
 
-/// A retroactive system loader.
+/// A system self loader.
 ///
-/// This loader is responsible for retrieving symbols from libraries already loaded.
+/// This loader is retrieves symbols from libraries currently loaded by this process.
 ///
 /// # Unix Platform
 ///
@@ -49,11 +54,11 @@ pub struct SystemLoader(*mut core::ffi::c_void);
 ///
 /// ```rust
 /// use dylink::*;
-/// use std::ffi::{c_char, c_int, CStr};
+/// use std::ffi::*;
 ///
-/// static LIBC_LIB: Library<SelfLoader> = Library::new(&["libc"]);
+/// static THIS: Library<SelfLoader> = Library::new(&[""]);
 ///
-/// #[dylink(library=LIBC_LIB)]
+/// #[dylink(library=THIS)]
 /// extern "C" {
 /// 	fn atoi(s: *const c_char) -> c_int;
 /// }

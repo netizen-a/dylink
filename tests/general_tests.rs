@@ -66,6 +66,10 @@ fn test_linux_x11() {
 			println!("display created successfully.\nnow destroying...");
 			XCloseDisplay(disp);
 		}
-		LIB_X11.close().expect("close failed");
+		LIB_X11
+			.lock()
+			.expect("failed to get lock")
+			.close()
+			.expect("close failed");
 	}
 }

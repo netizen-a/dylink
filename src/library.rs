@@ -40,6 +40,17 @@ mod sealed {
 /// Implements constraint to use the [`dylink`](crate::dylink) attribute macro `library` parameter.
 pub trait LibraryLock<'a>: sealed::Sealed {
 	type Guard: 'a;
+	/// Acquires a mutex, blocking the current thread until it is able to do so.
+	///
+	/// This function will block the local thread until it is available to acquire the mutex. Upon returning, the thread is the only thread with the lock held. An RAII guard is returned to allow scoped unlock of the lock. When the guard goes out of scope, the mutex will be unlocked.
+	///
+	/// The exact behavior on locking a mutex in the thread which already holds the lock is left unspecified. However, this function will not return on the second call (it might panic or deadlock, for example).
+	/// # Errors
+	///
+	/// If another user of this mutex panicked while holding the mutex, then this call will return an error once the mutex is acquired.
+	/// # Panics
+	///
+	/// This function might panic when called if the lock is already held by the current thread.
 	fn lock(&'a self) -> LockResult<Self::Guard>;
 }
 
@@ -81,7 +92,7 @@ impl<'a, L: Loader> Library<'a, L> {
 
 impl<'a, L: Loader + 'a> LibraryLock<'a> for Library<'a, L> {
 	type Guard = LibraryGuard<'a, L>;
-	/// acquires lock
+
 	fn lock(&'a self) -> LockResult<Self::Guard> {
 		self.hlib
 			.lock()
@@ -127,7 +138,7 @@ impl<'a, L: Close> CloseableLibrary<'a, L> {
 
 impl<'a, L: Close + 'a> LibraryLock<'a> for CloseableLibrary<'a, L> {
 	type Guard = CloseableLibraryGuard<'a, L>;
-	/// acquires lock
+
 	fn lock(&'a self) -> LockResult<Self::Guard> {
 		self.inner
 			.lock()

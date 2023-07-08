@@ -1,33 +1,35 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use super::*;
-use std::{ffi::CString, io};
+use std::{ffi::{CString, c_void}, io};
 
 // internal type is opaque and managed by OS, so it's `Send` safe
 unsafe impl Send for SystemLoader {}
 
 unsafe impl Loader for SystemLoader {
-	fn is_invalid(&self) -> bool {
-		self.0.is_null()
-	}
 	/// If successful, increments reference count to shared library handle, and constructs `SystemLoader`.
-	unsafe fn load_library(path: &str) -> Self {
+	unsafe fn open(path: &str) -> Option<Self> {
+		let handle: *mut c_void;
 		#[cfg(unix)]
 		{
 			use crate::os::unix::*;
 			let c_str = CString::new(path).unwrap();
-			Self(dlopen(c_str.as_ptr(), RTLD_NOW | RTLD_LOCAL))
+			handle = dlopen(c_str.as_ptr(), RTLD_NOW | RTLD_LOCAL);
 		}
 		#[cfg(windows)]
 		{
 			use crate::os::win32::*;
 			let wide_str: Vec<u16> = path.encode_utf16().chain(core::iter::once(0u16)).collect();
-
-			Self(crate::os::win32::LoadLibraryExW(
+			handle = crate::os::win32::LoadLibraryExW(
 				wide_str.as_ptr().cast(),
 				core::ptr::null_mut(),
 				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SAFE_CURRENT_DIRS,
-			))
+			);
+		}
+		if handle.is_null() {
+			None
+		} else {
+			Some(Self(handle))
 		}
 	}
 
