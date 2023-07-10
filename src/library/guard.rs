@@ -2,6 +2,8 @@ use super::*;
 
 
 // iterates through all paths and skips any checks to load the library somehow.
+// This should be called as infrequently as possible, so its marked cold.
+#[cold]
 pub(super) unsafe fn force_unchecked<L: Loader>(libs: &[&str]) -> Option<L> {
 	libs.iter().find_map(|name| L::open(name))
 }
