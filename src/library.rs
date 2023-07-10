@@ -11,14 +11,24 @@ use crate::loader::Close;
 mod guard;
 mod lock;
 
-
+/// An RAII implementation of a “scoped lock” of a mutex.
+/// When this structure is dropped (falls out of scope), the lock will be unlocked.
+///
+/// The data protected by the mutex can be accessed through this guard via its [`find_and_swap`](LibraryGuard::find_and_swap) implementation.
+///
+/// This structure is created by the [`lock`](Library::lock) method on [`Library`].
 #[derive(Debug)]
 pub struct LibraryGuard<'a, L: Loader> {
 	libs: &'a [&'a str],
 	guard: MutexGuard<'a, Option<L>>,
 }
 
-
+// An RAII implementation of a “scoped lock” of a mutex.
+/// When this structure is dropped (falls out of scope), the lock will be unlocked.
+///
+/// The data protected by the mutex can be accessed through this guard via its [`find_and_swap`](CloseableLibraryGuard::find_and_swap) implementation.
+///
+/// This structure is created by the [`lock`](CloseableLibrary::lock) method on [`CloseableLibrary`].
 #[derive(Debug)]
 pub struct CloseableLibraryGuard<'a, L: Loader> {
 	libs: &'a [&'a str],
@@ -51,7 +61,9 @@ pub trait LibraryLock<'a>: sealed::Sealed {
 	fn lock(&'a self) -> LockResult<Self::Guard>;
 }
 
-/// A library handle.
+/// An object providing access to a lazily loaded library on the filesystem.
+///
+/// This object is designed to be used with [`dylink`](crate::dylink) for subsequent zero overhead calls.
 #[derive(Debug)]
 pub struct Library<'a, L: Loader> {
 	libs: &'a [&'a str],
@@ -85,9 +97,21 @@ impl<'a, L: Loader> Library<'a, L> {
 			hlib: Mutex::new(None),
 		}
 	}
+	/// Immediately loads library.
+	///
+	/// If library is loaded, true is returned, otherwise false.
+	pub fn force(this: &Library<'_, L>) -> bool {
+		let mut lock = this.lock().unwrap();
+		if let None = *lock.guard {
+			*lock.guard = unsafe {guard::force_unchecked(this.libs)};
+		}
+		lock.guard.is_some()
+	}
 }
 
-
+/// An object providing access to a lazily loaded closeable library on the filesystem.
+///
+/// This object is designed to be used with [`dylink`](crate::dylink) for subsequent zero overhead calls.
 pub struct CloseableLibrary<'a, L: Close> {
 	libs: &'a [&'a str],
 	inner: Mutex<(Option<L>, Vec<(&'static AtomicPtr<()>, AtomicSymAddr)>)>,
@@ -112,5 +136,15 @@ impl<'a, L: Close> CloseableLibrary<'a, L> {
 			libs,
 			inner: Mutex::new((None, Vec::new())),
 		}
+	}
+	/// Immediately loads library.
+	///
+	/// If library is loaded, true is returned, otherwise false.
+	pub fn force(this: &CloseableLibrary<'_, L>) -> bool {
+		let mut lock = this.lock().unwrap();
+		if let None = lock.guard.0 {
+			lock.guard.0 = unsafe {guard::force_unchecked(this.libs)};
+		}
+		lock.guard.0.is_some()
 	}
 }

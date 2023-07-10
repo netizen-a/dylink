@@ -30,16 +30,15 @@ pub unsafe trait Loader: Send + Sized {
 pub unsafe trait Close: Loader {
 	unsafe fn close(self) -> io::Result<()>;
 }
-
-/// A system library loader.
+/// An object providing access to an open shared library on the filesystem.
 ///
 /// This is a basic library loader primitive designed to be used with [`Library`].
 #[cfg(any(windows, unix, doc))]
 pub struct SystemLoader(*mut core::ffi::c_void);
 
-/// A system self loader.
+/// An object providing access to libraries currently loaded by this process.
 ///
-/// This loader is retrieves symbols from libraries currently loaded by this process.
+/// This object is designed to be used with [`Library`].
 ///
 /// # Unix Platform
 ///
