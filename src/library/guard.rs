@@ -43,7 +43,7 @@ impl<L: Close> CloseableLibraryGuard<'_, L> {
 				None
 			} else {
 				let last_symbol = psym.swap(sym.cast_mut(), Ordering::SeqCst);
-				self.guard.1.push((psym, SymAddrWrapper(last_symbol)));
+				self.guard.1.push((psym, AtomicSymAddr::new(last_symbol)));
 				Some(last_symbol)
 			}
 		} else {
@@ -59,8 +59,8 @@ impl<L: Close> CloseableLibraryGuard<'_, L> {
 	pub unsafe fn close(&mut self) -> io::Result<()> {
 		let (hlib, rstv) = &mut *self.guard;
 		if let Some(handle) = hlib.take() {
-			for (pfn, SymAddrWrapper(init_addr)) in rstv.drain(..) {
-				pfn.store(init_addr.cast_mut(), Ordering::Release);
+			for (pfn, init_addr) in rstv.drain(..) {
+				pfn.store(init_addr.into_inner(), Ordering::Release);
 			}
 			match handle.close() {
 				Ok(()) => Ok(()),

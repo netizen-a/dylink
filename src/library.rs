@@ -9,6 +9,7 @@ use std::sync::{LockResult, Mutex, MutexGuard, PoisonError};
 use crate::loader::Close;
 
 mod guard;
+mod lock;
 
 
 #[derive(Debug)]
@@ -21,14 +22,10 @@ pub struct LibraryGuard<'a, L: Loader> {
 #[derive(Debug)]
 pub struct CloseableLibraryGuard<'a, L: Loader> {
 	libs: &'a [&'a str],
-	guard: MutexGuard<'a, (Option<L>, Vec<(&'static AtomicPtr<()>, SymAddrWrapper)>)>,
+	guard: MutexGuard<'a, (Option<L>, Vec<(&'static AtomicPtr<()>, AtomicSymAddr)>)>,
 }
 
-
-// this wrapper struct is the bane of my existance...
-#[derive(Debug)]
-struct SymAddrWrapper(SymAddr);
-unsafe impl Send for SymAddrWrapper {}
+type AtomicSymAddr = AtomicPtr<()>;
 
 mod sealed {
 	use super::*;
@@ -90,28 +87,10 @@ impl<'a, L: Loader> Library<'a, L> {
 	}
 }
 
-impl<'a, L: Loader + 'a> LibraryLock<'a> for Library<'a, L> {
-	type Guard = LibraryGuard<'a, L>;
-
-	fn lock(&'a self) -> LockResult<Self::Guard> {
-		self.hlib
-			.lock()
-			.map(|guard| LibraryGuard {
-				libs: self.libs,
-				guard,
-			})
-			.or_else(|poison| {
-				Err(PoisonError::new(LibraryGuard {
-					libs: self.libs,
-					guard: poison.into_inner(),
-				}))
-			})
-	}
-}
 
 pub struct CloseableLibrary<'a, L: Close> {
 	libs: &'a [&'a str],
-	inner: Mutex<(Option<L>, Vec<(&'static AtomicPtr<()>, SymAddrWrapper)>)>,
+	inner: Mutex<(Option<L>, Vec<(&'static AtomicPtr<()>, AtomicSymAddr)>)>,
 }
 
 impl<'a, L: Close> CloseableLibrary<'a, L> {
@@ -133,24 +112,5 @@ impl<'a, L: Close> CloseableLibrary<'a, L> {
 			libs,
 			inner: Mutex::new((None, Vec::new())),
 		}
-	}
-}
-
-impl<'a, L: Close + 'a> LibraryLock<'a> for CloseableLibrary<'a, L> {
-	type Guard = CloseableLibraryGuard<'a, L>;
-
-	fn lock(&'a self) -> LockResult<Self::Guard> {
-		self.inner
-			.lock()
-			.map(|guard| CloseableLibraryGuard {
-				libs: self.libs,
-				guard,
-			})
-			.or_else(|poison| {
-				Err(PoisonError::new(CloseableLibraryGuard {
-					libs: self.libs,
-					guard: poison.into_inner(),
-				}))
-			})
 	}
 }

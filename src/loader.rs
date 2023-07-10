@@ -11,13 +11,14 @@ mod sys_loader;
 /// Used to specify the run-time linker loader constraint for [`Library`].
 /// `Loader` can also be used to make custom loaders.
 pub unsafe trait Loader: Send + Sized {
-	/// Opens a shared library at `path`.
+	/// Attempts to open a shared library.
 	///
 	/// Returns `Some` if success, otherwise `None`.
 	unsafe fn open(path: &str) -> Option<Self>;
-	/// Retrieves symbol from shared library.
+	/// Retrieves raw symbol from shared library.
 	///
-	/// If success [`SymAddr`] resolves to a valid pointer, otherwise is `null`.
+	/// If successful, returns a valid address to symbol, otherwise
+	/// returns a `null` pointer.
 	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr;
 }
 

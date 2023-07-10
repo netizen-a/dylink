@@ -10,7 +10,7 @@ unsafe impl Send for SelfLoader {}
 unsafe impl Loader for SelfLoader {
 	/// Does not increment reference count to handle.
 	/// # Unix Platform
-	/// On unix,  `path` is ignored, and a default library handle is returned.
+	/// On unix, `path` is ignored, and a default library handle is returned.
 	///
 	/// # Windows Platform
 	/// On windows, `path` is used to load the library handle.
