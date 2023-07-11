@@ -80,10 +80,7 @@ impl<'a, L: Loader> Library<'a, L> {
 	/// mechanism in case the shared library is in a seperate directory or may have a variety
 	/// of names.
 	///
-	/// *Note: Symbols used in the libraries **must** be the same in all fallback paths.*
-	///
-	/// # Panics
-	/// Will panic if `libs` is an empty array.
+	/// *Note: If `libs` is empty, the library cannot load.*
 	///
 	/// # Examples
 	/// ```rust
@@ -91,7 +88,6 @@ impl<'a, L: Loader> Library<'a, L> {
 	/// static KERNEL32: Library<SelfLoader> = Library::new(&["kernel32.dll"]);
 	/// ```
 	pub const fn new(libs: &'a [&'a str]) -> Self {
-		assert!(!libs.is_empty());
 		Self {
 			libs,
 			hlib: Mutex::new(None),
@@ -99,7 +95,7 @@ impl<'a, L: Loader> Library<'a, L> {
 	}
 	/// Immediately loads library.
 	///
-	/// If library is loaded, true is returned, otherwise false.
+	/// If library is loaded, [`true`] is returned, otherwise [`false`].
 	pub fn force(this: &Library<'_, L>) -> bool {
 		let mut lock = this.lock().unwrap();
 		if let None = *lock.guard {
@@ -126,12 +122,8 @@ impl<'a, L: Close> CloseableLibrary<'a, L> {
 	/// mechanism in case the shared library is in a seperate directory or may have a variety
 	/// of names.
 	///
-	/// *Note: Symbols used in the libraries **must** be the same in all fallback paths.*
-	///
-	/// # Panic
-	/// Will panic if `libs` is an empty array.
+	/// *Note: If `libs` is empty, the library cannot load*
 	pub const fn new(libs: &'a [&'a str]) -> Self {
-		assert!(!libs.is_empty());
 		Self {
 			libs,
 			inner: Mutex::new((None, Vec::new())),
@@ -139,7 +131,7 @@ impl<'a, L: Close> CloseableLibrary<'a, L> {
 	}
 	/// Immediately loads library.
 	///
-	/// If library is loaded, true is returned, otherwise false.
+	/// If library is loaded, [`true`] is returned, otherwise [`false`].
 	pub fn force(this: &CloseableLibrary<'_, L>) -> bool {
 		let mut lock = this.lock().unwrap();
 		if let None = lock.guard.0 {
