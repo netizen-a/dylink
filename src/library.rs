@@ -39,14 +39,47 @@ type AtomicSymAddr = AtomicPtr<()>;
 
 mod sealed {
 	use super::*;
-	pub trait Sealed {}
-	impl<L: Loader> Sealed for Library<'_, L> {}
-	impl<L: Close> Sealed for CloseableLibrary<'_, L> {}
+	pub trait SealedLock {
+		fn libs(&self) -> &[&str];
+	}
+	impl<L: Loader> SealedLock for Library<'_, L> {
+		fn libs(&self) -> &[&str] {
+			self.libs
+		}
+	}
+	impl<L: Close> SealedLock for CloseableLibrary<'_, L> {
+		fn libs(&self) -> &[&str] {
+			self.libs
+		}
+	}
+	pub trait SealedGuard {
+		type Handle : Loader;
+		fn set_handle(&mut self, handle: Option<Self::Handle>);
+		fn get_handle(&self) -> &Option<Self::Handle>;
+	}
+	impl <L: Loader> SealedGuard for LibraryGuard<'_, L> {
+		type Handle = L;
+		fn set_handle(&mut self, handle: Option<Self::Handle>) {
+			*self.guard = handle
+		}
+		fn get_handle(&self) -> &Option<Self::Handle> {
+			&*self.guard
+		}
+	}
+	impl <L: Loader> SealedGuard for CloseableLibraryGuard<'_, L> {
+		type Handle = L;
+		fn set_handle(&mut self, handle: Option<Self::Handle>) {
+			self.guard.0 = handle
+		}
+		fn get_handle(&self) -> &Option<Self::Handle> {
+			&self.guard.0
+		}
+	}
 }
 
 /// Implements constraint to use the [`dylink`](crate::dylink) attribute macro `library` parameter.
-pub trait LibraryLock<'a>: sealed::Sealed {
-	type Guard: 'a;
+pub trait LibraryLock<'a>: sealed::SealedLock {
+	type Guard: 'a + sealed::SealedGuard;
 	/// Acquires a mutex, blocking the current thread until it is able to do so.
 	///
 	/// This function will block the local thread until it is available to acquire the mutex. Upon returning, the thread is the only thread with the lock held. An RAII guard is returned to allow scoped unlock of the lock. When the guard goes out of scope, the mutex will be unlocked.
@@ -93,16 +126,6 @@ impl<'a, L: Loader> Library<'a, L> {
 			hlib: Mutex::new(None),
 		}
 	}
-	/// Immediately loads library.
-	///
-	/// If library is loaded, [`true`] is returned, otherwise [`false`].
-	pub fn force(this: &Library<'_, L>) -> bool {
-		let mut lock = this.lock().unwrap();
-		if let None = *lock.guard {
-			*lock.guard = unsafe {guard::force_unchecked(this.libs)};
-		}
-		lock.guard.is_some()
-	}
 }
 
 /// An object providing access to a lazily loaded closeable library on the filesystem.
@@ -129,14 +152,16 @@ impl<'a, L: Close> CloseableLibrary<'a, L> {
 			inner: Mutex::new((None, Vec::new())),
 		}
 	}
-	/// Immediately loads library.
-	///
-	/// If library is loaded, [`true`] is returned, otherwise [`false`].
-	pub fn force(this: &CloseableLibrary<'_, L>) -> bool {
-		let mut lock = this.lock().unwrap();
-		if let None = lock.guard.0 {
-			lock.guard.0 = unsafe {guard::force_unchecked(this.libs)};
-		}
-		lock.guard.0.is_some()
+}
+
+/// Immediately loads library.
+///
+/// If library is loaded, [`true`] is returned, otherwise [`false`].
+pub fn force<'a, L: LibraryLock<'a>>(this: &'a L) -> bool {
+	use self::sealed::SealedGuard;
+	let mut lock = this.lock().unwrap();
+	if let None = lock.get_handle() {
+		lock.set_handle(unsafe {guard::force_unchecked(this.libs())});
 	}
+	lock.get_handle().is_some()
 }
