@@ -154,14 +154,19 @@ impl<'a, L: Close> CloseableLibrary<'a, L> {
 	}
 }
 
-/// Immediately loads library.
+/// Attempts to load the library.
 ///
 /// If library is loaded, [`true`] is returned, otherwise [`false`].
-pub fn force<'a, L: LibraryLock<'a>>(this: &'a L) -> bool {
+///
+/// # Errors
+/// May error if library lock was poisoned.
+pub fn force<'a, Lib: LibraryLock<'a>>(library: &'a Lib) -> Result<bool, PoisonError<Lib::Guard>> {
 	use self::sealed::SealedGuard;
-	let mut lock = this.lock().unwrap();
+	let mut lock = library.lock()?;
 	if let None = lock.get_handle() {
-		lock.set_handle(unsafe {guard::force_unchecked(this.libs())});
+		lock.set_handle(unsafe {guard::force_unchecked(library.libs())});
+		Ok(lock.get_handle().is_some())
+	} else {
+		Ok(true)
 	}
-	lock.get_handle().is_some()
 }

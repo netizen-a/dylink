@@ -37,7 +37,7 @@ fn test_win32_impl() {
 		#[dylink(library = KERNEL32)]
 		extern "system" fn GetLastError() -> Foo;
 	}
-	let is_loaded = force(&KERNEL32);
+	let is_loaded = force(&KERNEL32).unwrap();
 	assert!(is_loaded);
 
 	let foo = Foo(23);
