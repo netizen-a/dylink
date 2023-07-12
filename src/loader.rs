@@ -49,24 +49,5 @@ pub struct SystemLoader(*mut core::ffi::c_void);
 /// # Windows Platform
 ///
 /// The windows implementation must specify, which libraries the `SelfLoader` shall attempt to load from.
-///
-/// # Example
-///
-/// ```rust
-/// use dylink::*;
-/// use std::ffi::*;
-///
-/// static THIS: Library<SelfLoader> = Library::new(&[""]);
-///
-/// #[dylink(library=THIS)]
-/// extern "C" {
-/// 	fn atoi(s: *const c_char) -> c_int;
-/// }
-///
-/// # #[cfg(unix)] {
-/// let five = unsafe { atoi(b"5\0".as_ptr().cast()) };
-/// assert_eq!(five, 5);
-/// # }
-/// ```
 #[cfg(any(windows, unix, doc))]
 pub struct SelfLoader(*mut core::ffi::c_void);

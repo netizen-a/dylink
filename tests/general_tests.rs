@@ -75,3 +75,18 @@ fn test_linux_x11() {
 			.expect("close failed");
 	}
 }
+
+
+#[cfg(target_os="linux")]
+#[test]
+fn test_atoi_linux() {
+	use std::ffi::{c_char, c_int};
+	static THIS: Library<SelfLoader> = Library::new(&[""]);
+	#[dylink(library=THIS)]
+	extern "C" {
+		fn atoi(s: *const c_char) -> c_int;
+	}
+
+	let five = unsafe { atoi(b"5\0".as_ptr().cast()) };
+	assert_eq!(five, 5);
+}
