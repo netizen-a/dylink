@@ -2,25 +2,31 @@
 
 ![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink) [![dylink-rs](https://github.com/Razordor/dylink/actions/workflows/rust.yml/badge.svg)](https://github.com/Razordor/dylink/actions/workflows/rust.yml) ![unsafe:yes](https://img.shields.io/badge/unsafe-yes-red)
 
-Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries such as `.dll` files.
-When functions are loaded they are evaluated through a thunk for first time calls, which loads the function from
-it's respective library. Proceeding calls after initialization have no overhead or additional branching checks,
-as the thunk is replaced by the loaded function.
+Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
+When functions are loaded they are evaluated through a thunk for first time calls, which loads the function from its respective library. Preceeding calls after initialization have no overhead or additional branching checks, since the thunk is replaced by the loaded function.
+
+This crate can be used with other library loaders by making a wrapper around your favorite loader and implementing the `Loader` trait.
 
 ----
 
 Related links:
 
-* [API Documentation](https://docs.rs/dylink)
+* [Documentation](https://docs.rs/dylink)
 * [Release notes](https://github.com/Razordor/dylink/releases)
+
+## Features
+
+* Thread-safe library loading.
+* Fearless closing - closing never invalidates symbols.
+* Branchless symbols - loaded symbols have zero overhead.
 
 ## Supported platforms
 
-Dylink has been implemented for all 3 major platforms.
+Implemented for all major platforms.
 
-| Windows | Linux | MacOS | WASM |
-|:-------:|:-----:|:-----:|------|
-| YES     | YES   | YES   | NO   |
+| Windows | Linux | MacOS |
+|:-------:|:-----:|:-----:|
+| YES     | YES   | YES   |
 
 ## Usage
 
@@ -28,28 +34,27 @@ Add this to your `Cargo.toml`
 
 ```toml
 [dependencies]
-dylink = "0.5"
+dylink = "0.7"
 ```
 
 ## Example
 
 Below is a basic working example on how to use the macro on windows.
-For windows, the `.dll` file extension is *optional*, but still recommended.
 
 ```rust
-use dylink::dylink;
+use dylink::*;
 
-#[dylink(name = "Kernel32.dll")]
+static KERNEL32: Library<SystemLoader> = Library::new(&["Kernel32.dll"]);
+
+#[dylink(library=KERNEL32)]
 extern "stdcall" {
     fn GetLastError() -> u32;
     fn SetLastError(_: u32);
 }
 
-fn main() {
-   unsafe {
-      SetLastError(52);
-      assert_eq!(52, GetLastError());
-   }
+unsafe {
+   SetLastError(52);
+   assert_eq!(52, GetLastError());
 }
 ```
 

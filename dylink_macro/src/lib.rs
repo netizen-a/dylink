@@ -36,7 +36,9 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 					.items
 					.iter()
 					.map(|item| match item {
-						ForeignItem::Fn(fn_item) => parse_fn::<true>(Some(abi), fn_item, &attr_data),
+						ForeignItem::Fn(fn_item) => {
+							parse_fn::<true>(Some(abi), fn_item, &attr_data)
+						}
 						other => quote!(#abi {#other}),
 					})
 					.collect::<TokenStream2>()
@@ -57,12 +59,24 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	attr_data: &AttrData,
 ) -> TokenStream2 {
 	let abi = abi.to_token_stream();
-	let fn_name = fn_item.sig.ident.to_token_stream();	
+	let fn_name = fn_item.sig.ident.to_token_stream();
 	let vis = fn_item.vis.to_token_stream();
 	let output = fn_item.sig.output.to_token_stream();
-	let strip = attr_data.strip;
-	let link_ty = &attr_data.link_ty;
-	let linker = &attr_data.linker;
+	let library = match attr_data.library {
+		Ok(ref path) => path,
+		Err(span) => {
+			return syn::Error::new(span, "`link_name` should be applied to a foreign function")
+				.to_compile_error()
+		}
+	};
+	// constness makes no sense in this context
+	match &fn_item.sig.constness {
+		None => (),
+		Some(kw) => {
+			return syn::Error::new(kw.span(), "`const` functions are unsupported")
+				.into_compile_error()
+		}
+	}
 
 	let fn_attrs: Vec<TokenStream2> = fn_item
 		.attrs
@@ -70,6 +84,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		.map(syn::Attribute::to_token_stream)
 		.collect();
 
+	// `self` can be used, but not inferred, so it's conditionally useful.
 	if let syn::ReturnType::Type(_, ret_type) = &fn_item.sig.output {
 		if let syn::Type::Path(syn::TypePath { path, .. }) = ret_type.as_ref() {
 			if path.is_ident("Self") {
@@ -86,7 +101,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	let mut param_ty_list = Vec::new();
 	let mut internal_param_ty_list = Vec::new();
 	let mut internal_param_list = Vec::new();
-	let params_default = fn_item.sig.inputs.to_token_stream();
 	for (i, arg) in fn_item.sig.inputs.iter().enumerate() {
 		match arg {
 			syn::FnArg::Typed(pat_type) => {
@@ -111,7 +125,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 				internal_param_ty_list.push(quote!(#param_name : #ty));
 			}
 			syn::FnArg::Receiver(rec) => {
-				if IS_MOD_ITEM || strip {
+				if IS_MOD_ITEM {
 					// TODO: fix error message
 					return syn::Error::new(
 						rec.span(),
@@ -139,93 +153,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		}
 	}
 
-	// this is sure to obfuscate things, but this is needed here because `strip` screws with call context.
-	let caller_name = if strip {
-		quote! {function}
-	} else {
-		quote! {DYN_FUNC}
-	};
-
-	let std_transmute = quote! {std::mem::transmute};
-
-	let call_dyn_func = if *link_ty == LinkType::Vulkan {
-		match fn_name.to_string().as_str() {
-			"vkCreateInstance" => {
-				if strip {
-					return syn::Error::new(
-						fn_item.span(),
-						"`vkCreateInstance` is incompatible with `strip=true`",
-					)
-					.to_compile_error();
-				}
-				let inst_param = &param_list[2];
-				quote! {
-					let result = #caller_name(#(#param_list),*);
-					unsafe {
-						dylink::Global.insert_instance(
-							*#std_transmute::<_, *mut dylink::vk::Instance>(#inst_param)
-						);
-					}
-					result
-				}
-			}
-			"vkDestroyInstance" => {
-				if strip {
-					return syn::Error::new(
-						fn_item.span(),
-						"`vkDestroyInstance` is incompatible with `strip=true`",
-					)
-					.to_compile_error();
-				}
-				let inst_param = &param_list[0];
-				quote! {
-					let result = #caller_name(#(#param_list),*);
-					unsafe {
-						dylink::Global.remove_instance(&#std_transmute::<_, dylink::vk::Instance>(#inst_param));
-					}
-					result
-				}
-			}
-			"vkCreateDevice" => {
-				if strip {
-					return syn::Error::new(
-						fn_item.span(),
-						"`vkCreateDevice` is incompatible with `strip=true`",
-					)
-					.to_compile_error();
-				}
-				let inst_param = &param_list[3];
-				quote! {
-					let result = #caller_name(#(#param_list),*);
-					unsafe {
-						dylink::Global.insert_device(*#std_transmute::<_, *mut dylink::vk::Device>(#inst_param));
-					}
-					result
-				}
-			}
-			"vkDestroyDevice" => {
-				if strip {
-					return syn::Error::new(
-						fn_item.span(),
-						"`vkDestroyDevice` is incompatible with `strip=true`",
-					)
-					.to_compile_error();
-				}
-				let inst_param = &param_list[0];
-				quote! {
-					let result = #caller_name(#(#param_list),*);
-					unsafe {
-						dylink::Global.remove_device(&#std_transmute::<_, dylink::vk::Device>(#inst_param));
-					}
-					result
-				}
-			}
-			_ => quote!(#caller_name(#(#param_list),*)),
-		}
-	} else {
-		quote!(#caller_name(#(#param_list),*))
-	};
-
 	let lint;
 	let link_name = match &attr_data.link_name {
 		Some((name, _)) => {
@@ -233,67 +160,53 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			name.clone()
 		}
 		None => {
-			lint = if strip {
-				quote! {#[allow(non_upper_case_globals)]}
-			} else {
-				quote! {#[allow(non_snake_case)]}
-			};
+			lint = quote! {#[allow(non_snake_case)]};
 			fn_name.to_string()
 		}
 	};
-	//println!("{fn_name}:{abi}");
-	
+
+	// This is mainly useful for applying lifetimes.
+	let generics = &fn_item.sig.generics;
+
+	// variadic compatible ABIs can use this
+	let variadic = match &fn_item.sig.variadic {
+		None => TokenStream2::default(),
+		Some(token) => quote!(, #token),
+	};
+
+	// The Rust ABI can use this token.
+	let asyncness = match &fn_item.sig.asyncness {
+		None => TokenStream2::default(),
+		Some(token) => token.to_token_stream(),
+	};
+
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
-	if strip {
-		quote! {
-			#(#fn_attrs)*
-			#lint
-			#vis static #fn_name
-			: dylink::LazyFn<unsafe #abi fn (#params_default) #output, #linker>
-			= dylink::LazyFn::new(
-				{
-					type InstFnPtr = unsafe #abi fn (#params_default) #output;
-					unsafe #abi fn initial_fn (#(#param_ty_list),*) #output {
-						use std::ffi::CStr;
-						match #fn_name.try_link() {
-							Ok(function) => {#call_dyn_func},
-							Err(err) => panic!("{}", err),
-						}
-					}
-					const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
-					DYN_FUNC_REF
-				},
-				unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
-				dylink::#link_ty
+	quote! {
+		#(#fn_attrs)*
+		#lint
+		#[inline]
+		#vis #asyncness unsafe #abi fn #generics #fn_name (#(#param_ty_list),* #variadic) #output {
+			use std::sync::atomic::{AtomicPtr, Ordering};
+			static FUNC: AtomicPtr<()> = AtomicPtr::new(
+				initializer as *mut ()
 			);
-		}
-	} else {
-		quote! {
-			#(#fn_attrs)*
-			#lint
-			#[inline]
-			#vis unsafe #abi fn #fn_name (#(#param_ty_list),*) #output {
-				// InstFnPtr: instance function pointer type
-				type InstFnPtr = #abi fn (#(#internal_param_ty_list),*) #output;
-				#abi fn initial_fn (#(#internal_param_ty_list),*) #output {
-					use std::ffi::CStr;
-					match DYN_FUNC.try_link() {
-						Ok(function) => {function(#(#internal_param_list),*)},
-						Err(err) => panic!("{}", err),
-					}
-				}
-				const DYN_FUNC_REF: &'static InstFnPtr = &(initial_fn as InstFnPtr);
-				static DYN_FUNC
-				: dylink::LazyFn<InstFnPtr, #linker>
-				= dylink::LazyFn::new(
-					DYN_FUNC_REF,
-					unsafe {std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(#link_name, '\0').as_bytes())},
-					dylink::#link_ty
-				);
 
-				#call_dyn_func
+			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
+				let symbol = ::dylink::LibraryLock::lock(&#library)
+					.unwrap()
+					.find_and_swap(&FUNC,#link_name);
+				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = match symbol {
+					None => panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name)),
+					Some(_) => std::mem::transmute(FUNC.load(Ordering::Relaxed)),
+				};
+				pfn(#(#internal_param_list),*)
 			}
+
+			let symbol: *mut () = FUNC.load(Ordering::Relaxed);
+			std::sync::atomic::compiler_fence(Ordering::Acquire);
+			let pfn : #abi fn (#(#internal_param_ty_list),*) #output = std::mem::transmute(symbol);
+			pfn(#(#param_list),*)
 		}
 	}
 }
