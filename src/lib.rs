@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-#![cfg_attr(doc, feature(doc_auto_cfg))]
-#![cfg_attr(doc, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
 //! When functions are loaded they are evaluated through a thunk for first time calls, which loads the function

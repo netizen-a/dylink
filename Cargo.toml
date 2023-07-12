@@ -16,3 +16,7 @@ members = ["dylink_macro"]
 [dependencies.dylink_macro]
 version = "0.8"
 path="./dylink_macro"
+
+[package.metadata.docs.rs]
+rustc-args = ["--cfg", "docsrs"]
+all-features = true
