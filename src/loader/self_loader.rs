@@ -1,5 +1,4 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-
 use super::*;
 use crate::os::*;
 use std::ffi;
@@ -23,7 +22,7 @@ unsafe impl Loader for SelfLoader {
 		#[cfg(windows)]
 		{
 			use std::mem::MaybeUninit;
-			let wide_str: Vec<u16> = path.encode_utf16().chain(core::iter::once(0u16)).collect();
+			let wide_str: Vec<u16> = path.encode_utf16().chain(std::iter::once(0u16)).collect();
 			let wide_ptr = if path.is_empty() {
 				std::ptr::null()
 			} else {

@@ -1,7 +1,10 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use super::*;
-use std::{ffi::{CString, c_void}, io};
+use std::{
+	ffi::{c_void, CString},
+	io,
+};
 
 // internal type is opaque and managed by OS, so it's `Send` safe
 unsafe impl Send for SystemLoader {}
@@ -19,10 +22,10 @@ unsafe impl Loader for SystemLoader {
 		#[cfg(windows)]
 		{
 			use crate::os::win32::*;
-			let wide_str: Vec<u16> = path.encode_utf16().chain(core::iter::once(0u16)).collect();
+			let wide_str: Vec<u16> = path.encode_utf16().chain(std::iter::once(0u16)).collect();
 			handle = crate::os::win32::LoadLibraryExW(
 				wide_str.as_ptr().cast(),
-				core::ptr::null_mut(),
+				std::ptr::null_mut(),
 				LOAD_LIBRARY_SEARCH_DEFAULT_DIRS | LOAD_LIBRARY_SAFE_CURRENT_DIRS,
 			);
 		}

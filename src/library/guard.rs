@@ -1,5 +1,5 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use super::*;
-
 
 // iterates through all paths and skips any checks to load the library somehow.
 // This should be called as infrequently as possible, so its marked cold.
@@ -9,14 +9,13 @@ pub(super) unsafe fn force_unchecked<L: Loader>(libs: &[&str]) -> Option<L> {
 }
 
 impl<L: Loader> LibraryGuard<'_, L> {
-
-    /// Attempts to resolve lazily evaluated library handle, which if successful will also
-    /// attempt to resolve symbol. If a symbol is resolved successfully, `psym` will swap with
-    /// ordering [`SeqCst`](Ordering::SeqCst) and resolved symbol.
-    /// If successful the return value is Some with last address in `psym`, otherwise returns None.
+	/// Attempts to resolve lazily evaluated library handle, which if successful will also
+	/// attempt to resolve symbol. If a symbol is resolved successfully, `psym` will swap with
+	/// ordering [`SeqCst`](Ordering::SeqCst) and resolved symbol.
+	/// If successful the return value is Some with last address in `psym`, otherwise returns None.
 	pub fn find_and_swap(&mut self, psym: &AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
-        if let None = *self.guard {
-			*self.guard = unsafe {force_unchecked(self.libs)};
+		if let None = *self.guard {
+			*self.guard = unsafe { force_unchecked(self.libs) };
 		}
 
 		if let Some(ref lib_handle) = *self.guard {
@@ -33,16 +32,16 @@ impl<L: Loader> LibraryGuard<'_, L> {
 }
 
 impl<L: Close> CloseableLibraryGuard<'_, L> {
-    /// Attempts to resolve lazily evaluated library handle, which if successful will also
-    /// attempt to resolve symbol. If a symbol is resolved successfully, `psym` will swap with
-    /// ordering [`SeqCst`](Ordering::SeqCst) and resolved symbol.
-    /// If successful the return value is Some with last address in `psym`, otherwise returns None.
-    ///
+	/// Attempts to resolve lazily evaluated library handle, which if successful will also
+	/// attempt to resolve symbol. If a symbol is resolved successfully, `psym` will swap with
+	/// ordering [`SeqCst`](Ordering::SeqCst) and resolved symbol.
+	/// If successful the return value is Some with last address in `psym`, otherwise returns None.
+	///
 	/// The last symbol and the atomic variable will be stored internally to be reset to initial state
 	/// when [`close`](CloseableLibraryGuard::close) is called
 	pub fn find_and_swap(&mut self, psym: &'static AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
 		if let None = self.guard.0 {
-			self.guard.0 = unsafe {force_unchecked(self.libs)};
+			self.guard.0 = unsafe { force_unchecked(self.libs) };
 		}
 
 		if let Some(ref lib_handle) = self.guard.0 {
@@ -58,9 +57,9 @@ impl<L: Close> CloseableLibraryGuard<'_, L> {
 			None
 		}
 	}
-    /// Closes, but does not `drop` the library.
-    ///
-    /// All associated function pointers are reset to initial state.
+	/// Closes, but does not `drop` the library.
+	///
+	/// All associated function pointers are reset to initial state.
 	///
 	/// # Errors
 	/// This may error if library is uninitialized.

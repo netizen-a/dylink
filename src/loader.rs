@@ -34,7 +34,7 @@ pub unsafe trait Close: Loader {
 ///
 /// This is a basic library loader primitive designed to be used with [`Library`].
 #[cfg(any(windows, unix, doc))]
-pub struct SystemLoader(*mut core::ffi::c_void);
+pub struct SystemLoader(*mut std::ffi::c_void);
 
 /// An object providing access to libraries currently loaded by this process.
 ///
@@ -50,4 +50,4 @@ pub struct SystemLoader(*mut core::ffi::c_void);
 ///
 /// The windows implementation must specify, which libraries the `SelfLoader` shall attempt to load from.
 #[cfg(any(windows, unix, doc))]
-pub struct SelfLoader(*mut core::ffi::c_void);
+pub struct SelfLoader(*mut std::ffi::c_void);

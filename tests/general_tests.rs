@@ -76,8 +76,7 @@ fn test_linux_x11() {
 	}
 }
 
-
-#[cfg(target_os="linux")]
+#[cfg(target_os = "linux")]
 #[test]
 fn test_atoi_linux() {
 	use std::ffi::{c_char, c_int};

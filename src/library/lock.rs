@@ -1,3 +1,4 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use super::*;
 impl<'a, L: Loader + 'a> LibraryLock<'a> for Library<'a, L> {
 	type Guard = LibraryGuard<'a, L>;

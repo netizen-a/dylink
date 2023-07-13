@@ -53,11 +53,11 @@ mod sealed {
 		}
 	}
 	pub trait SealedGuard {
-		type Handle : Loader;
+		type Handle: Loader;
 		fn set_handle(&mut self, handle: Option<Self::Handle>);
 		fn get_handle(&self) -> &Option<Self::Handle>;
 	}
-	impl <L: Loader> SealedGuard for LibraryGuard<'_, L> {
+	impl<L: Loader> SealedGuard for LibraryGuard<'_, L> {
 		type Handle = L;
 		fn set_handle(&mut self, handle: Option<Self::Handle>) {
 			*self.guard = handle
@@ -66,7 +66,7 @@ mod sealed {
 			&*self.guard
 		}
 	}
-	impl <L: Loader> SealedGuard for CloseableLibraryGuard<'_, L> {
+	impl<L: Loader> SealedGuard for CloseableLibraryGuard<'_, L> {
 		type Handle = L;
 		fn set_handle(&mut self, handle: Option<Self::Handle>) {
 			self.guard.0 = handle
@@ -164,7 +164,7 @@ pub fn force<'a, Lib: LibraryLock<'a>>(library: &'a Lib) -> Result<bool, PoisonE
 	use self::sealed::SealedGuard;
 	let mut lock = library.lock()?;
 	if let None = lock.get_handle() {
-		lock.set_handle(unsafe {guard::force_unchecked(library.libs())});
+		lock.set_handle(unsafe { guard::force_unchecked(library.libs()) });
 		Ok(lock.get_handle().is_some())
 	} else {
 		Ok(true)
