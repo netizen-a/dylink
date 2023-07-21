@@ -1,3 +1,5 @@
+use std::borrow::BorrowMut;
+
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use super::*;
 
@@ -9,10 +11,11 @@ pub(super) unsafe fn force_unchecked<L: Loader>(libs: &[&str]) -> Option<L> {
 }
 
 impl<L: Loader> LibraryGuard<'_, L> {
-	/// Attempts to resolve lazily evaluated library handle, which if successful will also
-	/// attempt to resolve symbol. If a symbol is resolved successfully, `psym` will swap with
+	/// If a symbol is resolved successfully, `psym` will swap with
 	/// ordering [`SeqCst`](Ordering::SeqCst) and resolved symbol.
 	/// If successful the return value is Some with last address in `psym`, otherwise returns None.
+	///
+	/// This will lazily initialize the handle.
 	pub fn find_and_swap(&mut self, psym: &AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
 		if let None = *self.guard {
 			*self.guard = unsafe { force_unchecked(self.libs) };
@@ -29,16 +32,23 @@ impl<L: Loader> LibraryGuard<'_, L> {
 			None
 		}
 	}
+	pub fn with_borrow_mut<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Option<L>) -> R,
+    {
+        f(self.guard.borrow_mut())
+    }
 }
 
 impl<L: Close> CloseableLibraryGuard<'_, L> {
-	/// Attempts to resolve lazily evaluated library handle, which if successful will also
-	/// attempt to resolve symbol. If a symbol is resolved successfully, `psym` will swap with
+	/// If a symbol is resolved successfully, `psym` will swap with
 	/// ordering [`SeqCst`](Ordering::SeqCst) and resolved symbol.
 	/// If successful the return value is Some with last address in `psym`, otherwise returns None.
 	///
 	/// The last symbol and the atomic variable will be stored internally to be reset to initial state
 	/// when [`close`](CloseableLibraryGuard::close) is called
+	///
+	/// This will lazily initialize the handle.
 	pub fn find_and_swap(&mut self, psym: &'static AtomicPtr<()>, symbol: &str) -> Option<SymAddr> {
 		if let None = self.guard.0 {
 			self.guard.0 = unsafe { force_unchecked(self.libs) };
@@ -57,6 +67,13 @@ impl<L: Close> CloseableLibraryGuard<'_, L> {
 			None
 		}
 	}
+
+	pub fn with_borrow_mut<F, R>(&mut self, f: F) -> R
+    where
+        F: FnOnce(&mut Option<L>) -> R,
+    {
+        f(self.guard.0.borrow_mut())
+    }
 	/// Closes, but does not `drop` the library.
 	///
 	/// All associated function pointers are reset to initial state.
