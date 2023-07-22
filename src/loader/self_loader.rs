@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use super::*;
 use crate::os::*;
-use std::ffi;
+use std::{ffi, sync::atomic::Ordering};
 
 // internal type is opaque and managed by OS, so it's `Send` safe
 unsafe impl Send for SelfLoader {}
@@ -35,7 +35,7 @@ unsafe impl Loader for SelfLoader {
 				handle.as_mut_ptr(),
 			);
 			if result != 0 {
-				Some(Self(handle.assume_init()))
+				Some(Self(AtomicPtr::new(handle.assume_init())))
 			} else {
 				None
 			}
@@ -43,6 +43,6 @@ unsafe impl Loader for SelfLoader {
 	}
 	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr {
 		let c_str = ffi::CString::new(symbol).unwrap();
-		dlsym(self.0, c_str.as_ptr())
+		dlsym(self.0.load(Ordering::Relaxed), c_str.as_ptr())
 	}
 }

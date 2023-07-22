@@ -1,7 +1,8 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
+use std::sync::atomic::AtomicPtr;
+
 use crate::*;
-use std::io;
 
 #[cfg(any(windows, unix, doc))]
 mod self_loader;
@@ -22,19 +23,11 @@ pub unsafe trait Loader: Send + Sized {
 	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr;
 }
 
-/// This trait is similar to the `Drop` trait, which frees resources.
-/// Unlike the `Drop` trait, `Close` must assume there side affects when closing a library.
-/// As a consequence of these side affects `close` is marked as `unsafe`.
-///
-/// *Note: Closing a library is always considered super unsafe.*
-pub unsafe trait Close: Loader {
-	unsafe fn close(self) -> io::Result<()>;
-}
 /// An object providing access to an open shared library on the filesystem.
 ///
 /// This is a basic library loader primitive designed to be used with [`Library`].
 #[cfg(any(windows, unix, doc))]
-pub struct SystemLoader(*mut std::ffi::c_void);
+pub struct SystemLoader(AtomicPtr<std::ffi::c_void>);
 
 /// An object providing access to libraries currently loaded by this process.
 ///
@@ -50,4 +43,4 @@ pub struct SystemLoader(*mut std::ffi::c_void);
 ///
 /// The windows implementation must specify, which libraries the `SelfLoader` shall attempt to load from.
 #[cfg(any(windows, unix, doc))]
-pub struct SelfLoader(*mut std::ffi::c_void);
+pub struct SelfLoader(AtomicPtr<std::ffi::c_void>);

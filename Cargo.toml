@@ -1,6 +1,6 @@
 [package]
 name = "dylink"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2021"
 authors = ["Jonathan Thomason"]
 license = "MIT OR Apache-2.0"
@@ -14,7 +14,7 @@ publish = false
 members = ["dylink_macro"]
 
 [dependencies.dylink_macro]
-version = "0.8"
+version = "0.9"
 path="./dylink_macro"
 
 [package.metadata.docs.rs]

@@ -187,25 +187,25 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		#lint
 		#[inline]
 		#vis #asyncness unsafe #abi fn #generics #fn_name (#(#param_ty_list),* #variadic) #output {
-			use std::sync::atomic::{AtomicPtr, Ordering};
+			use ::std::sync::atomic::{AtomicPtr, Ordering};
 			static FUNC: AtomicPtr<()> = AtomicPtr::new(
 				initializer as *mut ()
 			);
 
 			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
-				let symbol = ::dylink::LibraryLock::lock(&#library)
-					.unwrap()
-					.find_and_swap(&FUNC,#link_name);
-				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = match symbol {
-					None => panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name)),
-					Some(_) => std::mem::transmute(FUNC.load(Ordering::Relaxed)),
+				let symbol = ::dylink::Library::find_symbol(&#library, #link_name);
+				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = if symbol.is_null() {
+					panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name))
+				} else {
+					FUNC.store(symbol.cast_mut(), Ordering::Relaxed);
+					::std::mem::transmute(symbol)
 				};
 				pfn(#(#internal_param_list),*)
 			}
 
 			let symbol: *mut () = FUNC.load(Ordering::Relaxed);
-			std::sync::atomic::compiler_fence(Ordering::Acquire);
-			let pfn : #abi fn (#(#internal_param_ty_list),*) #output = std::mem::transmute(symbol);
+			::std::sync::atomic::compiler_fence(Ordering::Acquire);
+			let pfn : #abi fn (#(#internal_param_ty_list),*) #output = ::std::mem::transmute(symbol);
 			pfn(#(#param_list),*)
 		}
 	}

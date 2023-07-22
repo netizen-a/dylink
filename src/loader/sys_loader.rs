@@ -4,6 +4,7 @@ use super::*;
 use std::{
 	ffi::{c_void, CString},
 	io,
+	sync::atomic::Ordering,
 };
 
 // internal type is opaque and managed by OS, so it's `Send` safe
@@ -32,22 +33,22 @@ unsafe impl Loader for SystemLoader {
 		if handle.is_null() {
 			None
 		} else {
-			Some(Self(handle))
+			Some(Self(AtomicPtr::new(handle)))
 		}
 	}
 
 	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr {
 		let c_str = CString::new(symbol).unwrap();
-		crate::os::dlsym(self.0, c_str.as_ptr().cast())
+		crate::os::dlsym(self.0.load(Ordering::Relaxed), c_str.as_ptr().cast())
 	}
 }
 
-unsafe impl Close for SystemLoader {
+impl SystemLoader {
 	/// Decrements reference counter to shared library. When reference counter hits zero the library is unloaded.
 	/// ## Errors
 	/// May error depending on system call.
-	unsafe fn close(self) -> io::Result<()> {
-		let result = crate::os::dlclose(self.0);
+	pub unsafe fn close(self) -> io::Result<()> {
+		let result = crate::os::dlclose(self.0.into_inner());
 		if (cfg!(windows) && result == 0) || (cfg!(unix) && result != 0) {
 			#[cfg(windows)]
 			{

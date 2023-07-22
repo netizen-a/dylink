@@ -37,8 +37,6 @@ fn test_win32_impl() {
 		#[dylink(library = KERNEL32)]
 		extern "system" fn GetLastError() -> Foo;
 	}
-	let is_loaded = force(&KERNEL32).unwrap();
-	assert!(is_loaded);
 
 	let foo = Foo(23);
 	unsafe {
@@ -68,11 +66,6 @@ fn test_linux_x11() {
 			println!("display created successfully.\nnow destroying...");
 			XCloseDisplay(disp);
 		}
-		LIB_X11
-			.lock()
-			.expect("failed to get lock")
-			.close()
-			.expect("close failed");
 	}
 }
 
