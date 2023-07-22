@@ -12,7 +12,7 @@ unsafe impl Send for SystemLoader {}
 
 unsafe impl Loader for SystemLoader {
 	/// If successful, increments reference count to shared library handle, and constructs `SystemLoader`.
-	unsafe fn open(path: &str) -> Option<Self> {
+	unsafe fn open(path: &str) -> io::Result<Self> {
 		let handle: *mut c_void;
 		#[cfg(unix)]
 		{
@@ -31,9 +31,9 @@ unsafe impl Loader for SystemLoader {
 			);
 		}
 		if handle.is_null() {
-			None
+			Err(io::Error::last_os_error())
 		} else {
-			Some(Self(AtomicPtr::new(handle)))
+			Ok(Self(handle.into()))
 		}
 	}
 
@@ -45,25 +45,12 @@ unsafe impl Loader for SystemLoader {
 
 impl SystemLoader {
 	/// Decrements reference counter to shared library. When reference counter hits zero the library is unloaded.
-	/// ## Errors
+	/// # Errors
 	/// May error depending on system call.
 	pub unsafe fn close(self) -> io::Result<()> {
 		let result = crate::os::dlclose(self.0.into_inner());
 		if (cfg!(windows) && result == 0) || (cfg!(unix) && result != 0) {
-			#[cfg(windows)]
-			{
-				// windows dumps *all* error info into this call.
-				Err(io::Error::last_os_error())
-			}
-			#[cfg(unix)]
-			{
-				// unix uses dlerror to for error handling, but it's
-				// not MT-safety guarenteed, so I can't use it.
-				Err(io::Error::new(
-					io::ErrorKind::Other,
-					"Unknown Error. Call `dlerror` for more information",
-				))
-			}
+			Err(io::Error::last_os_error())
 		} else {
 			Ok(())
 		}

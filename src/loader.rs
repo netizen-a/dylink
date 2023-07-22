@@ -3,6 +3,7 @@
 use std::sync::atomic::AtomicPtr;
 
 use crate::*;
+use std::io;
 
 #[cfg(any(windows, unix, doc))]
 mod self_loader;
@@ -15,7 +16,7 @@ pub unsafe trait Loader: Send + Sized {
 	/// Attempts to open a shared library.
 	///
 	/// Returns `Some` if success, otherwise `None`.
-	unsafe fn open(path: &str) -> Option<Self>;
+	unsafe fn open(path: &str) -> io::Result<Self>;
 	/// Retrieves raw symbol from shared library.
 	///
 	/// If successful, returns a valid address to symbol, otherwise

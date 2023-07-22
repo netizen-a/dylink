@@ -42,9 +42,12 @@ impl<'a, L: Loader> Library<'a, L> {
 	///
 	/// This will lazily initialize the handle.
 	pub fn find_symbol(&self, symbol: &str) -> SymAddr {
-		let handle = self
-			.hlib
-			.get_or_init(|| unsafe { force_unchecked(self.libs).unwrap() });
+		let handle = self.hlib.get_or_init(|| {
+			self.libs
+				.iter()
+				.find_map(|name| unsafe { L::open(name).ok() })
+				.expect("failed to open library")
+		});
 		unsafe { L::find_symbol(handle, symbol) }
 	}
 
@@ -52,11 +55,4 @@ impl<'a, L: Loader> Library<'a, L> {
 	pub fn take(&mut self) -> Option<L> {
 		self.hlib.take()
 	}
-}
-
-// iterates through all paths and skips any checks to load the library somehow.
-// This should be called as infrequently as possible, so its marked cold.
-#[cold]
-pub(super) unsafe fn force_unchecked<L: Loader>(libs: &[&str]) -> Option<L> {
-	libs.iter().find_map(|name| L::open(name))
 }

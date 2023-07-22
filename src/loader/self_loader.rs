@@ -1,6 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use super::*;
 use crate::os::*;
+use std::io;
 use std::{ffi, sync::atomic::Ordering};
 
 // internal type is opaque and managed by OS, so it's `Send` safe
@@ -13,11 +14,11 @@ unsafe impl Loader for SelfLoader {
 	///
 	/// # Windows Platform
 	/// On windows, `path` is used to load the library handle.
-	unsafe fn open(path: &str) -> Option<Self> {
+	unsafe fn open(path: &str) -> io::Result<Self> {
 		#[cfg(unix)]
 		{
 			let _ = path;
-			Some(Self(unix::RTLD_DEFAULT))
+			Ok(Self(unix::RTLD_DEFAULT.into()))
 		}
 		#[cfg(windows)]
 		{
@@ -35,9 +36,9 @@ unsafe impl Loader for SelfLoader {
 				handle.as_mut_ptr(),
 			);
 			if result != 0 {
-				Some(Self(AtomicPtr::new(handle.assume_init())))
+				Ok(Self(handle.assume_init().into()))
 			} else {
-				None
+				Err(io::Error::last_os_error())
 			}
 		}
 	}

@@ -4,7 +4,7 @@ use dylink::*;
 static KERNEL32: Library<SystemLoader> = Library::new(&["Kernel32.dll"]);
 
 #[cfg(target_os = "linux")]
-static LIB_X11: CloseableLibrary<SystemLoader> = CloseableLibrary::new(&["libX11.so.6"]);
+static LIB_X11: Library<SystemLoader> = Library::new(&["libX11.so.6"]);
 
 #[cfg(windows)]
 #[test]
