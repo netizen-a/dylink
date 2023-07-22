@@ -36,22 +36,26 @@ impl<'a, L: Loader> Library<'a, L> {
 			hlib: sync::OnceLock::new(),
 		}
 	}
-	/// If a symbol is resolved successfully, `psym` will swap with
-	/// ordering [`SeqCst`](Ordering::SeqCst) and resolved symbol.
-	/// If successful the return value is Some with last address in `psym`, otherwise returns None.
+
+	/// May block if another thread is currently attempting to initialize the cell.
 	///
-	/// This will lazily initialize the handle.
+	/// This will lazily initialize the library.
+	/// # Panics
+	/// May panic if [`Library`] failed to be initialized.
 	pub fn find_symbol(&self, symbol: &str) -> SymAddr {
-		let handle = self.hlib.get_or_init(|| {
+		let handle = self.hlib.get_or_init(||{
 			self.libs
 				.iter()
 				.find_map(|name| unsafe { L::open(name).ok() })
-				.expect("failed to open library")
+				.expect("failed to initialize `Library`")
 		});
-		unsafe { L::find_symbol(handle, symbol) }
+		unsafe { handle.find_symbol(symbol) }
 	}
-
-	// This lets the user manage the library instead. it does not invalidate any functions.
+	#[inline]
+	pub fn get(&self) -> Option<&L> {
+		self.hlib.get()
+	}
+	#[inline]
 	pub fn take(&mut self) -> Option<L> {
 		self.hlib.take()
 	}
