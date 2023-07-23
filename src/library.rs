@@ -51,10 +51,19 @@ impl<'a, L: Loader> Library<'a, L> {
 		});
 		unsafe { handle.find_symbol(symbol) }
 	}
+	/// Gets the reference to the underlying value.
+    ///
+    /// Returns `None` if the cell is empty, or being initialized. This
+    /// method never blocks.
 	#[inline]
 	pub fn get(&self) -> Option<&L> {
 		self.hlib.get()
 	}
+	/// Takes the value out of this `Library`, moving it back to an uninitialized state.
+    ///
+    /// Has no effect and returns `None` if the `Library` hasn't been initialized.
+    ///
+    /// Safety is guaranteed by requiring a mutable reference.
 	#[inline]
 	pub fn take(&mut self) -> Option<L> {
 		self.hlib.take()
