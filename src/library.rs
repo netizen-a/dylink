@@ -1,20 +1,19 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use crate::loader::Loader;
-use crate::SymAddr;
+use crate::loader;
 use std::sync;
 
 /// An object providing access to a lazily loaded library on the filesystem.
 ///
 /// This object is designed to be used with [`dylink`](crate::dylink) for subsequent zero overhead calls.
 #[derive(Debug)]
-pub struct Library<'a, L: Loader> {
+pub struct Library<'a, L: loader::Loader> {
 	libs: &'a [&'a str],
 	// library handle
 	hlib: sync::OnceLock<L>,
 }
 
-impl<'a, L: Loader> Library<'a, L> {
+impl<'a, L: loader::Loader> Library<'a, L> {
 	/// Constructs a new `Library`.
 	///
 	/// This function accepts a slice of paths the Library will attempt to load from
@@ -42,7 +41,7 @@ impl<'a, L: Loader> Library<'a, L> {
 	/// This will lazily initialize the library.
 	/// # Panics
 	/// May panic if [`Library`] failed to be initialized.
-	pub fn find_symbol(&self, symbol: &str) -> SymAddr {
+	pub fn find(&self, symbol: &str) -> *const () {
 		let handle = self.hlib.get_or_init(||{
 			self.libs
 				.iter()
@@ -67,5 +66,12 @@ impl<'a, L: Loader> Library<'a, L> {
 	#[inline]
 	pub fn take(&mut self) -> Option<L> {
 		self.hlib.take()
+	}
+}
+
+#[cfg(unix)]
+impl Default for Library<'_, loader::SelfLoader> {
+	fn default() -> Self {
+		Self::new(&[""])
 	}
 }

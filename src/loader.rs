@@ -2,7 +2,6 @@
 
 use std::sync::atomic::AtomicPtr;
 
-use crate::*;
 use std::io;
 
 #[cfg(any(windows, unix, doc))]
@@ -21,7 +20,7 @@ pub unsafe trait Loader: Send + Sized {
 	///
 	/// If successful, returns a valid address to symbol, otherwise
 	/// returns a `null` pointer.
-	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr;
+	unsafe fn find_symbol(&self, symbol: &str) -> *const ();
 }
 
 /// An object providing access to an open shared library on the filesystem.

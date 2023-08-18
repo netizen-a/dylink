@@ -42,7 +42,7 @@ unsafe impl Loader for SelfLoader {
 			}
 		}
 	}
-	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr {
+	unsafe fn find_symbol(&self, symbol: &str) -> *const () {
 		let c_str = ffi::CString::new(symbol).unwrap();
 		dlsym(self.0.load(Ordering::Relaxed), c_str.as_ptr())
 	}

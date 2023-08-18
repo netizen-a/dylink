@@ -51,11 +51,6 @@ pub use loader::*;
 ///```
 pub use dylink_macro::dylink;
 
-/// Raw symbol address.
-///
-/// Must be cast to be useable.
-pub type SymAddr = *const ();
-
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;

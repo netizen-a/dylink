@@ -37,7 +37,7 @@ unsafe impl Loader for SystemLoader {
 		}
 	}
 
-	unsafe fn find_symbol(&self, symbol: &str) -> SymAddr {
+	unsafe fn find_symbol(&self, symbol: &str) -> *const () {
 		let c_str = CString::new(symbol).unwrap();
 		crate::os::dlsym(self.0.load(Ordering::Relaxed), c_str.as_ptr().cast())
 	}

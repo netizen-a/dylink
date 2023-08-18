@@ -1,12 +1,11 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use crate::SymAddr;
 use std::ffi::{c_char, c_void};
 // yes this is cursed, and no I'm not changing it.
 extern "system" {
 	#[cfg_attr(windows, link_name = "GetProcAddress")]
 	#[cfg_attr(unix, link_name = "dlsym")]
-	pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> SymAddr;
+	pub fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *const ();
 
 	#[cfg_attr(windows, link_name = "FreeLibrary")]
 	#[cfg_attr(unix, link_name = "dlclose")]
