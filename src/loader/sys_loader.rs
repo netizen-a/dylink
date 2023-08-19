@@ -4,11 +4,8 @@ use super::*;
 use std::{
 	ffi::{c_void, CString},
 	io,
-	sync::atomic::Ordering,
+	sync::atomic::Ordering, os::windows::prelude::{IntoRawHandle, RawHandle},
 };
-
-// internal type is opaque and managed by OS, so it's `Send` safe
-unsafe impl Send for SystemLoader {}
 
 unsafe impl Loader for SystemLoader {
 	/// If successful, increments reference count to shared library handle, and constructs `SystemLoader`.
@@ -37,7 +34,7 @@ unsafe impl Loader for SystemLoader {
 		}
 	}
 
-	unsafe fn find_symbol(&self, symbol: &str) -> *const () {
+	unsafe fn find(&self, symbol: &str) -> *const () {
 		let c_str = CString::new(symbol).unwrap();
 		crate::os::dlsym(self.0.load(Ordering::Relaxed), c_str.as_ptr().cast())
 	}
@@ -54,5 +51,14 @@ impl SystemLoader {
 		} else {
 			Ok(())
 		}
+	}
+}
+
+// rust's std doesn't have a unix equivalent trait for IntoRawHandle
+
+#[cfg(windows)]
+impl IntoRawHandle for SystemLoader {
+	fn into_raw_handle(self) -> RawHandle {
+		self.0.into_inner()
 	}
 }

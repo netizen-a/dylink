@@ -48,7 +48,7 @@ impl<'a, L: loader::Loader> Library<'a, L> {
 				.find_map(|name| unsafe { L::open(name).ok() })
 				.expect("failed to initialize `Library`")
 		});
-		unsafe { handle.find_symbol(symbol) }
+		unsafe { handle.find(symbol) }
 	}
 	/// Gets the reference to the underlying value.
     ///
@@ -69,7 +69,7 @@ impl<'a, L: loader::Loader> Library<'a, L> {
 	}
 }
 
-#[cfg(unix)]
+#[cfg(any(unix, doc))]
 impl Default for Library<'_, loader::SelfLoader> {
 	fn default() -> Self {
 		Self::new(&[""])

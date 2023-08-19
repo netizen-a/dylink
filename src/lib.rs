@@ -31,12 +31,12 @@ pub use loader::*;
 ///
 /// May currently be used in 2 patterns:
 /// * foreign modules
-/// * foreign functionS
+/// * foreign functions
 ///
 /// More may patterns may be added in the future if needed.
 /// # Examples
 ///```rust
-/// # use dylink::*;
+/// use dylink::*;
 /// static FOOBAR: Library<SystemLoader> = Library::new(&["foobar.dll"]);
 ///
 /// // foreign module pattern

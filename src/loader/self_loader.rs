@@ -4,9 +4,6 @@ use crate::os::*;
 use std::io;
 use std::{ffi, sync::atomic::Ordering};
 
-// internal type is opaque and managed by OS, so it's `Send` safe
-unsafe impl Send for SelfLoader {}
-
 unsafe impl Loader for SelfLoader {
 	/// Does not increment reference count to handle.
 	/// # Unix Platform
@@ -42,7 +39,7 @@ unsafe impl Loader for SelfLoader {
 			}
 		}
 	}
-	unsafe fn find_symbol(&self, symbol: &str) -> *const () {
+	unsafe fn find(&self, symbol: &str) -> *const () {
 		let c_str = ffi::CString::new(symbol).unwrap();
 		dlsym(self.0.load(Ordering::Relaxed), c_str.as_ptr())
 	}

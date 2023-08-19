@@ -4,34 +4,32 @@ use std::sync::atomic::AtomicPtr;
 
 use std::io;
 
-#[cfg(any(windows, unix, doc))]
 mod self_loader;
-#[cfg(any(windows, unix, doc))]
 mod sys_loader;
 
-/// Used to specify the run-time linker loader constraint for [`Library`].
+/// Used to specify the run-time linker loader constraint for [`Library`](crate::library::Library).
 /// `Loader` can also be used to make custom loaders.
 pub unsafe trait Loader: Send + Sized {
 	/// Attempts to open a shared library.
 	///
-	/// Returns `Some` if success, otherwise `None`.
+	/// Returns `Ok` if success, otherwise `Err`.
 	unsafe fn open(path: &str) -> io::Result<Self>;
 	/// Retrieves raw symbol from shared library.
 	///
 	/// If successful, returns a valid address to symbol, otherwise
 	/// returns a `null` pointer.
-	unsafe fn find_symbol(&self, symbol: &str) -> *const ();
+	unsafe fn find(&self, symbol: &str) -> *const ();
 }
 
 /// An object providing access to an open shared library on the filesystem.
 ///
-/// This is a basic library loader primitive designed to be used with [`Library`].
-#[cfg(any(windows, unix, doc))]
+/// This is a basic library loader primitive designed to be used with [`Library`](crate::library::Library).
+#[derive(Debug)]
 pub struct SystemLoader(AtomicPtr<std::ffi::c_void>);
 
 /// An object providing access to libraries currently loaded by this process.
 ///
-/// This object is designed to be used with [`Library`].
+/// This object is designed to be used with [`Library`](crate::library::Library).
 ///
 /// # Unix Platform
 ///
@@ -42,5 +40,5 @@ pub struct SystemLoader(AtomicPtr<std::ffi::c_void>);
 /// # Windows Platform
 ///
 /// The windows implementation must specify, which libraries the `SelfLoader` shall attempt to load from.
-#[cfg(any(windows, unix, doc))]
+#[derive(Debug)]
 pub struct SelfLoader(AtomicPtr<std::ffi::c_void>);
