@@ -1,16 +1,17 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use crate::loader;
-use std::sync;
+use std::cell;
 
 /// An object providing access to a lazily loaded library on the filesystem.
 ///
 /// This object is designed to be used with [`dylink`](crate::dylink) for subsequent zero overhead calls.
 #[derive(Debug)]
 pub struct Library<'a, L: loader::Loader> {
+    // NOTE: might make this mutable
 	libs: &'a [&'a str],
 	// library handle
-	hlib: sync::OnceLock<L>,
+	hlib: cell::OnceCell<L>,
 }
 
 impl<'a, L: loader::Loader> Library<'a, L> {
@@ -27,12 +28,12 @@ impl<'a, L: loader::Loader> Library<'a, L> {
 	/// # Examples
 	/// ```rust
 	/// # use dylink::*;
-	/// static KERNEL32: Library<SelfLoader> = Library::new(&["kernel32.dll"]);
+	/// static KERNEL32: sync::Library<SelfLoader> = sync::Library::new(&["kernel32.dll"]);
 	/// ```
 	pub const fn new(libs: &'a [&'a str]) -> Self {
 		Self {
 			libs,
-			hlib: sync::OnceLock::new(),
+			hlib: cell::OnceCell::new(),
 		}
 	}
 
@@ -58,6 +59,12 @@ impl<'a, L: loader::Loader> Library<'a, L> {
 	pub fn get(&self) -> Option<&L> {
 		self.hlib.get()
 	}
+
+    #[inline]
+	pub fn into_inner(self) -> Option<L> {
+		self.hlib.into_inner()
+	}
+
 	/// Takes the value out of this `Library`, moving it back to an uninitialized state.
     ///
     /// Has no effect and returns `None` if the `Library` hasn't been initialized.

@@ -193,7 +193,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			);
 
 			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
-				let symbol = ::dylink::Library::find(&#library, #link_name);
+				let symbol = ::dylink::sync::Library::find(&#library, #link_name);
 				assert!(!symbol.is_null(), "Dylink Error: failed to load `{}`", stringify!(#fn_name));
 				FUNC.store(symbol.cast_mut(), Ordering::Relaxed);
 				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = ::std::mem::transmute(symbol);

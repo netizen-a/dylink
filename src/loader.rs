@@ -7,7 +7,7 @@ use std::io;
 mod self_loader;
 mod sys_loader;
 
-/// Used to specify the run-time linker loader constraint for [`Library`](crate::library::Library).
+/// Used to specify the run-time linker loader constraint for [`sync::Library`](crate::sync::Library) and [`cell::Library`](crate::cell::Library).
 /// `Loader` can also be used to make custom loaders.
 pub unsafe trait Loader: Send + Sized {
 	/// Attempts to open a shared library.
@@ -23,13 +23,11 @@ pub unsafe trait Loader: Send + Sized {
 
 /// An object providing access to an open shared library on the filesystem.
 ///
-/// This is a basic library loader primitive designed to be used with [`Library`](crate::library::Library).
+/// This is a basic library loader primitive designed to be used with [`sync::Library`](crate::sync::Library) and [`cell::Library`](crate::cell::Library).
 #[derive(Debug)]
 pub struct SystemLoader(AtomicPtr<std::ffi::c_void>);
 
 /// An object providing access to libraries currently loaded by this process.
-///
-/// This object is designed to be used with [`Library`](crate::library::Library).
 ///
 /// # Unix Platform
 ///
