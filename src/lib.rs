@@ -11,7 +11,7 @@
 //! ```rust
 //! use dylink::*;
 //!
-//! static KERNEL32: sync::Library<SystemLoader> = sync::Library::new(&["Kernel32.dll"]);
+//! static KERNEL32: sync::Library = sync::Library::new(&["Kernel32.dll"]);
 //!
 //! #[dylink(library=KERNEL32)]
 //! extern "system" {
@@ -22,12 +22,9 @@
 
 pub mod sync;
 pub mod cell;
+pub mod load;
 
-// FIXME: consider moving loader into `crate::cell`.
-mod loader;
 mod os;
-
-pub use loader::*;
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -39,7 +36,7 @@ pub use loader::*;
 /// # Examples
 ///```rust
 /// use dylink::*;
-/// static FOOBAR: sync::Library<SystemLoader> = sync::Library::new(&["foobar.dll"]);
+/// static FOOBAR: sync::Library<load::System> = sync::Library::new(&["foobar.dll"]);
 ///
 /// // foreign module pattern
 /// #[dylink(library=FOOBAR)]

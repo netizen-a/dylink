@@ -1,10 +1,10 @@
 use dylink::*;
 
 #[cfg(windows)]
-static KERNEL32: sync::Library<SystemLoader> = sync::Library::new(&["Kernel32.dll"]);
+static KERNEL32: sync::Library = sync::Library::new(&["Kernel32.dll"]);
 
 #[cfg(target_os = "linux")]
-static LIB_X11: sync::Library<SystemLoader> = sync::Library::new(&["libX11.so.6"]);
+static LIB_X11: sync::Library = sync::Library::new(&["libX11.so.6"]);
 
 #[cfg(windows)]
 #[test]
@@ -73,7 +73,7 @@ fn test_linux_x11() {
 #[test]
 fn test_atoi_linux() {
 	use std::ffi::{c_char, c_int};
-	static THIS: Library<SelfLoader> = Library::new(&[""]);
+	static THIS: Library<load::This> = Library::new(&[""]);
 	#[dylink(library=THIS)]
 	extern "C" {
 		fn atoi(s: *const c_char) -> c_int;

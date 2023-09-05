@@ -7,7 +7,7 @@ use std::{
 	sync::atomic::Ordering, os::windows::prelude::{IntoRawHandle, RawHandle},
 };
 
-unsafe impl Loader for SystemLoader {
+unsafe impl Loader for System {
 	/// If successful, increments reference count to shared library handle, and constructs `SystemLoader`.
 	unsafe fn open(path: &str) -> io::Result<Self> {
 		let handle: *mut c_void;
@@ -40,7 +40,7 @@ unsafe impl Loader for SystemLoader {
 	}
 }
 
-impl SystemLoader {
+impl System {
 	/// Decrements reference counter to shared library. When reference counter hits zero the library is unloaded.
 	/// # Errors
 	/// May error depending on system call.
@@ -57,7 +57,7 @@ impl SystemLoader {
 // rust's std doesn't have a unix equivalent trait for IntoRawHandle
 
 #[cfg(windows)]
-impl IntoRawHandle for SystemLoader {
+impl IntoRawHandle for System {
 	fn into_raw_handle(self) -> RawHandle {
 		self.0.into_inner()
 	}

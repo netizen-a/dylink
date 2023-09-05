@@ -1,20 +1,20 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use crate::loader;
 use std::cell;
+use crate::load;
 
 /// An object providing access to a lazily loaded library on the filesystem.
 ///
 /// This object is designed to be used with [`dylink`](crate::dylink) for subsequent zero overhead calls.
 #[derive(Debug)]
-pub struct Library<'a, L: loader::Loader> {
+pub struct Library<'a, L: load::Loader = load::System> {
     // NOTE: might make this mutable
 	libs: &'a [&'a str],
 	// library handle
 	hlib: cell::OnceCell<L>,
 }
 
-impl<'a, L: loader::Loader> Library<'a, L> {
+impl<'a, L: load::Loader> Library<'a, L> {
 	/// Constructs a new `Library`.
 	///
 	/// This function accepts a slice of paths the Library will attempt to load from
@@ -28,7 +28,7 @@ impl<'a, L: loader::Loader> Library<'a, L> {
 	/// # Examples
 	/// ```rust
 	/// # use dylink::*;
-	/// static KERNEL32: sync::Library<SelfLoader> = sync::Library::new(&["kernel32.dll"]);
+	/// static KERNEL32: sync::Library<load::This> = sync::Library::new(&["kernel32.dll"]);
 	/// ```
 	pub const fn new(libs: &'a [&'a str]) -> Self {
 		Self {
@@ -74,10 +74,15 @@ impl<'a, L: loader::Loader> Library<'a, L> {
 	pub fn take(&mut self) -> Option<L> {
 		self.hlib.take()
 	}
+
+	#[inline]
+	pub fn set(&self, value: L) -> Result<(), L> {
+		self.hlib.set(value)
+	}
 }
 
 #[cfg(any(unix, doc))]
-impl Default for Library<'_, loader::SelfLoader> {
+impl Default for Library<'_, load::This> {
 	fn default() -> Self {
 		Self::new(&[""])
 	}

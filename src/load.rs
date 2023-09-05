@@ -4,8 +4,8 @@ use std::sync::atomic::AtomicPtr;
 
 use std::io;
 
-mod self_loader;
-mod sys_loader;
+mod this;
+mod sys;
 
 /// Used to specify the run-time linker loader constraint for [`sync::Library`](crate::sync::Library) and [`cell::Library`](crate::cell::Library).
 /// `Loader` can also be used to make custom loaders.
@@ -25,7 +25,7 @@ pub unsafe trait Loader: Send + Sized {
 ///
 /// This is a basic library loader primitive designed to be used with [`sync::Library`](crate::sync::Library) and [`cell::Library`](crate::cell::Library).
 #[derive(Debug)]
-pub struct SystemLoader(AtomicPtr<std::ffi::c_void>);
+pub struct System(AtomicPtr<std::ffi::c_void>);
 
 /// An object providing access to libraries currently loaded by this process.
 ///
@@ -37,6 +37,7 @@ pub struct SystemLoader(AtomicPtr<std::ffi::c_void>);
 ///
 /// # Windows Platform
 ///
-/// The windows implementation must specify, which libraries the `SelfLoader` shall attempt to load from.
+/// The windows implementation must specify, which libraries the `This` structure shall attempt
+/// to load from.
 #[derive(Debug)]
-pub struct SelfLoader(AtomicPtr<std::ffi::c_void>);
+pub struct This(AtomicPtr<std::ffi::c_void>);

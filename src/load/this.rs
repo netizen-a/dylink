@@ -4,7 +4,7 @@ use crate::os::*;
 use std::io;
 use std::{ffi, sync::atomic::Ordering};
 
-unsafe impl Loader for SelfLoader {
+unsafe impl Loader for This {
 	/// Does not increment reference count to handle.
 	/// # Unix Platform
 	/// On unix, `path` is ignored, and a default library handle is returned.
