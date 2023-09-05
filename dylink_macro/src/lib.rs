@@ -11,6 +11,8 @@ use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned, Expr, Token};
 use attr_data::*;
 use syn::ForeignItem;
 
+//TODO: maybe allow fail to return default instead of panic
+
 #[proc_macro_attribute]
 pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 	let punct = Parser::parse2(

@@ -3,6 +3,7 @@
 use std::sync::atomic::AtomicPtr;
 
 use std::io;
+use std::path::Path;
 
 mod this;
 mod sys;
@@ -13,12 +14,12 @@ pub unsafe trait Loader: Send + Sized {
 	/// Attempts to open a shared library.
 	///
 	/// Returns `Ok` if success, otherwise `Err`.
-	unsafe fn open(path: &str) -> io::Result<Self>;
+	unsafe fn open<P: AsRef<Path>>(path: P) -> io::Result<Self>;
 	/// Retrieves raw symbol from shared library.
 	///
 	/// If successful, returns a valid address to symbol, otherwise
 	/// returns a `null` pointer.
-	unsafe fn find(&self, symbol: &str) -> *const ();
+	unsafe fn sym(&self, symbol: &str) -> *const ();
 }
 
 /// An object providing access to an open shared library on the filesystem.

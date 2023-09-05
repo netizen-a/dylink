@@ -14,6 +14,7 @@ extern "system" {
 
 #[cfg(windows)]
 pub mod win32 {
+	#![allow(clippy::upper_case_acronyms)]
 	type HANDLE = *mut std::ffi::c_void;
 	type HMODULE = HANDLE;
 	type PCWSTR = *const u16;

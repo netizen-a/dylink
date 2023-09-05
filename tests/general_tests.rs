@@ -73,7 +73,7 @@ fn test_linux_x11() {
 #[test]
 fn test_atoi_linux() {
 	use std::ffi::{c_char, c_int};
-	static THIS: Library<load::This> = Library::new(&[""]);
+	static THIS: sync::Library<load::This> = sync::Library::new(&[""]);
 	#[dylink(library=THIS)]
 	extern "C" {
 		fn atoi(s: *const c_char) -> c_int;

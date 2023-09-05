@@ -49,7 +49,7 @@ impl<'a, L: load::Loader> Library<'a, L> {
 				.find_map(|name| unsafe { L::open(name).ok() })
 				.expect("failed to initialize `Library`")
 		});
-		unsafe { handle.find(symbol) }
+		unsafe { handle.sym(symbol) }
 	}
 	/// Gets the reference to the underlying value.
     ///

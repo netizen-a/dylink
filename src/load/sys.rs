@@ -2,25 +2,37 @@
 
 use super::*;
 use std::{
-	ffi::{c_void, CString},
+	ffi,
 	io,
-	sync::atomic::Ordering, os::windows::prelude::{IntoRawHandle, RawHandle},
+	sync::atomic::Ordering,
 };
+#[cfg(windows)]
+use std::os::windows::prelude::{IntoRawHandle, RawHandle};
+
 
 unsafe impl Loader for System {
 	/// If successful, increments reference count to shared library handle, and constructs `SystemLoader`.
-	unsafe fn open(path: &str) -> io::Result<Self> {
-		let handle: *mut c_void;
+	unsafe fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+		let handle: *mut ffi::c_void;
+		let path = path.as_ref();
 		#[cfg(unix)]
 		{
 			use crate::os::unix::*;
-			let c_str = CString::new(path).unwrap();
+			let c_str = if let Some(val) = path.as_os_str().to_str() {
+				ffi::CString::new(val)
+			} else {
+				//FIXME: change to use a stricter error when stable.
+				//return Err(io::ErrorKind::InvalidFilename.into())
+				ffi::CString::new("")
+			}?;
 			handle = dlopen(c_str.as_ptr(), RTLD_NOW | RTLD_LOCAL);
 		}
 		#[cfg(windows)]
 		{
 			use crate::os::win32::*;
-			let wide_str: Vec<u16> = path.encode_utf16().chain(std::iter::once(0u16)).collect();
+			use std::os::windows::ffi::OsStrExt;
+			let os_str = path.as_os_str();
+			let wide_str: Vec<u16> = os_str.encode_wide().chain(std::iter::once(0u16)).collect();
 			handle = crate::os::win32::LoadLibraryExW(
 				wide_str.as_ptr().cast(),
 				std::ptr::null_mut(),
@@ -34,8 +46,8 @@ unsafe impl Loader for System {
 		}
 	}
 
-	unsafe fn find(&self, symbol: &str) -> *const () {
-		let c_str = CString::new(symbol).unwrap();
+	unsafe fn sym(&self, symbol: &str) -> *const () {
+		let c_str = ffi::CString::new(symbol).unwrap();
 		crate::os::dlsym(self.0.load(Ordering::Relaxed), c_str.as_ptr().cast())
 	}
 }

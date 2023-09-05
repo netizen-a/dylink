@@ -11,7 +11,7 @@ unsafe impl Loader for This {
 	///
 	/// # Windows Platform
 	/// On windows, `path` is used to load the library handle.
-	unsafe fn open(path: &str) -> io::Result<Self> {
+	unsafe fn open<P: AsRef<Path>>(path: P) -> io::Result<Self> {
 		#[cfg(unix)]
 		{
 			let _ = path;
@@ -20,8 +20,10 @@ unsafe impl Loader for This {
 		#[cfg(windows)]
 		{
 			use std::mem::MaybeUninit;
-			let wide_str: Vec<u16> = path.encode_utf16().chain(std::iter::once(0u16)).collect();
-			let wide_ptr = if path.is_empty() {
+			use std::os::windows::ffi::OsStrExt;
+			let os_str = path.as_ref().as_os_str();
+			let wide_str: Vec<u16> = os_str.encode_wide().chain(std::iter::once(0u16)).collect();
+			let lpmodulename = if os_str.is_empty() {
 				std::ptr::null()
 			} else {
 				wide_str.as_ptr()
@@ -29,7 +31,7 @@ unsafe impl Loader for This {
 			let mut handle = MaybeUninit::zeroed();
 			let result = win32::GetModuleHandleExW(
 				win32::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-				wide_ptr,
+				lpmodulename,
 				handle.as_mut_ptr(),
 			);
 			if result != 0 {
@@ -39,7 +41,7 @@ unsafe impl Loader for This {
 			}
 		}
 	}
-	unsafe fn find(&self, symbol: &str) -> *const () {
+	unsafe fn sym(&self, symbol: &str) -> *const () {
 		let c_str = ffi::CString::new(symbol).unwrap();
 		dlsym(self.0.load(Ordering::Relaxed), c_str.as_ptr())
 	}
