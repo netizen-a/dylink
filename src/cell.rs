@@ -42,7 +42,7 @@ impl<'a, L: load::Loader> Library<'a, L> {
 	/// This will lazily initialize the library.
 	/// # Panics
 	/// May panic if [`Library`] failed to be initialized.
-	pub fn find(&self, symbol: &str) -> *const () {
+	pub fn sym(&self, symbol: &str) -> *const () {
 		let handle = self.hlib.get_or_init(||{
 			self.libs
 				.iter()
