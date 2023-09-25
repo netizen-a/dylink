@@ -11,7 +11,7 @@
 //! ```rust
 //! use dylink::*;
 //!
-//! static KERNEL32: sync::Library = sync::Library::new(&["Kernel32.dll"]);
+//! static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
 //!
 //! #[dylink(library=KERNEL32)]
 //! extern "system" {
@@ -22,9 +22,9 @@
 
 pub mod sync;
 pub mod cell;
-pub mod load;
-
 mod os;
+
+use std::{path, io, ffi, sync::atomic::AtomicPtr};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -36,7 +36,7 @@ mod os;
 /// # Examples
 ///```rust
 /// use dylink::*;
-/// static FOOBAR: sync::Library<load::System> = sync::Library::new(&["foobar.dll"]);
+/// static FOOBAR: sync::LibLock = sync::LibLock::new(&["foobar.dll"]);
 ///
 /// // foreign module pattern
 /// #[dylink(library=FOOBAR)]
@@ -50,6 +50,56 @@ mod os;
 ///```
 pub use dylink_macro::dylink;
 
+#[cfg(windows)]
+use os::windows::{dylib_open, dylib_close, dylib_symbol, dylib_this};
+#[cfg(unix)]
+use os::unix::{dylib_open, dylib_close, dylib_symbol, dylib_this};
+
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
+
+
+#[repr(C)]
+pub struct Sym {
+	_data: [u8; 0],
+	_marker: core::marker::PhantomData<(*mut u8, std::marker::PhantomPinned)>,
+}
+
+// primitive type for handling library handles
+// Library should be treated as Arc
+#[derive(Debug)]
+pub struct Library(AtomicPtr<ffi::c_void>);
+
+impl Library {
+    // default way to open library
+    pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
+		unsafe {dylib_open(path.as_ref())}
+			.and_then(|handle| Ok(Self(AtomicPtr::new(handle))))
+    }
+
+	pub fn this() -> io::Result<Self> {
+		unsafe {dylib_this()}
+			.and_then(|handle| Ok(Self(AtomicPtr::new(handle))))
+	}
+
+	pub fn symbol<'a>(&'a mut self, name: &'a str) -> io::Result<&'a Sym> {
+		unsafe {dylib_symbol(*self.0.get_mut(), name)}
+	}
+}
+
+impl Drop for Library {
+	fn drop(&mut self) {
+		unsafe {
+    		let _ = dylib_close(*self.0.get_mut()).unwrap();
+		}
+	}
+}
+
+#[macro_export]
+macro_rules! lib {
+	($name:literal $(, alt_names:literal)*) => {
+		$crate::Library::open($name)
+		$(.or_else(||$crate::Library::open($name)))*
+	};
+}

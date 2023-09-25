@@ -44,7 +44,7 @@ Below is a basic working example on how to use the macro on windows.
 ```rust
 use dylink::*;
 
-static KERNEL32: sync::Library = sync::Library::new(&["Kernel32.dll"]);
+static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
 
 #[dylink(library=KERNEL32)]
 extern "stdcall" {

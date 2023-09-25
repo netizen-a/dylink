@@ -1,34 +1,36 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
 use std::cell;
-use crate::load;
+#[cfg(windows)]
+use crate::os::windows::dylib_symbol;
+#[cfg(unix)]
+use crate::os::unix::dylib_symbol;
+use crate::{Library, Sym};
+use std::io;
 
-/// An object providing access to a lazily loaded library on the filesystem.
-///
-/// This object is designed to be used with [`dylink`](crate::dylink) for subsequent zero overhead calls.
+/// An object providing access to a lazily loaded LibCell on the filesystem.
 #[derive(Debug)]
-pub struct Library<'a, L: load::Loader = load::System> {
-    // NOTE: might make this mutable
+pub struct LibCell<'a> {
 	libs: &'a [&'a str],
-	// library handle
-	hlib: cell::OnceCell<L>,
+	// LibCell handle
+	hlib: cell::OnceCell<Library>,
 }
 
-impl<'a, L: load::Loader> Library<'a, L> {
-	/// Constructs a new `Library`.
+impl <'a> LibCell<'a> {
+	/// Constructs a new `LibCell`.
 	///
-	/// This function accepts a slice of paths the Library will attempt to load from
+	/// This function accepts a slice of paths the LibCell will attempt to load from
 	/// by priority (where `0..n`, index `0` is highest, and `n` is lowest), but only the first
-	/// library successfully loaded will be used. The reason is to provide fallback
-	/// mechanism in case the shared library is in a seperate directory or may have a variety
+	/// LibCell successfully loaded will be used. The reason is to provide fallback
+	/// mechanism in case the shared LibCell is in a seperate directory or may have a variety
 	/// of names.
 	///
-	/// *Note: If `libs` is empty, the library cannot load.*
+	/// If `libs` is empty then the program attempts to load itself.
 	///
 	/// # Examples
 	/// ```rust
 	/// # use dylink::*;
-	/// static KERNEL32: sync::Library<load::This> = sync::Library::new(&["kernel32.dll"]);
+	/// let _kernel32: cell::LibCell = cell::LibCell::new(&["kernel32.dll"]);
 	/// ```
 	pub const fn new(libs: &'a [&'a str]) -> Self {
 		Self {
@@ -39,51 +41,53 @@ impl<'a, L: load::Loader> Library<'a, L> {
 
 	/// May block if another thread is currently attempting to initialize the cell.
 	///
-	/// This will lazily initialize the library.
+	/// This will lazily initialize the LibCell.
 	/// # Panics
-	/// May panic if [`Library`] failed to be initialized.
-	pub fn sym(&self, symbol: &str) -> *const () {
-		let handle = self.hlib.get_or_init(||{
-			self.libs
-				.iter()
-				.find_map(|name| unsafe { L::open(name).ok() })
-				.expect("failed to initialize `Library`")
+	/// May panic if [`LibCell`] failed to be initialized.
+	pub fn symbol(&'a self, name: &'a str) -> io::Result<&'a Sym> {
+		let lib = self.hlib.get_or_init(||{
+			if self.libs.is_empty() {
+				Library::this()
+					.expect("failed to initialize `LibLock`")
+			} else {
+				self.libs
+					.iter()
+					.find_map(|path| Library::open(path).ok() )
+					.expect("failed to initialize `LibLock`")
+			}
 		});
-		unsafe { handle.sym(symbol) }
+		unsafe {
+			// ValidHandle::as_ptr is safe here, because we got the
+			// library through OnceCell::get_or_init
+			dylib_symbol(*lib.0.as_ptr(), name)
+		}
 	}
 	/// Gets the reference to the underlying value.
     ///
     /// Returns `None` if the cell is empty, or being initialized. This
     /// method never blocks.
 	#[inline]
-	pub fn get(&self) -> Option<&L> {
+	pub fn get(&self) -> Option<&Library> {
 		self.hlib.get()
 	}
 
-    #[inline]
-	pub fn into_inner(self) -> Option<L> {
-		self.hlib.into_inner()
-	}
-
-	/// Takes the value out of this `Library`, moving it back to an uninitialized state.
+	/// Takes the value out of this `LibCell`, moving it back to an uninitialized state.
     ///
-    /// Has no effect and returns `None` if the `Library` hasn't been initialized.
+    /// Has no effect and returns `None` if the `LibCell` hasn't been initialized.
     ///
     /// Safety is guaranteed by requiring a mutable reference.
 	#[inline]
-	pub fn take(&mut self) -> Option<L> {
+	pub fn take(&mut self) -> Option<Library> {
 		self.hlib.take()
 	}
 
 	#[inline]
-	pub fn set(&self, value: L) -> Result<(), L> {
+	pub fn set(&self, value: Library) -> Result<(), Library> {
 		self.hlib.set(value)
 	}
-}
 
-#[cfg(any(unix, doc))]
-impl Default for Library<'_, load::This> {
-	fn default() -> Self {
-		Self::new(&[""])
+	#[inline]
+	pub fn into_inner(self) -> Option<Library> {
+		self.hlib.into_inner()
 	}
 }
