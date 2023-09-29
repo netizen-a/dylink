@@ -77,7 +77,7 @@ pub unsafe fn dylib_this() -> io::Result<*mut ffi::c_void> {
 }
 
 pub unsafe fn dylib_close(lib_handle: *mut ffi::c_void) -> io::Result<()> {
-	let result = crate::os::windows::FreeLibrary(lib_handle);
+	let result = FreeLibrary(lib_handle);
     if result == 0 {
 		Err(io::Error::last_os_error())
 	} else {
@@ -91,7 +91,6 @@ pub unsafe fn dylib_symbol(lib_handle: *mut ffi::c_void, name: &str) -> io::Resu
 		GetProcAddress(lib_handle, c_str.as_ptr().cast()).cast()
 	};
 	if addr.is_null() {
-		// todo: use dlerror for unix
 		Err(io::Error::last_os_error())
 	} else {
 		Ok(addr.cast::<Sym>().as_ref().unwrap_unchecked())
