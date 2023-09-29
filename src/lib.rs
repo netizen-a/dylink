@@ -66,13 +66,11 @@ pub struct Sym {
 	_marker: core::marker::PhantomData<(*mut u8, std::marker::PhantomPinned)>,
 }
 
-// primitive type for handling library handles
-// Library should be treated as Arc
+/// An object providing access to an open dynamic library.
 #[derive(Debug)]
 pub struct Library(AtomicPtr<ffi::c_void>);
 
 impl Library {
-    // default way to open library
     pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
 		unsafe {dylib_open(path.as_ref())}
 			.and_then(|handle| Ok(Self(AtomicPtr::new(handle))))
