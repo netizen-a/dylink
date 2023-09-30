@@ -22,7 +22,7 @@
 
 pub mod sync;
 pub mod cell;
-mod os;
+pub mod os;
 
 use std::{path, io, ffi, sync::atomic::AtomicPtr};
 

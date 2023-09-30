@@ -45,6 +45,15 @@ fn test_win32_impl() {
 	}
 }
 
+#[cfg(windows)]
+#[test]
+fn test_win32_ext() {
+	use dylink::os::windows::LibraryExt;
+	let mut this = Library::this().unwrap();
+	let path = this.get_path().unwrap();
+	println!("{:?}", path);
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn test_linux_x11() {
