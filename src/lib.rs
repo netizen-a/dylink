@@ -91,7 +91,7 @@ impl Library {
 impl Drop for Library {
 	fn drop(&mut self) {
 		unsafe {
-    		let _ = dylib_close(*self.0.get_mut()).unwrap();
+    		let _ = dylib_close(*self.0.get_mut());
 		}
 	}
 }
