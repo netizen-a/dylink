@@ -51,7 +51,7 @@ fn test_win32_ext() {
 	use dylink::os::windows::LibraryExt;
 	let mut this = Library::this().unwrap();
 	let path = this.get_path().unwrap();
-	println!("{:?}", path);
+	println!("path: {}", path.display());
 }
 
 #[cfg(target_os = "linux")]

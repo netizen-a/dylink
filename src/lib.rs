@@ -66,6 +66,11 @@ pub struct Sym {
 	_marker: core::marker::PhantomData<(*mut u8, std::marker::PhantomPinned)>,
 }
 
+#[inline]
+const fn handle_to_lib(handle: *mut ffi::c_void) -> Library {
+	Library(AtomicPtr::new(handle))
+}
+
 // primitive type for handling library handles
 // Library should be treated as Arc
 #[derive(Debug)]
@@ -75,12 +80,12 @@ impl Library {
     // default way to open library
     pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
 		unsafe {dylib_open(path.as_ref())}
-			.and_then(|handle| Ok(Self(AtomicPtr::new(handle))))
+			.map(handle_to_lib)
     }
 
 	pub fn this() -> io::Result<Self> {
 		unsafe {dylib_this()}
-			.and_then(|handle| Ok(Self(AtomicPtr::new(handle))))
+			.map(handle_to_lib)
 	}
 
 	pub fn symbol<'a>(&'a mut self, name: &'a str) -> io::Result<&'a Sym> {

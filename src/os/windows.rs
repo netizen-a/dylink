@@ -41,36 +41,27 @@ pub trait LibraryExt {
 impl LibraryExt for Library {
 	fn get_path(&mut self) -> io::Result<path::PathBuf> {
 		use std::os::windows::ffi::OsStringExt;
-
 		const MAX_PATH: usize = 260;
 		let mut file_name = vec![0u16; MAX_PATH];
 		loop {
-			let len = unsafe {GetModuleFileNameW(*self.0.get_mut(), file_name.as_mut_ptr(), file_name.len() as DWORD)};
-
+			let _ = unsafe {GetModuleFileNameW(*self.0.get_mut(), file_name.as_mut_ptr(), file_name.len() as DWORD)};
 			let last_error = io::Error::last_os_error();
-			if len == 0 {
-				return Err(last_error);
-			}
-
-			let raw_error = unsafe {last_error.raw_os_error().unwrap_unchecked()};
-			match raw_error {
+			match unsafe {last_error.raw_os_error().unwrap_unchecked()} {
 				0 => {
-					file_name.resize(len as usize, 0);
 					let os_str = ffi::OsString::from_wide(&file_name);
-					return Ok(os_str.into())
+					break Ok(os_str.into())
 				},
 				0x7A => file_name.resize(file_name.len() * 2, 0),
-				_ => unreachable!(),
+				_ => break Err(last_error),
 			}
 		}
 	}
 }
 
 pub(crate) unsafe fn dylib_open<P: AsRef<ffi::OsStr>>(path: P) -> io::Result<*mut ffi::c_void> {
-    let handle: *mut ffi::c_void;
 	let os_str = path.as_ref();
 	let wide_str: Vec<u16> = os_str.encode_wide().chain(std::iter::once(0u16)).collect();
-	handle = LoadLibraryExW(
+	let handle: *mut ffi::c_void = LoadLibraryExW(
 		wide_str.as_ptr().cast(),
 		std::ptr::null_mut(),
 		0,
