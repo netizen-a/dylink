@@ -1,13 +1,13 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 
-use std::{sync, io};
+use std::{io, sync};
 
 use crate::{Library, Sym};
 
-#[cfg(windows)]
-use crate::os::windows::dylib_symbol;
 #[cfg(unix)]
 use crate::os::unix::dylib_symbol;
+#[cfg(windows)]
+use crate::os::windows::dylib_symbol;
 
 /// An object providing access to a lazily loaded LibLock on the filesystem.
 ///
@@ -19,7 +19,7 @@ pub struct LibLock<'a> {
 	hlib: sync::OnceLock<Library>,
 }
 
-impl <'a> LibLock<'a> {
+impl<'a> LibLock<'a> {
 	/// Constructs a new `LibLock`.
 	///
 	/// This function accepts a slice of paths the LibLock will attempt to load from
@@ -55,14 +55,13 @@ impl <'a> LibLock<'a> {
 	/// # Panics
 	/// May panic if [`LibLock`] failed to be initialized.
 	pub fn symbol(&'a self, name: &'a str) -> io::Result<&'a Sym> {
-		let lib = self.hlib.get_or_init(||{
+		let lib = self.hlib.get_or_init(|| {
 			if self.libs.is_empty() {
-				Library::this()
-					.expect("failed to initialize `LibLock`")
+				Library::this().expect("failed to initialize `LibLock`")
 			} else {
 				self.libs
 					.iter()
-					.find_map(|path| Library::open(path).ok() )
+					.find_map(|path| Library::open(path).ok())
 					.expect("failed to initialize `LibLock`")
 			}
 		});
@@ -73,18 +72,18 @@ impl <'a> LibLock<'a> {
 		}
 	}
 	/// Gets the reference to the underlying value.
-    ///
-    /// Returns `None` if the cell is empty, or being initialized. This
-    /// method never blocks.
+	///
+	/// Returns `None` if the cell is empty, or being initialized. This
+	/// method never blocks.
 	#[inline]
 	pub fn get(&self) -> Option<&Library> {
 		self.hlib.get()
 	}
 	/// Takes the value out of this `LibLock`, moving it back to an uninitialized state.
-    ///
-    /// Has no effect and returns `None` if the `LibLock` hasn't been initialized.
-    ///
-    /// Safety is guaranteed by requiring a mutable reference.
+	///
+	/// Has no effect and returns `None` if the `LibLock` hasn't been initialized.
+	///
+	/// Safety is guaranteed by requiring a mutable reference.
 	#[inline]
 	pub fn take(&mut self) -> Option<Library> {
 		self.hlib.take()

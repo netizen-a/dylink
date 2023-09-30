@@ -20,11 +20,11 @@
 //! }
 //! ```
 
-pub mod sync;
 pub mod cell;
 pub mod os;
+pub mod sync;
 
-use std::{path, io, ffi, sync::atomic::AtomicPtr};
+use std::{ffi, io, mem, path, sync::atomic::AtomicPtr};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -50,15 +50,14 @@ use std::{path, io, ffi, sync::atomic::AtomicPtr};
 ///```
 pub use dylink_macro::dylink;
 
-#[cfg(windows)]
-use os::windows::{dylib_open, dylib_close, dylib_symbol, dylib_this};
 #[cfg(unix)]
-use os::unix::{dylib_open, dylib_close, dylib_symbol, dylib_this};
+use os::unix::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this};
+#[cfg(windows)]
+use os::windows::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this};
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
-
 
 #[repr(C)]
 pub struct Sym {
@@ -77,26 +76,24 @@ const fn handle_to_lib(handle: *mut ffi::c_void) -> Library {
 pub struct Library(AtomicPtr<ffi::c_void>);
 
 impl Library {
-    // default way to open library
-    pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
-		unsafe {dylib_open(path.as_ref())}
-			.map(handle_to_lib)
-    }
+	// default way to open library
+	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
+		unsafe { dylib_open(path.as_ref()) }.map(handle_to_lib)
+	}
 
 	pub fn this() -> io::Result<Self> {
-		unsafe {dylib_this()}
-			.map(handle_to_lib)
+		unsafe { dylib_this() }.map(handle_to_lib)
 	}
 
 	pub fn symbol<'a>(&'a mut self, name: &'a str) -> io::Result<&'a Sym> {
-		unsafe {dylib_symbol(*self.0.get_mut(), name)}
+		unsafe { dylib_symbol(*self.0.get_mut(), name) }
 	}
 }
 
 impl Drop for Library {
 	fn drop(&mut self) {
 		unsafe {
-    		let _ = dylib_close(*self.0.get_mut());
+			let _ = dylib_close(*self.0.get_mut());
 		}
 	}
 }
@@ -107,4 +104,11 @@ macro_rules! lib {
 		$crate::Library::open($name)
 		$(.or_else(||$crate::Library::open($name)))*
 	};
+}
+
+// This is the preferred way to close libraries and exit on windows, but it also works for unix.
+pub fn close_and_exit(lib: Library, exit_code: u32) -> ! {
+	let mut lib = mem::ManuallyDrop::new(lib);
+	let handle = lib.0.get_mut();
+	unsafe { dylib_close_and_exit(*handle, exit_code) }
 }
