@@ -4,14 +4,9 @@ use std::{io, sync};
 
 use crate::{Library, Sym};
 
-#[cfg(unix)]
-use crate::os::unix::dylib_symbol;
-#[cfg(windows)]
-use crate::os::windows::dylib_symbol;
-
 /// An object providing access to a lazily loaded LibLock on the filesystem.
 ///
-/// This object is designed to be used with [`dylink`](crate::dylink) for subsequent zero overhead calls.
+/// This object is designed to be used with [`dylink`](crate::dylink).
 #[derive(Debug)]
 pub struct LibLock<'a> {
 	libs: &'a [&'a str],
@@ -54,7 +49,7 @@ impl<'a> LibLock<'a> {
 	/// This will lazily initialize the LibLock.
 	/// # Panics
 	/// May panic if [`LibLock`] failed to be initialized.
-	pub fn symbol(&'a self, name: &'a str) -> io::Result<&'a Sym> {
+	pub fn symbol(&'a self, name: &str) -> io::Result<&'a Sym> {
 		let lib = self.hlib.get_or_init(|| {
 			if self.libs.is_empty() {
 				Library::this().expect("failed to initialize `LibLock`")
@@ -65,11 +60,7 @@ impl<'a> LibLock<'a> {
 					.expect("failed to initialize `LibLock`")
 			}
 		});
-		unsafe {
-			// as_ptr is safe because we got the library through OnceLock::get_or_init
-			let handle = lib.0.as_ptr();
-			dylib_symbol(*handle, name)
-		}
+		lib.symbol(name)
 	}
 	/// Gets the reference to the underlying value.
 	///

@@ -20,11 +20,10 @@
 //! }
 //! ```
 
-pub mod cell;
 pub mod os;
 pub mod sync;
 
-use std::{ffi, io, mem, path, sync::atomic::AtomicPtr};
+use std::{io, path};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -65,35 +64,33 @@ pub struct Sym {
 	_marker: core::marker::PhantomData<(*mut u8, std::marker::PhantomPinned)>,
 }
 
-#[inline]
-const fn handle_to_lib(handle: *mut ffi::c_void) -> Library {
-	Library(AtomicPtr::new(handle))
-}
-
 // primitive type for handling library handles
 // Library should be treated as Arc
 #[derive(Debug)]
-pub struct Library(AtomicPtr<ffi::c_void>);
+pub struct Library(os::Handle);
+unsafe impl Send for Library {}
+unsafe impl Sync for Library {}
 
 impl Library {
 	// default way to open library
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
-		unsafe { dylib_open(path.as_ref()) }.map(handle_to_lib)
+		unsafe { dylib_open(path.as_ref().as_os_str()) }.map(Library)
 	}
-
 	pub fn this() -> io::Result<Self> {
-		unsafe { dylib_this() }.map(handle_to_lib)
+		unsafe { dylib_this() }.map(Library)
 	}
-
-	pub fn symbol<'a>(&'a mut self, name: &'a str) -> io::Result<&'a Sym> {
-		unsafe { dylib_symbol(*self.0.get_mut(), name) }
+	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
+		unsafe { dylib_symbol(self.0, name) }
+	}
+	pub fn close(self) -> io::Result<()> {
+		unsafe { dylib_close(self.0) }
 	}
 }
 
 impl Drop for Library {
 	fn drop(&mut self) {
 		unsafe {
-			let _ = dylib_close(*self.0.get_mut());
+			let _ = dylib_close(self.0);
 		}
 	}
 }
@@ -107,8 +104,6 @@ macro_rules! lib {
 }
 
 // This is the preferred way to close libraries and exit on windows, but it also works for unix.
-pub fn close_and_exit(lib: Library, exit_code: u32) -> ! {
-	let mut lib = mem::ManuallyDrop::new(lib);
-	let handle = lib.0.get_mut();
-	unsafe { dylib_close_and_exit(*handle, exit_code) }
+pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
+	unsafe { dylib_close_and_exit(lib.0, exit_code) }
 }
