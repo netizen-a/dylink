@@ -49,8 +49,8 @@ fn test_win32_impl() {
 #[test]
 fn test_win32_ext() {
 	use dylink::os::windows::LibraryExt;
-	let mut this = Library::this().unwrap();
-	let path = this.get_path().unwrap();
+	let this = Library::this().unwrap();
+	let path = this.path().unwrap();
 	println!("path: {}", path.display());
 }
 

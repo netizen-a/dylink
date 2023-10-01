@@ -1,26 +1,42 @@
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
-use std::os::windows::prelude::AsRawHandle;
+use std::os::windows::prelude::*;
 use std::{ffi, io, path, ptr};
 
 use super::Handle;
+use crate::sealed::Sealed;
 use crate::Library;
 use crate::Sym;
 
 mod c;
 
 impl AsRawHandle for Library {
-	fn as_raw_handle(&self) -> std::os::windows::prelude::RawHandle {
+	#[inline]
+	fn as_raw_handle(&self) -> RawHandle {
 		self.0
 	}
 }
 
-pub trait LibraryExt {
-	fn get_path(&mut self) -> io::Result<path::PathBuf>;
+impl IntoRawHandle for Library {
+	#[inline]
+	fn into_raw_handle(self) -> RawHandle {
+		self.0
+	}
+}
+
+impl AsHandle for Library {
+	#[inline]
+	fn as_handle(&self) -> BorrowedHandle<'_> {
+		unsafe { BorrowedHandle::borrow_raw(self.0) }
+	}
+}
+
+pub trait LibraryExt: Sealed {
+	fn path(&self) -> io::Result<path::PathBuf>;
 }
 
 impl LibraryExt for Library {
-	fn get_path(&mut self) -> io::Result<path::PathBuf> {
+	fn path(&self) -> io::Result<path::PathBuf> {
 		const MAX_PATH: usize = 260;
 		let mut file_name = vec![0u16; MAX_PATH];
 		loop {
@@ -79,5 +95,5 @@ pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Res
 }
 
 pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) -> ! {
-	c::FreeLibraryAndExitThread(lib_handle, exit_code as i32)
+	c::FreeLibraryAndExitThread(lib_handle, exit_code as u32)
 }

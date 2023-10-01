@@ -1,13 +1,12 @@
-use crate::Sym;
-use std::{ffi, io, ptr};
 use super::Handle;
+use crate::Sym;
 use std::os::unix::ffi::OsStrExt;
+use std::{ffi, io, ptr};
 
 #[cfg(not(any(linux, macos, target_env = "gnu")))]
 use std::sync;
 
 mod c;
-
 
 #[cfg(not(any(linux, macos, target_env = "gnu")))]
 #[inline]
@@ -26,7 +25,8 @@ unsafe fn dylib_error() -> io::Error {
 }
 
 unsafe fn map_result<F>(f: F) -> io::Result<*mut ffi::c_void>
-where F: FnOnce() -> *mut ffi::c_void
+where
+	F: FnOnce() -> *mut ffi::c_void,
 {
 	let _lock = dylib_guard();
 	let _ = c::dlerror(); // clear existing errors

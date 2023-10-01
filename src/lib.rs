@@ -21,7 +21,9 @@
 //! ```
 
 pub mod os;
+mod sealed;
 pub mod sync;
+use crate::sealed::Sealed;
 
 use std::{io, path};
 
@@ -70,6 +72,7 @@ pub struct Sym {
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
+impl Sealed for Library {}
 
 impl Library {
 	// default way to open library
