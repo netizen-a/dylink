@@ -25,7 +25,7 @@ mod sealed;
 pub mod sync;
 use crate::sealed::Sealed;
 
-use std::{io, path};
+use std::{io, path, mem};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -75,18 +75,23 @@ unsafe impl Sync for Library {}
 impl Sealed for Library {}
 
 impl Library {
-	// default way to open library
+	/// Attempts to open a dynamic library file.
+	///
+	/// The library maintains an internal reference count that increments
+	/// for every time the library is opened
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
 		unsafe { dylib_open(path.as_ref().as_os_str()) }.map(Library)
 	}
+	/// Attempts to acquire a handle to the currently running program.
 	pub fn this() -> io::Result<Self> {
 		unsafe { dylib_this() }.map(Library)
 	}
+	/// Retrieves a symbol from the library if it exists
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
 		unsafe { dylib_symbol(self.0, name) }
 	}
 	pub fn close(self) -> io::Result<()> {
-		unsafe { dylib_close(self.0) }
+		unsafe { dylib_close(mem::ManuallyDrop::new(self).0) }
 	}
 }
 

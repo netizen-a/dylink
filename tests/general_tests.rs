@@ -52,6 +52,7 @@ fn test_win32_ext() {
 	let this = Library::this().unwrap();
 	let path = this.path().unwrap();
 	println!("path: {}", path.display());
+	this.close().unwrap();
 }
 
 #[cfg(target_os = "linux")]
