@@ -66,8 +66,7 @@ pub struct Sym {
 	_marker: core::marker::PhantomData<(*mut u8, std::marker::PhantomPinned)>,
 }
 
-// primitive type for handling library handles
-// Library should be treated as Arc
+/// An object providing access to an open dynamic library.
 #[derive(Debug)]
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
