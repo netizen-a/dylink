@@ -55,6 +55,20 @@ fn test_win32_ext() {
 	this.close().unwrap();
 }
 
+#[cfg(any(windows, target_os="linux"))]
+#[test]
+fn test_is_loaded() {
+	let loaded = if cfg!(windows) {
+		is_loaded("Kernel32.dll")
+	} else if cfg!(target_os="linux") {
+		let _lib = Library::open("libX11.so.6").unwrap();
+		is_loaded("libX11.so.6")
+	} else {
+		todo!()
+	};
+	assert!(loaded)
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn test_linux_x11() {

@@ -54,7 +54,10 @@ pub use dylink_macro::dylink;
 #[cfg(unix)]
 use os::unix::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this};
 #[cfg(windows)]
-use os::windows::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this};
+use os::windows::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this, dylib_is_loaded};
+
+#[cfg(any(linux, macos, target_env="gnu"))]
+use os::unix::dylib_is_loaded;
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
@@ -89,6 +92,7 @@ impl Library {
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
 		unsafe { dylib_symbol(self.0, name) }
 	}
+	///
 	pub fn close(self) -> io::Result<()> {
 		unsafe { dylib_close(mem::ManuallyDrop::new(self).0) }
 	}
@@ -113,4 +117,9 @@ macro_rules! lib {
 // This is the preferred way to close libraries and exit on windows, but it also works for unix.
 pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
 	unsafe { dylib_close_and_exit(lib.0, exit_code) }
+}
+
+#[cfg(any(windows, linux, macos, target_env="gnu"))]
+pub fn is_loaded<P: AsRef<path::Path>>(path: P) -> bool {
+	unsafe {dylib_is_loaded(path.as_ref().as_os_str())}
 }

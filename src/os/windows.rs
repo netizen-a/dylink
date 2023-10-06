@@ -97,3 +97,10 @@ pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Res
 pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) -> ! {
 	c::FreeLibraryAndExitThread(lib_handle, exit_code as u32)
 }
+
+pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
+	let wide_str: Vec<u16> = path.encode_wide().chain(std::iter::once(0u16)).collect();
+	let mut handle = ptr::null_mut();
+	let _ = c::GetModuleHandleExW(c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, wide_str.as_ptr(), &mut handle);
+	!handle.is_null()
+}

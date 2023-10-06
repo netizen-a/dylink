@@ -67,3 +67,16 @@ pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) ->
 	let _ = dylib_close(lib_handle);
 	std::process::exit(exit_code)
 }
+
+// This function doesn't use a lock because we don't check errors.
+#[cfg(any(linux, macos, target_env="gnu"))]
+pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
+	let c_str = ffi::CString::new(path.as_bytes()).expect("failed to create CString");
+	let result = c::dlopen(c_str.as_ptr(), c::RTLD_NOW | c::RTLD_NOLOAD);
+	if result.is_null() {
+		false
+	} else {
+		let _ = c::dlclose(result);
+		true
+	}
+}

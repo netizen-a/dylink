@@ -18,3 +18,5 @@ extern "stdcall" {
 	pub fn GetModuleFileNameW(hmodule: HMODULE, lpfilename: PWSTR, nsize: DWORD) -> DWORD;
 	pub fn FreeLibraryAndExitThread(hLibModule: HMODULE, dwExitCode: DWORD) -> !;
 }
+
+pub const GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT: DWORD = 0x00000002u32;
