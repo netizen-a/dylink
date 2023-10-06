@@ -56,7 +56,7 @@ use os::unix::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dyli
 #[cfg(windows)]
 use os::windows::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this, dylib_is_loaded};
 
-#[cfg(any(linux, macos, target_env="gnu"))]
+#[cfg(any(target_os="linux", target_os="macos", target_env="gnu"))]
 use os::unix::dylib_is_loaded;
 
 #[doc = include_str!("../README.md")]
@@ -92,9 +92,19 @@ impl Library {
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
 		unsafe { dylib_symbol(self.0, name) }
 	}
+	/// Same as drop, but returns a result.
 	///
+	/// This method is recommended when using other crates that manipulate dynamic libraries.
+	///
+	/// # Errors
+	/// May return an error if failed to drop.
 	pub fn close(self) -> io::Result<()> {
 		unsafe { dylib_close(mem::ManuallyDrop::new(self).0) }
+	}
+
+	/// This is the preferred way to close libraries when exiting threads.
+	pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
+		unsafe { dylib_close_and_exit(lib.0, exit_code) }
 	}
 }
 
@@ -114,12 +124,7 @@ macro_rules! lib {
 	};
 }
 
-// This is the preferred way to close libraries and exit on windows, but it also works for unix.
-pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
-	unsafe { dylib_close_and_exit(lib.0, exit_code) }
-}
-
-#[cfg(any(windows, linux, macos, target_env="gnu"))]
+#[cfg(any(windows, target_os="linux", target_os="macos", target_env="gnu"))]
 pub fn is_loaded<P: AsRef<path::Path>>(path: P) -> bool {
 	unsafe {dylib_is_loaded(path.as_ref().as_os_str())}
 }
