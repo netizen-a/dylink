@@ -92,9 +92,19 @@ impl Library {
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
 		unsafe { dylib_symbol(self.0, name) }
 	}
+	/// Same as drop, but returns a result.
 	///
+	/// This method is recommended when using other crates that manipulate dynamic libraries.
+	///
+	/// # Errors
+	/// May return an error if failed to drop.
 	pub fn close(self) -> io::Result<()> {
 		unsafe { dylib_close(mem::ManuallyDrop::new(self).0) }
+	}
+
+	/// This is the preferred way to close libraries when exiting threads.
+	pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
+		unsafe { dylib_close_and_exit(lib.0, exit_code) }
 	}
 }
 
@@ -112,11 +122,6 @@ macro_rules! lib {
 		$crate::Library::open($name)
 		$(.or_else(||$crate::Library::open($name)))*
 	};
-}
-
-// This is the preferred way to close libraries and exit on windows, but it also works for unix.
-pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
-	unsafe { dylib_close_and_exit(lib.0, exit_code) }
 }
 
 #[cfg(any(windows, linux, macos, target_env="gnu"))]
