@@ -56,10 +56,31 @@ impl LibraryExt for Library {
 	}
 }
 
+pub trait SymExt: Sealed {
+	// This is just weird, but strangely makes sense.
+	fn library(self) -> io::Result<Library>;
+}
+
+impl SymExt for &Sym {
+	fn library(self) -> io::Result<Library> {
+		let mut handle = ptr::null_mut();
+		let result = unsafe {
+			c::GetModuleHandleExW(c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, self as *const Sym as *const _, &mut handle)
+		};
+		if result == 0 {
+			Err(io::Error::last_os_error())
+		} else {
+			Ok(Library(handle))
+		}
+	}
+}
+
+
 fn into_wide(path: &ffi::OsStr) -> Vec<u16> {
 	path.encode_wide().chain(std::iter::once(0u16)).collect()
 }
 
+#[inline]
 pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	let wide_str: Vec<u16> = into_wide(path);
 	let handle = c::LoadLibraryExW(wide_str.as_ptr(), ptr::null_mut(), 0);
@@ -70,6 +91,7 @@ pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	}
 }
 
+#[inline]
 pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	let mut handle: *mut ffi::c_void = ptr::null_mut();
 	let result = c::GetModuleHandleExW(0, ptr::null(), &mut handle);
@@ -80,6 +102,7 @@ pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	}
 }
 
+#[inline]
 pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	if c::FreeLibrary(lib_handle) == 0 {
 		Err(io::Error::last_os_error())
@@ -88,6 +111,7 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	}
 }
 
+#[inline]
 pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Result<&'a Sym> {
 	let c_str = ffi::CString::new(name).unwrap();
 	let addr: *const () = unsafe { c::GetProcAddress(lib_handle, c_str.as_ptr()).cast() };
@@ -98,6 +122,7 @@ pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Res
 	}
 }
 
+#[inline]
 pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) -> ! {
 	c::FreeLibraryAndExitThread(lib_handle, exit_code as u32)
 }

@@ -68,6 +68,7 @@ pub struct Sym {
 	_data: [u8; 0],
 	_marker: core::marker::PhantomData<(*mut u8, std::marker::PhantomPinned)>,
 }
+impl Sealed for &Sym {}
 
 /// An object providing access to an open dynamic library.
 #[derive(Debug)]

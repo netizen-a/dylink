@@ -55,6 +55,16 @@ fn test_win32_ext() {
 	this.close().unwrap();
 }
 
+#[cfg(windows)]
+#[test]
+fn test_lib_sym_lib() {
+	use os::windows::SymExt;
+	let get_last_error = KERNEL32.symbol("GetLastError").unwrap();
+	let lib = get_last_error.library().unwrap();
+	let get_last_error2 = lib.symbol("GetLastError").unwrap();
+	assert!(get_last_error as *const Sym == get_last_error2 as *const Sym);
+}
+
 #[cfg(any(windows, target_os="linux"))]
 #[test]
 fn test_is_loaded() {
