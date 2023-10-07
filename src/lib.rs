@@ -52,12 +52,9 @@ use std::{io, path, mem};
 pub use dylink_macro::dylink;
 
 #[cfg(unix)]
-use os::unix::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this};
+use os::unix as imp;
 #[cfg(windows)]
-use os::windows::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this, dylib_is_loaded};
-
-#[cfg(any(target_os="linux", target_os="macos", target_env="gnu"))]
-use os::unix::dylib_is_loaded;
+use os::windows as imp;
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
@@ -83,15 +80,15 @@ impl Library {
 	/// The library maintains an internal reference count that increments
 	/// for every time the library is opened
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
-		unsafe { dylib_open(path.as_ref().as_os_str()) }.map(Library)
+		unsafe { imp::dylib_open(path.as_ref().as_os_str()) }.map(Library)
 	}
 	/// Attempts to acquire a handle to the currently running program.
 	pub fn this() -> io::Result<Self> {
-		unsafe { dylib_this() }.map(Library)
+		unsafe { imp::dylib_this() }.map(Library)
 	}
 	/// Retrieves a symbol from the library if it exists
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
-		unsafe { dylib_symbol(self.0, name) }
+		unsafe { imp::dylib_symbol(self.0, name) }
 	}
 	/// Same as drop, but returns a result.
 	///
@@ -100,19 +97,19 @@ impl Library {
 	/// # Errors
 	/// May return an error if failed to drop.
 	pub fn close(self) -> io::Result<()> {
-		unsafe { dylib_close(mem::ManuallyDrop::new(self).0) }
+		unsafe { imp::dylib_close(mem::ManuallyDrop::new(self).0) }
 	}
 
 	/// This is the preferred way to close libraries when exiting threads.
 	pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
-		unsafe { dylib_close_and_exit(lib.0, exit_code) }
+		unsafe { imp::dylib_close_and_exit(lib.0, exit_code) }
 	}
 }
 
 impl Drop for Library {
 	fn drop(&mut self) {
 		unsafe {
-			let _ = dylib_close(self.0);
+			let _ = imp::dylib_close(self.0);
 		}
 	}
 }
@@ -127,5 +124,5 @@ macro_rules! lib {
 
 #[cfg(any(windows, target_os="linux", target_os="macos", target_env="gnu"))]
 pub fn is_loaded<P: AsRef<path::Path>>(path: P) -> bool {
-	unsafe {dylib_is_loaded(path.as_ref().as_os_str())}
+	unsafe {imp::dylib_is_loaded(path.as_ref().as_os_str())}
 }

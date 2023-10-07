@@ -76,13 +76,13 @@ impl SymExt for &Sym {
 }
 
 
-fn into_wide(path: &ffi::OsStr) -> Vec<u16> {
+fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
 	path.encode_wide().chain(std::iter::once(0u16)).collect()
 }
 
 #[inline]
 pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
-	let wide_str: Vec<u16> = into_wide(path);
+	let wide_str: Vec<u16> = to_wide(path);
 	let handle = c::LoadLibraryExW(wide_str.as_ptr(), ptr::null_mut(), 0);
 	if handle.is_null() {
 		Err(io::Error::last_os_error())
@@ -128,7 +128,7 @@ pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) ->
 }
 
 pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
-	let wide_str: Vec<u16> = into_wide(path);
+	let wide_str: Vec<u16> = to_wide(path);
 	let mut handle = ptr::null_mut();
 	let _ = c::GetModuleHandleExW(c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, wide_str.as_ptr(), &mut handle);
 	!handle.is_null()

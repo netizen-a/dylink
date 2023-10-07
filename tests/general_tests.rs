@@ -47,7 +47,7 @@ fn test_win32_impl() {
 
 #[cfg(windows)]
 #[test]
-fn test_win32_ext() {
+fn test_win32_libext() {
 	use dylink::os::windows::LibraryExt;
 	let this = Library::this().unwrap();
 	let path = this.path().unwrap();
@@ -57,7 +57,7 @@ fn test_win32_ext() {
 
 #[cfg(windows)]
 #[test]
-fn test_lib_sym_lib() {
+fn test_win32_symext() {
 	use os::windows::SymExt;
 	let get_last_error = KERNEL32.symbol("GetLastError").unwrap();
 	let lib = get_last_error.library().unwrap();

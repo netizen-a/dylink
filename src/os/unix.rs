@@ -1,6 +1,7 @@
 use super::Handle;
 use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, ptr};
+use crate::Sym;
 
 #[cfg(not(any(linux, macos, target_env = "gnu")))]
 use std::sync;
@@ -18,9 +19,14 @@ fn dylib_guard<'a>() -> sync::LockResult<sync::MutexGuard<'a, ()>> {
 #[inline(always)]
 fn dylib_guard() {}
 
-unsafe fn dylib_error() -> io::Error {
-	let e = ffi::CStr::from_ptr(c::dlerror()).to_owned();
-	io::Error::new(io::ErrorKind::Other, e.to_str().unwrap())
+unsafe fn dylib_error() -> Option<io::Error> {
+	let raw = c::dlerror();
+	if raw.is_null() {
+		None
+	} else {
+		let e = ffi::CStr::from_ptr(raw).to_owned();
+		Some(io::Error::new(io::ErrorKind::Other, e.to_str().unwrap()))
+	}
 }
 
 unsafe fn map_result<F>(f: F) -> io::Result<*mut ffi::c_void>
@@ -30,8 +36,8 @@ where
 	let _lock = dylib_guard();
 	let _ = c::dlerror(); // clear existing errors
 	let handle: *mut ffi::c_void = f();
-	if handle.is_null() {
-		Err(dylib_error())
+	if let Some(error) = dylib_error() {
+		Err(error)
 	} else {
 		Ok(handle)
 	}
@@ -54,7 +60,7 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	let _ = c::dlerror(); // clear existing errors
 	let result = c::dlclose(lib_handle);
 	if result != 0 {
-		Err(dylib_error())
+		Err(dylib_error().unwrap_unchecked())
 	} else {
 		Ok(())
 	}
