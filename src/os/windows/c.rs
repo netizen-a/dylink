@@ -10,29 +10,32 @@ pub type PCSTR = *const ffi::c_char;
 pub type PWSTR = *mut u16;
 pub type BOOL = i32;
 pub type DWORD = u32;
-//pub type ULONG = ffi::c_ulong;
-//pub type ULONG64 = u64;
-//pub type CHAR = ffi::c_char;
-//pub type DWORD64 = u64;
-//// this structure is variable in length
-//#[repr(C)]
-//pub struct SYMBOL_INFO {
-//	SizeOfStruct: ULONG,
-//	TypeIndex: ULONG,
-//	Reserved: [ULONG64; 2],
-//	Index: ULONG,
-//	Size: ULONG,
-//	ModBase: ULONG64,
-//	Flags: ULONG,
-//	Value: ULONG64,
-//	Address: ULONG64,
-//	Register: ULONG,
-//	Scope: ULONG,
-//	Tag: ULONG,
-//	NameLen: ULONG,
-//	MaxNameLen: ULONG,
-//	Name: [CHAR; 1],
-//}
+pub type ULONG = ffi::c_ulong;
+pub type ULONG64 = u64;
+pub type DWORD64 = u64;
+
+pub const MAX_SYM_NAME: u32 = 2000u32;
+
+// this structure is variable in length
+#[derive(Debug)]
+#[repr(C)]
+pub struct SYMBOL_INFOW {
+	pub sizeofstruct: ULONG,
+	pub typeindex: ULONG,
+	pub reserved: [ULONG64; 2],
+	pub index: ULONG,
+	pub size: ULONG,
+	pub modbase: ULONG64,
+	pub flags: ULONG,
+	pub value: ULONG64,
+	pub address: ULONG64,
+	pub register: ULONG,
+	pub scope: ULONG,
+	pub tag: ULONG,
+	pub namelen: ULONG,
+	pub maxnamelen: ULONG,
+	pub name: [u16; 1],
+}
 
 
 extern "stdcall" {
@@ -49,19 +52,12 @@ extern "stdcall" {
 extern "stdcall" {
 	pub fn SymInitializeW(hprocess: HANDLE, usersearchpath: PCWSTR, finvadeprocess: BOOL) -> BOOL;
 	pub fn SymCleanup(process: HANDLE) -> BOOL;
-	//pub fn SymFromAddr(
-	//	hprocess: HANDLE,
-	//	address: DWORD64,
-	//	displacement: *mut DWORD64,
-	//	symbol: *mut SYMBOL_INFO,
-	//) -> BOOL;
-	//pub fn SymDeleteSymbol(
-	//	hprocess: HANDLE,
-	//	baseofdll: ULONG64,
-	//	name: PCSTR,
-	//	address: DWORD64,
-	//	flags: DWORD,
-	//) -> BOOL;
+	pub fn SymFromAddrW(
+		hprocess: HANDLE,
+		address: DWORD64,
+		displacement: *mut DWORD64,
+		symbol: *mut SYMBOL_INFOW,
+	) -> BOOL;
 }
 
 pub const GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT: DWORD = 0x00000002u32;
