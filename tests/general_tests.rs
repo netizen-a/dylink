@@ -72,7 +72,8 @@ fn test_sym_handler() {
 
 	let this = Library::this().unwrap();
 	let result = os::windows::SymbolHandler::new(None, &[this.path().unwrap()]);
-	let _handler = result.unwrap();
+	let handler = result.unwrap();
+	println!("{:?}", handler);
 	let result = os::windows::SymbolHandler::new(None, &[this.path().unwrap()]);
 	let _ = result.unwrap_err();
 }

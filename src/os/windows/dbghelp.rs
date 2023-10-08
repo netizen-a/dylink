@@ -3,9 +3,11 @@ use std::io;
 use std::os::windows::prelude::AsRawHandle;
 use std::path;
 use std::process;
+//use std::ptr;
 use std::sync::atomic;
 
 use crate::Library;
+//use crate::Sym;
 
 use super::LibraryExt;
 use super::c;
@@ -17,7 +19,11 @@ use std::os::windows::ffi::OsStrExt;
 static HANDLER_EXISTS: atomic::AtomicBool = atomic::AtomicBool::new(false);
 
 impl SymbolHandler {
-	/// Only one SymbolHandler may exist per process.
+	/// Constructs a SymbolHandler
+	///
+	/// **Note: Only one symbol handler may exist per process.**
+	/// # Errors
+	/// May error if another `SymbolHandler` instance is running.
 	pub fn new<P: AsRef<path::Path>>(
 		process: Option<&process::Child>,
 		paths: &[P],
@@ -59,6 +65,11 @@ impl SymbolHandler {
 			))
 		}
 	}
+    // untested. you probably shouldn't use this regardless.
+    //pub unsafe fn delete_symbol(&self, library: &mut Library, symbol: &Sym) {
+    //    c::SymDeleteSymbol(self.0, library.0 as c::ULONG64, ptr::null(), symbol as *const _ as _, 0);
+    //}
+
 }
 
 impl Drop for SymbolHandler {

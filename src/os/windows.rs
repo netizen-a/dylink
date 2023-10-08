@@ -145,3 +145,5 @@ impl SymExt for &Sym {
 // symbol handlers are single threaded so they are not Send or Sync
 #[derive(Debug)]
 pub struct SymbolHandler(c::HANDLE);
+// symbol handlers can be sent across threads, but does not implement Sync
+unsafe impl Send for SymbolHandler {}
