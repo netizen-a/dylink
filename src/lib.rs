@@ -25,7 +25,7 @@ mod sealed;
 pub mod sync;
 use crate::sealed::Sealed;
 
-use std::{io, path, mem};
+use std::{io, mem, path};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -122,7 +122,8 @@ macro_rules! lib {
 	};
 }
 
-#[cfg(any(windows, target_os="linux", target_os="macos", target_env="gnu"))]
+// TODO: replace with try_loaded later
+#[cfg(any(windows, target_os = "linux", target_os = "macos", target_env = "gnu"))]
 pub fn is_loaded<P: AsRef<path::Path>>(path: P) -> bool {
-	unsafe {imp::dylib_is_loaded(path.as_ref().as_os_str())}
+	unsafe { imp::dylib_is_loaded(path.as_ref().as_os_str()) }
 }

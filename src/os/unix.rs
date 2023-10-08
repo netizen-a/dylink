@@ -1,7 +1,7 @@
 use super::Handle;
+use crate::Sym;
 use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, ptr};
-use crate::Sym;
 
 #[cfg(not(any(linux, macos, target_env = "gnu")))]
 use std::sync;
@@ -19,13 +19,13 @@ fn dylib_guard<'a>() -> sync::LockResult<sync::MutexGuard<'a, ()>> {
 #[inline(always)]
 fn dylib_guard() {}
 
-unsafe fn dylib_error() -> Option<io::Error> {
+unsafe fn dylib_error() -> io::Result<()> {
 	let raw = c::dlerror();
 	if raw.is_null() {
-		None
+		Ok(())
 	} else {
 		let e = ffi::CStr::from_ptr(raw).to_owned();
-		Some(io::Error::new(io::ErrorKind::Other, e.to_str().unwrap()))
+		Err(io::Error::new(io::ErrorKind::Other, e.to_str().unwrap()))
 	}
 }
 
@@ -36,11 +36,7 @@ where
 	let _lock = dylib_guard();
 	let _ = c::dlerror(); // clear existing errors
 	let handle: *mut ffi::c_void = f();
-	if let Some(error) = dylib_error() {
-		Err(error)
-	} else {
-		Ok(handle)
-	}
+	dylib_error().and(Ok(handle))
 }
 
 #[inline]
@@ -58,9 +54,8 @@ pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	let _lock = dylib_guard();
 	let _ = c::dlerror(); // clear existing errors
-	let result = c::dlclose(lib_handle);
-	if result != 0 {
-		Err(dylib_error().unwrap_unchecked())
+	if c::dlclose(lib_handle) != 0 {
+		dylib_error()
 	} else {
 		Ok(())
 	}
@@ -80,7 +75,7 @@ pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) ->
 }
 
 // This function doesn't use a lock because we don't check errors.
-#[cfg(any(linux, macos, target_env="gnu"))]
+#[cfg(any(linux, macos, target_env = "gnu"))]
 #[inline]
 pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
 	let c_str = ffi::CString::new(path.as_bytes()).expect("failed to create CString");

@@ -65,12 +65,24 @@ fn test_win32_symext() {
 	assert!(get_last_error as *const Sym == get_last_error2 as *const Sym);
 }
 
-#[cfg(any(windows, target_os="linux"))]
+#[cfg(windows)]
+#[test]
+fn test_sym_handler() {
+    use dylink::os::windows::LibraryExt;
+
+	let this = Library::this().unwrap();
+	let result = os::windows::SymbolHandler::new(None, &[this.path().unwrap()]);
+	let _handler = result.unwrap();
+	let result = os::windows::SymbolHandler::new(None, &[this.path().unwrap()]);
+	let _ = result.unwrap_err();
+}
+
+#[cfg(any(windows, target_os = "linux"))]
 #[test]
 fn test_is_loaded() {
 	let loaded = if cfg!(windows) {
 		is_loaded("Kernel32.dll")
-	} else if cfg!(target_os="linux") {
+	} else if cfg!(target_os = "linux") {
 		let _lib = Library::open("libX11.so.6").unwrap();
 		is_loaded("libX11.so.6")
 	} else {

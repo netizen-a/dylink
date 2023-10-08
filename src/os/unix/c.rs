@@ -1,6 +1,5 @@
 use std::ffi;
 
-
 #[repr(C)]
 pub struct Dl_info {
 	pub dli_fname: *const ffi::c_char,
@@ -15,11 +14,8 @@ extern "C" {
 	pub fn dlsym(handle: *mut ffi::c_void, symbol: *const ffi::c_char) -> *const ffi::c_void;
 	pub fn dlclose(hlibmodule: *mut ffi::c_void) -> ffi::c_int;
 
-	#[cfg(not(target_os="aix"))]
-	pub fn dladdr(
-		addr: *const ffi::c_void,
-		info: *mut Dl_info
-	) -> ffi::c_int;
+	#[cfg(not(target_os = "aix"))]
+	pub fn dladdr(addr: *const ffi::c_void, info: *mut Dl_info) -> ffi::c_int;
 }
 
 pub const RTLD_NOW: ffi::c_int = 0x2;
