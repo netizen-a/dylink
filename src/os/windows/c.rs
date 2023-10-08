@@ -58,7 +58,13 @@ extern "stdcall" {
 		displacement: *mut DWORD64,
 		symbol: *mut SYMBOL_INFOW,
 	) -> BOOL;
+	pub fn SymSetOptions(
+		symoptions: DWORD,
+	) -> DWORD;
 }
 
 pub const GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT: DWORD = 0x00000002u32;
 pub const GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS: DWORD = 0x00000004u32;
+
+pub const SYMOPT_UNDNAME: DWORD = 0x00000002;
+pub const SYMOPT_DEFERRED_LOADS: DWORD = 0x00000004;

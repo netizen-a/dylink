@@ -11,6 +11,9 @@ use crate::Sym;
 mod c;
 mod dbghelp;
 
+pub use dbghelp::SymbolInfo;
+
+
 fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
 	path.encode_wide().chain(std::iter::once(0u16)).collect()
 }
@@ -71,20 +74,6 @@ pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
 		&mut handle,
 	);
 	!handle.is_null()
-}
-
-impl AsRawHandle for Library {
-	#[inline]
-	fn as_raw_handle(&self) -> RawHandle {
-		self.0
-	}
-}
-
-impl IntoRawHandle for Library {
-	#[inline]
-	fn into_raw_handle(self) -> RawHandle {
-		self.0
-	}
 }
 
 impl AsHandle for Library {

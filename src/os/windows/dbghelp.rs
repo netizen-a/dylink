@@ -2,17 +2,14 @@ use core::slice;
 use std::ffi;
 use std::io;
 use std::mem;
-use std::os::windows::prelude::AsRawHandle;
-use std::os::windows::prelude::OsStringExt;
+use std::os::windows::prelude::*;
 use std::path;
 use std::process;
 use std::ptr;
-//use std::ptr;
 use std::sync::atomic;
 
 use crate::Library;
 use crate::Sym;
-//use crate::Sym;
 
 use super::LibraryExt;
 use super::c;
@@ -51,7 +48,6 @@ impl SymbolHandler {
 	) -> io::Result<Self> {
 		if !HANDLER_EXISTS.swap(true, atomic::Ordering::SeqCst) {
 			let hprocess = if let Some(child) = process {
-				use std::os::windows::io::AsHandle;
 				child.as_handle().as_raw_handle()
 			} else {
 				unsafe { c::GetCurrentProcess() }
@@ -68,12 +64,14 @@ impl SymbolHandler {
 					path_list.push(path_str);
 				}
 			}
-
 			let usersearchpath: Vec<u16> = path_list
 				.encode_wide()
 				.chain(std::iter::once(0u16))
 				.collect();
-			let result = unsafe { c::SymInitializeW(hprocess, usersearchpath.as_ptr(), 1) };
+			let result = unsafe {
+				c::SymSetOptions(c::SYMOPT_UNDNAME | c::SYMOPT_DEFERRED_LOADS);
+				c::SymInitializeW(hprocess, usersearchpath.as_ptr(), 1)
+			};
 			if result == 0 {
 				Err(io::Error::last_os_error())
 			} else {
@@ -133,5 +131,11 @@ impl TryFrom<&Library> for SymbolHandler {
     type Error = io::Error;
     fn try_from(value: &Library) -> Result<Self, Self::Error> {
         value.path().and_then(|path| SymbolHandler::new(None, &[path]))
+    }
+}
+
+impl AsHandle for SymbolHandler {
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        unsafe {BorrowedHandle::borrow_raw(self.0)}
     }
 }
