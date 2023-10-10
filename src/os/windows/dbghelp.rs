@@ -8,15 +8,15 @@ use std::process;
 use std::ptr;
 use std::sync::atomic;
 
-use crate::Library;
 use crate::Sym;
 
-use super::LibraryExt;
 use super::c;
 use super::SymbolHandler;
 
 use std::os::windows::ffi::OsStrExt;
+use std::os::windows::ffi::OsStringExt;
 
+/// documentation: <https://learn.microsoft.com/en-us/windows/win32/api/dbghelp/ns-dbghelp-symbol_info>
 #[derive(Debug)]
 pub struct SymbolInfo {
 	pub typeindex: c::ULONG,
@@ -25,13 +25,12 @@ pub struct SymbolInfo {
 	pub modbase: c::ULONG64,
 	pub flags: c::ULONG,
 	pub value: c::ULONG64,
-	pub address: c::ULONG64,
+	pub address: *const Sym,
 	pub register: c::ULONG,
 	pub scope: c::ULONG,
 	pub tag: c::ULONG,
 	pub name: ffi::OsString,
 }
-
 
 // only a single symbol handler may exist per process.
 static HANDLER_EXISTS: atomic::AtomicBool = atomic::AtomicBool::new(false);
@@ -84,38 +83,82 @@ impl SymbolHandler {
 			))
 		}
 	}
-    pub fn symbol_info(&self, symbol: &Sym) -> io::Result<SymbolInfo> {
-        let mut displacement: c::DWORD64 = 0;
-        let address: c::DWORD64 = symbol as *const Sym as c::DWORD64;
-        let mut buffer = vec![0u8; mem::size_of::<c::SYMBOL_INFOW>() + c::MAX_SYM_NAME as usize * mem::size_of::<u16>()];
+	pub fn symbol_info(&self, symbol: &Sym) -> io::Result<SymbolInfo> {
+		let mut displacement: c::DWORD64 = 0;
+		let address: c::DWORD64 = symbol as *const Sym as c::DWORD64;
+		let mut buffer = vec![
+			0u8;
+			mem::size_of::<c::SYMBOL_INFOW>()
+				+ c::MAX_SYM_NAME as usize * mem::size_of::<u16>()
+		];
 
-        let symbol_info: &mut c::SYMBOL_INFOW = unsafe {(buffer.as_mut_ptr() as *mut c::SYMBOL_INFOW).as_mut()}.unwrap();
+		let symbol_info: &mut c::SYMBOL_INFOW =
+			unsafe { (buffer.as_mut_ptr() as *mut c::SYMBOL_INFOW).as_mut() }.unwrap();
 
-        unsafe {
-            symbol_info.sizeofstruct = mem::size_of::<c::SYMBOL_INFOW>() as c::ULONG;
-            symbol_info.maxnamelen = c::MAX_SYM_NAME;
+		unsafe {
+			symbol_info.sizeofstruct = mem::size_of::<c::SYMBOL_INFOW>() as c::ULONG;
+			symbol_info.maxnamelen = c::MAX_SYM_NAME;
 
-            if c::SymFromAddrW(self.0, address, &mut displacement, symbol_info) == 0 {
-                Err(io::Error::last_os_error())
-            } else {
-                let name_slice = slice::from_raw_parts(ptr::addr_of!(symbol_info.name) as *const _, symbol_info.namelen as usize);
-                let info = SymbolInfo {
-                    typeindex: symbol_info.typeindex,
-	                index: symbol_info.index,
-	                size: symbol_info.size,
-	                modbase: symbol_info.modbase,
-	                flags: symbol_info.flags,
-	                value: symbol_info.value,
-	                address: symbol_info.address,
-	                register: symbol_info.register,
-	                scope: symbol_info.scope,
-	                tag: symbol_info.tag,
-	                name: ffi::OsString::from_wide(name_slice),
-                };
-                Ok(info)
-            }
-        }
-    }
+			if c::SymFromAddrW(self.0, address, &mut displacement, symbol_info) == 0 {
+				Err(io::Error::last_os_error())
+			} else {
+				let name_slice = slice::from_raw_parts(
+					ptr::addr_of!(symbol_info.name) as *const _,
+					symbol_info.namelen as usize,
+				);
+				let info = SymbolInfo {
+					typeindex: symbol_info.typeindex,
+					index: symbol_info.index,
+					size: symbol_info.size,
+					modbase: symbol_info.modbase,
+					flags: symbol_info.flags,
+					value: symbol_info.value,
+					address: symbol_info.address as *const Sym,
+					register: symbol_info.register,
+					scope: symbol_info.scope,
+					tag: symbol_info.tag,
+					name: ffi::OsString::from_wide(name_slice),
+				};
+				Ok(info)
+			}
+		}
+	}
+
+	pub fn enumerate_modules<F: Fn(&ffi::OsStr, u64) -> bool>(&self, f: F) -> io::Result<()> {
+		struct UserData<'a> {
+			closure: &'a dyn Fn(&ffi::OsStr, c::DWORD64) -> bool,
+		}
+		unsafe extern "system-unwind" fn callback(
+			module_name: c::PCWSTR,
+			base_of_dll: c::DWORD64,
+			user_context: *mut ffi::c_void,
+		) -> c::BOOL {
+			let len = crate::os::wcslen(module_name);
+			let raw_wide = std::slice::from_raw_parts(module_name, len);
+			let wide_string = ffi::OsString::from_wide(raw_wide);
+			let f = (*(user_context as *mut UserData)).closure;
+			f(&wide_string, base_of_dll) as c::BOOL
+		}
+
+		let context: UserData = UserData { closure: &f };
+		unsafe {
+			if 0 != c::SymEnumerateModulesW64(self.0, callback, &context as *const _ as *mut _) {
+				Ok(())
+			} else {
+				Err(io::Error::last_os_error())
+			}
+		}
+	}
+
+	// The following functions have a reciever parameter,
+	// so they can only act on the same thread as the symbol handler.
+
+	pub fn set_options(&mut self, options: c::DWORD) -> c::DWORD {
+		unsafe { c::SymSetOptions(options) }
+	}
+	pub fn get_options(&self) -> c::DWORD {
+		unsafe { c::SymGetOptions() }
+	}
 }
 
 impl Drop for SymbolHandler {
@@ -127,15 +170,8 @@ impl Drop for SymbolHandler {
 	}
 }
 
-impl TryFrom<&Library> for SymbolHandler {
-    type Error = io::Error;
-    fn try_from(value: &Library) -> Result<Self, Self::Error> {
-        value.path().and_then(|path| SymbolHandler::new(None, &[path]))
-    }
-}
-
 impl AsHandle for SymbolHandler {
-    fn as_handle(&self) -> BorrowedHandle<'_> {
-        unsafe {BorrowedHandle::borrow_raw(self.0)}
-    }
+	fn as_handle(&self) -> BorrowedHandle<'_> {
+		unsafe { BorrowedHandle::borrow_raw(self.0) }
+	}
 }

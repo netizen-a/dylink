@@ -1,5 +1,6 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(non_snake_case)]
+#![allow(non_camel_case_types)]
 
 use std::ffi;
 pub use std::os::windows::raw::HANDLE;
@@ -13,6 +14,8 @@ pub type DWORD = u32;
 pub type ULONG = ffi::c_ulong;
 pub type ULONG64 = u64;
 pub type DWORD64 = u64;
+pub type PSYM_ENUMMODULES_CALLBACKW64 =
+	unsafe extern "system-unwind" fn(PCWSTR, DWORD64, *mut ffi::c_void) -> BOOL;
 
 pub const MAX_SYM_NAME: u32 = 2000u32;
 
@@ -37,8 +40,7 @@ pub struct SYMBOL_INFOW {
 	pub name: [u16; 1],
 }
 
-
-extern "stdcall" {
+extern "system" {
 	pub fn LoadLibraryExW(lplibfilename: PCWSTR, hfile: HANDLE, dwflags: u32) -> HMODULE;
 	pub fn GetModuleHandleExW(dwflags: u32, lpmodulename: PCWSTR, phmodule: *mut HMODULE) -> BOOL;
 	pub fn GetProcAddress(handle: HMODULE, symbol: PCSTR) -> *const ffi::c_void;
@@ -49,7 +51,7 @@ extern "stdcall" {
 }
 
 #[link(name = "Dbghelp")]
-extern "stdcall" {
+extern "system" {
 	pub fn SymInitializeW(hprocess: HANDLE, usersearchpath: PCWSTR, finvadeprocess: BOOL) -> BOOL;
 	pub fn SymCleanup(process: HANDLE) -> BOOL;
 	pub fn SymFromAddrW(
@@ -58,9 +60,13 @@ extern "stdcall" {
 		displacement: *mut DWORD64,
 		symbol: *mut SYMBOL_INFOW,
 	) -> BOOL;
-	pub fn SymSetOptions(
-		symoptions: DWORD,
-	) -> DWORD;
+	pub fn SymSetOptions(symoptions: DWORD) -> DWORD;
+	pub fn SymGetOptions() -> DWORD;
+	pub fn SymEnumerateModulesW64(
+		hprocess: HANDLE,
+		enummodulescallback: PSYM_ENUMMODULES_CALLBACKW64,
+		usercontext: *mut ffi::c_void,
+	) -> BOOL;
 }
 
 pub const GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT: DWORD = 0x00000002u32;

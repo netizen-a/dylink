@@ -60,6 +60,7 @@ use os::windows as imp;
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct Sym {
 	_data: [u8; 0],

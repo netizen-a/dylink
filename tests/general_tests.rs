@@ -68,18 +68,23 @@ fn test_win32_symext() {
 #[cfg(windows)]
 #[test]
 fn test_sym_handler() {
-    use dylink::os::windows::LibraryExt;
+	use dylink::os::windows::LibraryExt;
 	let get_last_error = KERNEL32.symbol("GetLastError").unwrap();
 	let kernel32 = KERNEL32.get().unwrap();
 	let result = os::windows::SymbolHandler::new(None, &[kernel32.path().unwrap()]);
 	let handler = result.unwrap();
-	println!("{:?}", handler);
 	let result = os::windows::SymbolHandler::new(None, &[kernel32.path().unwrap()]);
 	let _ = result.unwrap_err();
 
 	let info = handler.symbol_info(get_last_error).unwrap();
-	println!("{:?}", info);
-	println!("name: {:?}", info.name);
+	assert!(get_last_error as *const Sym == info.address);
+	println!("info = {:?}", info);
+	handler
+		.enumerate_modules(|module_name, _| {
+			println!("module_name = {}", module_name.to_string_lossy());
+			true
+		})
+		.unwrap();
 }
 
 #[cfg(any(windows, target_os = "linux"))]

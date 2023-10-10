@@ -13,7 +13,6 @@ mod dbghelp;
 
 pub use dbghelp::SymbolInfo;
 
-
 fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
 	path.encode_wide().chain(std::iter::once(0u16)).collect()
 }
