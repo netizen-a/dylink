@@ -80,8 +80,13 @@ fn test_sym_handler() {
 	assert!(get_last_error as *const Sym == info.address);
 	println!("info = {:?}", info);
 	handler
-		.map_modules(|module_name, _| {
-			println!("module_name = {}", module_name.to_string_lossy());
+		.map_modules(|module_name, lib| {
+			let name = module_name.to_string_lossy();
+			println!("module_name = {}", name);
+			if name.eq_ignore_ascii_case("kernel32") {
+				let maybe = lib.symbol("SetLastError");
+				println!("symbol exists = {}", maybe.is_ok());
+			}
 			true
 		})
 		.unwrap();
