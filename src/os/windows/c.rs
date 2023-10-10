@@ -16,6 +16,8 @@ pub type ULONG64 = u64;
 pub type DWORD64 = u64;
 pub type PSYM_ENUMMODULES_CALLBACKW64 =
 	unsafe extern "system-unwind" fn(PCWSTR, DWORD64, *mut ffi::c_void) -> BOOL;
+pub type PSYM_ENUMERATESYMBOLS_CALLBACKW =
+	unsafe extern "system-unwind" fn(*mut SYMBOL_INFOW, ULONG, *mut ffi::c_void) -> BOOL;
 
 pub const MAX_SYM_NAME: u32 = 2000u32;
 
@@ -66,6 +68,14 @@ extern "system" {
 		hprocess: HANDLE,
 		enummodulescallback: PSYM_ENUMMODULES_CALLBACKW64,
 		usercontext: *mut ffi::c_void,
+	) -> BOOL;
+	pub fn SymEnumSymbolsExW(
+		hProcess: HANDLE,
+		BaseOfDll: ULONG64,
+		Mask: PCWSTR,
+		EnumSymbolsCallback: PSYM_ENUMERATESYMBOLS_CALLBACKW,
+		UserContext: *mut ffi::c_void,
+		Options: DWORD,
 	) -> BOOL;
 }
 

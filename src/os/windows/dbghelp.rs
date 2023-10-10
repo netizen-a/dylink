@@ -124,11 +124,11 @@ impl SymbolHandler {
 		}
 	}
 
-	pub fn enumerate_modules<F: Fn(&ffi::OsStr, u64) -> bool>(&self, f: F) -> io::Result<()> {
-		struct UserData<'a> {
-			closure: &'a dyn Fn(&ffi::OsStr, c::DWORD64) -> bool,
-		}
-		unsafe extern "system-unwind" fn callback(
+	pub fn map_modules<F>(&self, f: F) -> io::Result<()>
+	where
+		F: Fn(&ffi::OsStr, u64) -> bool,
+	{
+		unsafe extern "system-unwind" fn callback<F: Fn(&ffi::OsStr, c::DWORD64) -> bool>(
 			module_name: c::PCWSTR,
 			base_of_dll: c::DWORD64,
 			user_context: *mut ffi::c_void,
@@ -136,13 +136,11 @@ impl SymbolHandler {
 			let len = crate::os::wcslen(module_name);
 			let raw_wide = std::slice::from_raw_parts(module_name, len);
 			let wide_string = ffi::OsString::from_wide(raw_wide);
-			let f = (*(user_context as *mut UserData)).closure;
+			let f = (user_context as *mut F).as_ref().unwrap_unchecked();
 			f(&wide_string, base_of_dll) as c::BOOL
 		}
-
-		let context: UserData = UserData { closure: &f };
 		unsafe {
-			if 0 != c::SymEnumerateModulesW64(self.0, callback, &context as *const _ as *mut _) {
+			if 0 != c::SymEnumerateModulesW64(self.0, callback::<F>, &f as *const _ as *mut _) {
 				Ok(())
 			} else {
 				Err(io::Error::last_os_error())

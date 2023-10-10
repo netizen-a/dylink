@@ -80,7 +80,7 @@ fn test_sym_handler() {
 	assert!(get_last_error as *const Sym == info.address);
 	println!("info = {:?}", info);
 	handler
-		.enumerate_modules(|module_name, _| {
+		.map_modules(|module_name, _| {
 			println!("module_name = {}", module_name.to_string_lossy());
 			true
 		})
