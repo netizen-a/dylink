@@ -25,7 +25,7 @@ mod sealed;
 pub mod sync;
 use crate::sealed::Sealed;
 
-use std::{io, path, mem};
+use std::{io, mem, ops, path};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -52,29 +52,27 @@ use std::{io, path, mem};
 pub use dylink_macro::dylink;
 
 #[cfg(unix)]
-use os::unix::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this};
+use os::unix as imp;
 #[cfg(windows)]
-use os::windows::{dylib_close, dylib_close_and_exit, dylib_open, dylib_symbol, dylib_this, dylib_is_loaded};
-
-#[cfg(any(linux, macos, target_env="gnu"))]
-use os::unix::dylib_is_loaded;
+use os::windows as imp;
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct Sym {
 	_data: [u8; 0],
 	_marker: core::marker::PhantomData<(*mut u8, std::marker::PhantomPinned)>,
 }
+impl Sealed for Sym {}
 
 /// An object providing access to an open dynamic library.
 #[derive(Debug)]
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
-impl Sealed for Library {}
 
 impl Library {
 	/// Attempts to open a dynamic library file.
@@ -82,15 +80,11 @@ impl Library {
 	/// The library maintains an internal reference count that increments
 	/// for every time the library is opened
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
-		unsafe { dylib_open(path.as_ref().as_os_str()) }.map(Library)
+		unsafe { imp::dylib_open(path.as_ref().as_os_str()) }.map(Library)
 	}
 	/// Attempts to acquire a handle to the currently running program.
 	pub fn this() -> io::Result<Self> {
-		unsafe { dylib_this() }.map(Library)
-	}
-	/// Retrieves a symbol from the library if it exists
-	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
-		unsafe { dylib_symbol(self.0, name) }
+		unsafe { imp::dylib_this() }.map(Library)
 	}
 	/// Same as drop, but returns a result.
 	///
@@ -99,7 +93,12 @@ impl Library {
 	/// # Errors
 	/// May return an error if failed to drop.
 	pub fn close(self) -> io::Result<()> {
-		unsafe { dylib_close(mem::ManuallyDrop::new(self).0) }
+		unsafe { imp::dylib_close(mem::ManuallyDrop::new(self).0) }
+	}
+
+	/// This is the preferred way to close libraries when exiting threads.
+	pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
+		unsafe { imp::dylib_close_and_exit(lib.0, exit_code) }
 	}
 
 	/// This is the preferred way to close libraries when exiting threads.
@@ -111,7 +110,7 @@ impl Library {
 impl Drop for Library {
 	fn drop(&mut self) {
 		unsafe {
-			let _ = dylib_close(self.0);
+			let _ = imp::dylib_close(self.0);
 		}
 	}
 }
@@ -124,7 +123,36 @@ macro_rules! lib {
 	};
 }
 
-#[cfg(any(windows, linux, macos, target_env="gnu"))]
+// TODO: replace with try_loaded later
+#[cfg(any(windows, target_os = "linux", target_os = "macos", target_env = "gnu"))]
 pub fn is_loaded<P: AsRef<path::Path>>(path: P) -> bool {
-	unsafe {dylib_is_loaded(path.as_ref().as_os_str())}
+	unsafe { imp::dylib_is_loaded(path.as_ref().as_os_str()) }
+}
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct Lib {
+	_data: [u8; 0],
+	_marker: core::marker::PhantomData<(*mut u8, std::marker::PhantomPinned)>,
+}
+impl Sealed for Lib {}
+
+impl ops::Deref for Library {
+	type Target = Lib;
+	fn deref(&self) -> &Self::Target {
+		unsafe { self.0.as_ref().unwrap_unchecked() }
+	}
+}
+
+impl ops::DerefMut for Library {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		unsafe { self.0.as_mut().unwrap_unchecked() }
+	}
+}
+
+impl Lib {
+	/// Retrieves a symbol from the library if it exists
+	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
+		unsafe { imp::dylib_symbol((self as *const Lib).cast_mut(), name) }
+	}
 }

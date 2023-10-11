@@ -5,43 +5,98 @@ use std::{ffi, io, path, ptr};
 
 use super::Handle;
 use crate::sealed::Sealed;
-use crate::Library;
 use crate::Sym;
+use crate::Lib;
 
 mod c;
+mod dbghelp;
 
-impl AsRawHandle for Library {
-	#[inline]
-	fn as_raw_handle(&self) -> RawHandle {
-		self.0
+pub use dbghelp::SymbolInfo;
+
+fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
+	path.encode_wide().chain(std::iter::once(0u16)).collect()
+}
+
+#[inline]
+pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
+	let wide_str: Vec<u16> = to_wide(path);
+	let handle = c::LoadLibraryExW(wide_str.as_ptr(), ptr::null_mut(), 0);
+	if handle.is_null() {
+		Err(io::Error::last_os_error())
+	} else {
+		Ok(handle.cast())
 	}
 }
 
-impl IntoRawHandle for Library {
-	#[inline]
-	fn into_raw_handle(self) -> RawHandle {
-		self.0
+#[inline]
+pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
+	let mut handle: *mut ffi::c_void = ptr::null_mut();
+	let result = c::GetModuleHandleExW(0, ptr::null(), &mut handle);
+	if result == 0 {
+		Err(io::Error::last_os_error())
+	} else {
+		Ok(handle.cast())
 	}
 }
 
-impl AsHandle for Library {
+#[inline]
+pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
+	if c::FreeLibrary(lib_handle.cast()) == 0 {
+		Err(io::Error::last_os_error())
+	} else {
+		Ok(())
+	}
+}
+
+#[inline]
+pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Result<&'a Sym> {
+	let c_str = ffi::CString::new(name).unwrap();
+	let addr: *const () = unsafe { c::GetProcAddress(lib_handle.cast(), c_str.as_ptr()).cast() };
+	if addr.is_null() {
+		Err(io::Error::last_os_error())
+	} else {
+		Ok(addr.cast::<Sym>().as_ref().unwrap_unchecked())
+	}
+}
+
+#[inline]
+pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) -> ! {
+	c::FreeLibraryAndExitThread(lib_handle.cast(), exit_code as u32)
+}
+
+pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
+	let wide_str: Vec<u16> = to_wide(path);
+	let mut handle = ptr::null_mut();
+	let _ = c::GetModuleHandleExW(
+		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		wide_str.as_ptr(),
+		&mut handle,
+	);
+	!handle.is_null()
+}
+
+impl AsHandle for Lib {
 	#[inline]
 	fn as_handle(&self) -> BorrowedHandle<'_> {
-		unsafe { BorrowedHandle::borrow_raw(self.0) }
+		unsafe { BorrowedHandle::borrow_raw(self as *const _ as *mut _) }
 	}
 }
 
-pub trait LibraryExt: Sealed {
+pub trait LibExt: Sealed {
 	fn path(&self) -> io::Result<path::PathBuf>;
 }
 
-impl LibraryExt for Library {
+impl LibExt for Lib {
 	fn path(&self) -> io::Result<path::PathBuf> {
 		const MAX_PATH: usize = 260;
 		let mut file_name = vec![0u16; MAX_PATH];
 		loop {
 			let _ = unsafe {
-				c::GetModuleFileNameW(self.0, file_name.as_mut_ptr(), file_name.len() as c::DWORD)
+				c::GetModuleFileNameW(
+					self as *const _ as *mut _,
+					file_name.as_mut_ptr(),
+					file_name.len() as c::DWORD,
+				)
 			};
 			let last_error = io::Error::last_os_error();
 			match unsafe { last_error.raw_os_error().unwrap_unchecked() } {
@@ -56,51 +111,31 @@ impl LibraryExt for Library {
 	}
 }
 
-pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
-	let wide_str: Vec<u16> = path.encode_wide().chain(std::iter::once(0u16)).collect();
-	let handle = c::LoadLibraryExW(wide_str.as_ptr().cast(), ptr::null_mut(), 0);
-	if handle.is_null() {
-		Err(io::Error::last_os_error())
-	} else {
-		Ok(handle)
+pub trait SymExt: Sealed {
+	fn library(&self) -> io::Result<&Lib>;
+}
+
+impl SymExt for Sym {
+	fn library(&self) -> io::Result<&Lib> {
+		let mut handle = ptr::null_mut();
+		let result = unsafe {
+			c::GetModuleHandleExW(
+				c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+					| c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+				self as *const Sym as *const _,
+				&mut handle,
+			)
+		};
+		if result == 0 {
+			Err(io::Error::last_os_error())
+		} else {
+			unsafe { Ok((handle as *mut Lib).as_ref().unwrap_unchecked()) }
+		}
 	}
 }
 
-pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
-	let mut handle: *mut ffi::c_void = ptr::null_mut();
-	let result = c::GetModuleHandleExW(0, ptr::null(), &mut handle);
-	if result == 0 {
-		Err(io::Error::last_os_error())
-	} else {
-		Ok(handle)
-	}
-}
-
-pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
-	if c::FreeLibrary(lib_handle) == 0 {
-		Err(io::Error::last_os_error())
-	} else {
-		Ok(())
-	}
-}
-
-pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Result<&'a Sym> {
-	let c_str = ffi::CString::new(name).unwrap();
-	let addr: *const () = unsafe { c::GetProcAddress(lib_handle, c_str.as_ptr().cast()).cast() };
-	if addr.is_null() {
-		Err(io::Error::last_os_error())
-	} else {
-		Ok(addr.cast::<Sym>().as_ref().unwrap_unchecked())
-	}
-}
-
-pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) -> ! {
-	c::FreeLibraryAndExitThread(lib_handle, exit_code as u32)
-}
-
-pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
-	let wide_str: Vec<u16> = path.encode_wide().chain(std::iter::once(0u16)).collect();
-	let mut handle = ptr::null_mut();
-	let _ = c::GetModuleHandleExW(c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, wide_str.as_ptr(), &mut handle);
-	!handle.is_null()
-}
+// symbol handlers are single threaded so they are not Send or Sync
+#[derive(Debug)]
+pub struct SymbolHandler(c::HANDLE);
+// symbol handlers can be sent across threads, but does not implement `Sync`
+unsafe impl Send for SymbolHandler {}
