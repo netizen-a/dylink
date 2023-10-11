@@ -68,7 +68,9 @@ fn test_win32_symext() {
 #[cfg(windows)]
 #[test]
 fn test_sym_handler() {
-	use dylink::os::windows::LibraryExt;
+	use std::ops;
+
+use dylink::os::windows::LibraryExt;
 	let get_last_error = KERNEL32.symbol("GetLastError").unwrap();
 	let kernel32 = KERNEL32.get().unwrap();
 	let result = os::windows::SymbolHandler::new(None, &[kernel32.path().unwrap()]);
@@ -80,14 +82,14 @@ fn test_sym_handler() {
 	assert!(get_last_error as *const Sym == info.address);
 	println!("info = {:?}", info);
 	handler
-		.map_modules(|module_name, lib| {
+		.try_for_each_lib(|module_name, lib| {
 			let name = module_name.to_string_lossy();
 			println!("module_name = {}", name);
 			if name.eq_ignore_ascii_case("kernel32") {
 				let maybe = lib.symbol("SetLastError");
 				println!("symbol exists = {}", maybe.is_ok());
 			}
-			true
+			ops::ControlFlow::Continue(())
 		})
 		.unwrap();
 }

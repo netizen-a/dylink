@@ -2,6 +2,7 @@ use core::slice;
 use std::ffi;
 use std::io;
 use std::mem;
+use std::ops;
 use std::os::windows::prelude::*;
 use std::path;
 use std::process;
@@ -125,21 +126,26 @@ impl SymbolHandler {
 		}
 	}
 
-	pub fn map_modules<F>(&self, mut f: F) -> io::Result<()>
+	pub fn try_for_each_lib<F>(&self, mut f: F) -> io::Result<()>
 	where
-		F: FnMut(&ffi::OsStr, &Library) -> bool,
+		F: FnMut(&ffi::OsStr, &Library) -> ops::ControlFlow<()>,
 	{
-		unsafe extern "system-unwind" fn callback<F: FnMut(&ffi::OsStr, &Library) -> bool>(
+		unsafe extern "system-unwind" fn callback<F>(
 			module_name: c::PCWSTR,
 			base_of_dll: c::DWORD64,
 			user_context: *mut ffi::c_void,
-		) -> c::BOOL {
-			let len = crate::os::wcslen(module_name);
+		) -> c::BOOL
+		where F: FnMut(&ffi::OsStr, &Library) -> ops::ControlFlow<()>
+		{
+			let len = c::wcslen(module_name);
 			let raw_wide = std::slice::from_raw_parts(module_name, len);
 			let wide_string = ffi::OsString::from_wide(raw_wide);
 			let f = (user_context as *mut F).as_mut().unwrap_unchecked();
 			let lib = mem::ManuallyDrop::new(Library(base_of_dll as *mut _));
-			f(&wide_string, &*lib) as c::BOOL
+			match f(&wide_string, &*lib){
+				ops::ControlFlow::Break(_) => false as c::BOOL,
+				ops::ControlFlow::Continue(_) => true as c::BOOL,
+			}
 		}
 		unsafe {
 			if 0 != c::SymEnumerateModulesW64(self.0, callback::<F>, &mut f as *mut _ as *mut _) {
@@ -149,6 +155,7 @@ impl SymbolHandler {
 			}
 		}
 	}
+
 
 	// The following functions have a reciever parameter,
 	// so they can only act on the same thread as the symbol handler.

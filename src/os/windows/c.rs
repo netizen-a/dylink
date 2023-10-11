@@ -50,6 +50,7 @@ extern "system" {
 	pub fn GetModuleFileNameW(hmodule: HMODULE, lpfilename: PWSTR, nsize: DWORD) -> DWORD;
 	pub fn FreeLibraryAndExitThread(hLibModule: HMODULE, dwExitCode: DWORD) -> !;
 	pub fn GetCurrentProcess() -> HANDLE;
+	pub fn wcslen(buf: *const u16) -> usize;
 }
 
 #[link(name = "Dbghelp")]
