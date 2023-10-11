@@ -20,7 +20,7 @@ use std::os::windows::ffi::OsStringExt;
 
 /// documentation: <https://learn.microsoft.com/en-us/windows/win32/api/dbghelp/ns-dbghelp-symbol_info>
 #[derive(Debug)]
-pub struct SymbolInfo {
+pub struct SymInfo {
 	pub typeindex: c::ULONG,
 	pub index: c::ULONG,
 	pub size: c::ULONG,
@@ -85,7 +85,7 @@ impl SymbolHandler {
 			))
 		}
 	}
-	pub fn symbol_info(&self, symbol: &Sym) -> io::Result<SymbolInfo> {
+	pub fn symbol_info(&self, symbol: &Sym) -> io::Result<SymInfo> {
 		let mut displacement: c::DWORD64 = 0;
 		let address: c::DWORD64 = symbol as *const Sym as c::DWORD64;
 		let mut buffer = vec![
@@ -108,7 +108,7 @@ impl SymbolHandler {
 					ptr::addr_of!(symbol_info.name) as *const _,
 					symbol_info.namelen as usize,
 				);
-				let info = SymbolInfo {
+				let info = SymInfo {
 					typeindex: symbol_info.typeindex,
 					index: symbol_info.index,
 					size: symbol_info.size,

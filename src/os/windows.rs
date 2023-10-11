@@ -11,7 +11,7 @@ use crate::Lib;
 mod c;
 mod dbghelp;
 
-pub use dbghelp::SymbolInfo;
+pub use dbghelp::SymInfo;
 
 fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
 	path.encode_wide().chain(std::iter::once(0u16)).collect()

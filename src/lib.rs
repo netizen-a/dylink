@@ -151,4 +151,6 @@ impl Lib {
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
 		unsafe { imp::dylib_symbol((self as *const Lib).cast_mut(), name) }
 	}
+
+	// TODO: implement `path`, and `base`
 }
