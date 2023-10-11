@@ -86,7 +86,6 @@ impl Library {
 	pub fn this() -> io::Result<Self> {
 		unsafe { imp::dylib_this() }.map(Library)
 	}
-
 	/// Same as drop, but returns a result.
 	///
 	/// This method is recommended when using other crates that manipulate dynamic libraries.
