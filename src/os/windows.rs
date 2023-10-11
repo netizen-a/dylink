@@ -5,8 +5,8 @@ use std::{ffi, io, path, ptr};
 
 use super::Handle;
 use crate::sealed::Sealed;
-use crate::Library;
 use crate::Sym;
+use crate::Lib;
 
 mod c;
 mod dbghelp;
@@ -24,7 +24,7 @@ pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	if handle.is_null() {
 		Err(io::Error::last_os_error())
 	} else {
-		Ok(handle)
+		Ok(handle.cast())
 	}
 }
 
@@ -35,13 +35,13 @@ pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	if result == 0 {
 		Err(io::Error::last_os_error())
 	} else {
-		Ok(handle)
+		Ok(handle.cast())
 	}
 }
 
 #[inline]
 pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
-	if c::FreeLibrary(lib_handle) == 0 {
+	if c::FreeLibrary(lib_handle.cast()) == 0 {
 		Err(io::Error::last_os_error())
 	} else {
 		Ok(())
@@ -51,7 +51,7 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 #[inline]
 pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Result<&'a Sym> {
 	let c_str = ffi::CString::new(name).unwrap();
-	let addr: *const () = unsafe { c::GetProcAddress(lib_handle, c_str.as_ptr()).cast() };
+	let addr: *const () = unsafe { c::GetProcAddress(lib_handle.cast(), c_str.as_ptr()).cast() };
 	if addr.is_null() {
 		Err(io::Error::last_os_error())
 	} else {
@@ -61,7 +61,7 @@ pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Res
 
 #[inline]
 pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) -> ! {
-	c::FreeLibraryAndExitThread(lib_handle, exit_code as u32)
+	c::FreeLibraryAndExitThread(lib_handle.cast(), exit_code as u32)
 }
 
 pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
@@ -75,24 +75,28 @@ pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
 	!handle.is_null()
 }
 
-impl AsHandle for Library {
+impl AsHandle for Lib {
 	#[inline]
 	fn as_handle(&self) -> BorrowedHandle<'_> {
-		unsafe { BorrowedHandle::borrow_raw(self.0) }
+		unsafe { BorrowedHandle::borrow_raw(self as *const _ as *mut _) }
 	}
 }
 
-pub trait LibraryExt: Sealed {
+pub trait LibExt: Sealed {
 	fn path(&self) -> io::Result<path::PathBuf>;
 }
 
-impl LibraryExt for Library {
+impl LibExt for Lib {
 	fn path(&self) -> io::Result<path::PathBuf> {
 		const MAX_PATH: usize = 260;
 		let mut file_name = vec![0u16; MAX_PATH];
 		loop {
 			let _ = unsafe {
-				c::GetModuleFileNameW(self.0, file_name.as_mut_ptr(), file_name.len() as c::DWORD)
+				c::GetModuleFileNameW(
+					self as *const _ as *mut _,
+					file_name.as_mut_ptr(),
+					file_name.len() as c::DWORD,
+				)
 			};
 			let last_error = io::Error::last_os_error();
 			match unsafe { last_error.raw_os_error().unwrap_unchecked() } {
@@ -108,15 +112,16 @@ impl LibraryExt for Library {
 }
 
 pub trait SymExt: Sealed {
-	fn library(&self) -> io::Result<Library>;
+	fn library(&self) -> io::Result<&Lib>;
 }
 
 impl SymExt for Sym {
-	fn library(&self) -> io::Result<Library> {
+	fn library(&self) -> io::Result<&Lib> {
 		let mut handle = ptr::null_mut();
 		let result = unsafe {
 			c::GetModuleHandleExW(
-				c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+				c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+					| c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
 				self as *const Sym as *const _,
 				&mut handle,
 			)
@@ -124,7 +129,7 @@ impl SymExt for Sym {
 		if result == 0 {
 			Err(io::Error::last_os_error())
 		} else {
-			Ok(Library(handle))
+			unsafe { Ok((handle as *mut Lib).as_ref().unwrap_unchecked()) }
 		}
 	}
 }

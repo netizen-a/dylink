@@ -25,7 +25,7 @@ mod sealed;
 pub mod sync;
 use crate::sealed::Sealed;
 
-use std::{io, mem, path};
+use std::{io, mem, ops, path};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -73,7 +73,6 @@ impl Sealed for Sym {}
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
-impl Sealed for Library {}
 
 impl Library {
 	/// Attempts to open a dynamic library file.
@@ -87,10 +86,7 @@ impl Library {
 	pub fn this() -> io::Result<Self> {
 		unsafe { imp::dylib_this() }.map(Library)
 	}
-	/// Retrieves a symbol from the library if it exists
-	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
-		unsafe { imp::dylib_symbol(self.0, name) }
-	}
+
 	/// Same as drop, but returns a result.
 	///
 	/// This method is recommended when using other crates that manipulate dynamic libraries.
@@ -127,4 +123,32 @@ macro_rules! lib {
 #[cfg(any(windows, target_os = "linux", target_os = "macos", target_env = "gnu"))]
 pub fn is_loaded<P: AsRef<path::Path>>(path: P) -> bool {
 	unsafe { imp::dylib_is_loaded(path.as_ref().as_os_str()) }
+}
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct Lib {
+	_data: [u8; 0],
+	_marker: core::marker::PhantomData<(*mut u8, std::marker::PhantomPinned)>,
+}
+impl Sealed for Lib {}
+
+impl ops::Deref for Library {
+	type Target = Lib;
+	fn deref(&self) -> &Self::Target {
+		unsafe { self.0.as_ref().unwrap_unchecked() }
+	}
+}
+
+impl ops::DerefMut for Library {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		unsafe { self.0.as_mut().unwrap_unchecked() }
+	}
+}
+
+impl Lib {
+	/// Retrieves a symbol from the library if it exists
+	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<&'a Sym> {
+		unsafe { imp::dylib_symbol((self as *const Lib).cast_mut(), name) }
+	}
 }

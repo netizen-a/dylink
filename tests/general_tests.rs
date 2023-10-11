@@ -48,7 +48,7 @@ fn test_win32_impl() {
 #[cfg(windows)]
 #[test]
 fn test_win32_libext() {
-	use dylink::os::windows::LibraryExt;
+	use dylink::os::windows::LibExt;
 	let this = Library::this().unwrap();
 	let path = this.path().unwrap();
 	println!("path: {}", path.display());
@@ -68,7 +68,7 @@ fn test_win32_symext() {
 #[cfg(windows)]
 #[test]
 fn test_sym_handler() {
-	use dylink::os::windows::LibraryExt;
+	use dylink::os::windows::LibExt;
 	use std::ops;
 
 	let get_last_error = KERNEL32.symbol("GetLastError").unwrap();

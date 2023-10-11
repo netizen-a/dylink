@@ -9,7 +9,7 @@ use std::process;
 use std::ptr;
 use std::sync::atomic;
 
-use crate::Library;
+use crate::Lib;
 use crate::Sym;
 
 use super::c;
@@ -128,7 +128,7 @@ impl SymbolHandler {
 
 	pub fn try_for_each_lib<F>(&self, mut f: F) -> io::Result<()>
 	where
-		F: FnMut(&ffi::OsStr, &Library) -> ops::ControlFlow<()>,
+		F: FnMut(&ffi::OsStr, &Lib) -> ops::ControlFlow<()>,
 	{
 		unsafe extern "system-unwind" fn callback<F>(
 			module_name: c::PCWSTR,
@@ -136,14 +136,13 @@ impl SymbolHandler {
 			user_context: *mut ffi::c_void,
 		) -> c::BOOL
 		where
-			F: FnMut(&ffi::OsStr, &Library) -> ops::ControlFlow<()>,
+			F: FnMut(&ffi::OsStr, &Lib) -> ops::ControlFlow<()>,
 		{
 			let len = c::wcslen(module_name);
 			let raw_wide = std::slice::from_raw_parts(module_name, len);
 			let wide_string = ffi::OsString::from_wide(raw_wide);
 			let f = (user_context as *mut F).as_mut().unwrap_unchecked();
-			let lib = mem::ManuallyDrop::new(Library(base_of_dll as *mut _));
-			match f(&wide_string, &*lib) {
+			match f(&wide_string, std::mem::transmute(base_of_dll)) {
 				ops::ControlFlow::Break(_) => false as c::BOOL,
 				ops::ControlFlow::Continue(_) => true as c::BOOL,
 			}
