@@ -108,12 +108,11 @@ impl LibraryExt for Library {
 }
 
 pub trait SymExt: Sealed {
-	// This is just weird, but strangely makes sense.
-	fn library(self) -> io::Result<Library>;
+	fn library(&self) -> io::Result<Library>;
 }
 
-impl SymExt for &Sym {
-	fn library(self) -> io::Result<Library> {
+impl SymExt for Sym {
+	fn library(&self) -> io::Result<Library> {
 		let mut handle = ptr::null_mut();
 		let result = unsafe {
 			c::GetModuleHandleExW(

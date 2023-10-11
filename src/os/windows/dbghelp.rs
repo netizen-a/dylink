@@ -24,10 +24,10 @@ pub struct SymbolInfo {
 	pub typeindex: c::ULONG,
 	pub index: c::ULONG,
 	pub size: c::ULONG,
-	pub modbase: c::ULONG64,
+	pub base: *mut ffi::c_void,
 	pub flags: c::ULONG,
 	pub value: c::ULONG64,
-	pub address: *const Sym,
+	pub addr: *const Sym,
 	pub register: c::ULONG,
 	pub scope: c::ULONG,
 	pub tag: c::ULONG,
@@ -112,10 +112,10 @@ impl SymbolHandler {
 					typeindex: symbol_info.typeindex,
 					index: symbol_info.index,
 					size: symbol_info.size,
-					modbase: symbol_info.modbase,
+					base: symbol_info.modbase as *mut ffi::c_void,
 					flags: symbol_info.flags,
 					value: symbol_info.value,
-					address: symbol_info.address as *const Sym,
+					addr: symbol_info.address as *const Sym,
 					register: symbol_info.register,
 					scope: symbol_info.scope,
 					tag: symbol_info.tag,
@@ -135,14 +135,15 @@ impl SymbolHandler {
 			base_of_dll: c::DWORD64,
 			user_context: *mut ffi::c_void,
 		) -> c::BOOL
-		where F: FnMut(&ffi::OsStr, &Library) -> ops::ControlFlow<()>
+		where
+			F: FnMut(&ffi::OsStr, &Library) -> ops::ControlFlow<()>,
 		{
 			let len = c::wcslen(module_name);
 			let raw_wide = std::slice::from_raw_parts(module_name, len);
 			let wide_string = ffi::OsString::from_wide(raw_wide);
 			let f = (user_context as *mut F).as_mut().unwrap_unchecked();
 			let lib = mem::ManuallyDrop::new(Library(base_of_dll as *mut _));
-			match f(&wide_string, &*lib){
+			match f(&wide_string, &*lib) {
 				ops::ControlFlow::Break(_) => false as c::BOOL,
 				ops::ControlFlow::Continue(_) => true as c::BOOL,
 			}
@@ -155,7 +156,6 @@ impl SymbolHandler {
 			}
 		}
 	}
-
 
 	// The following functions have a reciever parameter,
 	// so they can only act on the same thread as the symbol handler.

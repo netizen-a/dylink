@@ -68,9 +68,9 @@ fn test_win32_symext() {
 #[cfg(windows)]
 #[test]
 fn test_sym_handler() {
+	use dylink::os::windows::LibraryExt;
 	use std::ops;
 
-use dylink::os::windows::LibraryExt;
 	let get_last_error = KERNEL32.symbol("GetLastError").unwrap();
 	let kernel32 = KERNEL32.get().unwrap();
 	let result = os::windows::SymbolHandler::new(None, &[kernel32.path().unwrap()]);
@@ -79,7 +79,7 @@ use dylink::os::windows::LibraryExt;
 	let _ = result.unwrap_err();
 
 	let info = handler.symbol_info(get_last_error).unwrap();
-	assert!(get_last_error as *const Sym == info.address);
+	assert!(get_last_error as *const Sym == info.addr);
 	println!("info = {:?}", info);
 	handler
 		.try_for_each_lib(|module_name, lib| {
@@ -106,6 +106,16 @@ fn test_is_loaded() {
 		todo!()
 	};
 	assert!(loaded)
+}
+
+#[cfg(not(any(windows, target_os = "aix")))]
+#[test]
+fn test_unix_sym_info() {
+	use dylink::os::unix::SymExt;
+	let this = Library::this().unwrap();
+	let symbol = this.symbol("atoi").unwrap();
+	let info = symbol.info();
+	println!("{:?}", info);
 }
 
 #[cfg(target_os = "linux")]
