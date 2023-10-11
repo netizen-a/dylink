@@ -100,11 +100,6 @@ impl Library {
 	pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
 		unsafe { imp::dylib_close_and_exit(lib.0, exit_code) }
 	}
-
-	/// This is the preferred way to close libraries when exiting threads.
-	pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
-		unsafe { dylib_close_and_exit(lib.0, exit_code) }
-	}
 }
 
 impl Drop for Library {
