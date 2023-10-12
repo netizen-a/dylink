@@ -2,7 +2,7 @@
 
 use std::{io, sync};
 
-use crate::{Library, Sym};
+use crate::{Library, Symbol};
 
 /// An object providing access to a lazily loaded LibLock on the filesystem.
 ///
@@ -49,10 +49,10 @@ impl<'a> LibLock<'a> {
 	/// This will lazily initialize the LibLock.
 	/// # Panics
 	/// May panic if [`LibLock`] failed to be initialized.
-	pub fn symbol(&'a self, name: &str) -> io::Result<&'a Sym> {
+	pub fn symbol(&'a self, name: &str) -> io::Result<Symbol> {
 		let lib = self.hlib.get_or_init(|| {
 			if self.libs.is_empty() {
-				Library::this().expect("failed to initialize `LibLock`")
+				Library::this().unwrap()
 			} else {
 				self.libs
 					.iter()

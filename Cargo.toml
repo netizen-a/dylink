@@ -20,3 +20,7 @@ path="./dylink_macro"
 [package.metadata.docs.rs]
 rustc-args = ["--cfg", "docsrs"]
 all-features = true
+
+[features]
+# features still being tested. marked items must not be relied upon between versions.
+unstable = []

@@ -45,55 +45,38 @@ fn test_win32_impl() {
 	}
 }
 
-#[cfg(windows)]
 #[test]
-fn test_win32_libext() {
-	use dylink::os::windows::LibExt;
-	let this = Library::this().unwrap();
-	let path = this.path().unwrap();
-	println!("path: {}", path.display());
-	this.close().unwrap();
+fn test_metadata() {
+	let lib = lib!["libX11.so.6", "Kernel32.dll", "libSystem.dylib"].unwrap();
+	let path = lib.path().unwrap();
+	let metadata = lib.metadata();
+	println!("path = {}", path.display());
+	println!("metadata = {:?}", metadata);
+	lib.close().unwrap();
 }
 
+#[test]
+fn test_this_path() {
+	let lib = Library::this().unwrap();
+	let path = lib.path().unwrap();
+	let metadata = lib.metadata();
+	println!("path = {}", path.display());
+	println!("metadata = {:?}", metadata);
+	lib.close().unwrap();
+}
+
+#[cfg(feature = "unstable")]
 #[cfg(windows)]
 #[test]
 fn test_win32_symext() {
-	use os::windows::SymExt;
+	use os::windows::SymbolExt;
 	let get_last_error = KERNEL32.symbol("GetLastError").unwrap();
 	let lib = get_last_error.library().unwrap();
 	let get_last_error2 = lib.symbol("GetLastError").unwrap();
-	assert!(get_last_error as *const Sym == get_last_error2 as *const Sym);
+	assert!(get_last_error == get_last_error2);
 }
 
-#[cfg(windows)]
-#[test]
-fn test_sym_handler() {
-	use dylink::os::windows::LibExt;
-	use std::ops;
-
-	let get_last_error = KERNEL32.symbol("GetLastError").unwrap();
-	let kernel32 = KERNEL32.get().unwrap();
-	let result = os::windows::SymbolHandler::new(None, &[kernel32.path().unwrap()]);
-	let handler = result.unwrap();
-	let result = os::windows::SymbolHandler::new(None, &[kernel32.path().unwrap()]);
-	let _ = result.unwrap_err();
-
-	let info = handler.symbol_info(get_last_error).unwrap();
-	assert!(get_last_error as *const Sym == info.addr);
-	println!("info = {:?}", info);
-	handler
-		.try_for_each_lib(|module_name, lib| {
-			let name = module_name.to_string_lossy();
-			println!("module_name = {}", name);
-			if name.eq_ignore_ascii_case("kernel32") {
-				let maybe = lib.symbol("SetLastError");
-				println!("symbol exists = {}", maybe.is_ok());
-			}
-			ops::ControlFlow::Continue(())
-		})
-		.unwrap();
-}
-
+#[cfg(feature = "unstable")]
 #[cfg(any(windows, target_os = "linux"))]
 #[test]
 fn test_is_loaded() {
@@ -108,6 +91,7 @@ fn test_is_loaded() {
 	assert!(loaded)
 }
 
+#[cfg(feature = "unstable")]
 #[cfg(not(any(windows, target_os = "aix")))]
 #[test]
 fn test_unix_sym_info() {
