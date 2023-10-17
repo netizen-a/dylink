@@ -5,8 +5,6 @@ use std::os::windows::prelude::*;
 use std::{ffi, io, path, ptr};
 
 use super::Handle;
-#[cfg(feature = "unstable")]
-use crate::sealed::Sealed;
 use crate::{Library, Symbol};
 
 mod c;
@@ -119,30 +117,5 @@ pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*const ffi::c_void
 		Err(io::Error::last_os_error())
 	} else {
 		Ok(handle)
-	}
-}
-
-#[cfg(feature = "unstable")]
-pub trait SymbolExt: Sealed {
-	fn library(&self) -> io::Result<Library>;
-}
-
-#[cfg(feature = "unstable")]
-impl SymbolExt for Symbol<'_> {
-	#[doc(alias = "GetModuleHandle")]
-	fn library(&self) -> io::Result<Library> {
-		let mut handle = ptr::null_mut();
-		let result = unsafe {
-			c::GetModuleHandleExW(
-				c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-				self.0 as *const _,
-				&mut handle,
-			)
-		};
-		if result == 0 {
-			Err(io::Error::last_os_error())
-		} else {
-			Ok(Library(handle))
-		}
 	}
 }

@@ -81,17 +81,6 @@ fn test_sym_addr() {
 }
 
 #[cfg(feature = "unstable")]
-#[cfg(windows)]
-#[test]
-fn test_win32_symext() {
-	use os::windows::SymbolExt;
-	let get_last_error = KERNEL32.symbol("GetLastError").unwrap();
-	let lib = get_last_error.library().unwrap();
-	let get_last_error2 = lib.symbol("GetLastError").unwrap();
-	assert!(get_last_error == get_last_error2);
-}
-
-#[cfg(feature = "unstable")]
 #[cfg(any(windows, target_os = "linux"))]
 #[test]
 fn test_is_loaded() {

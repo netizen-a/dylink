@@ -47,7 +47,7 @@ use dylink::*;
 static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
 
 #[dylink(library=KERNEL32)]
-extern "stdcall" {
+extern "system-unwind" {
     fn GetLastError() -> u32;
     fn SetLastError(_: u32);
 }

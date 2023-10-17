@@ -18,7 +18,7 @@
 //! static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
 //!
 //! #[dylink(library=KERNEL32)]
-//! extern "system" {
+//! extern "system-unwind" {
 //!     fn GetLastError() -> u32;
 //!     fn SetLastError(_: u32);
 //! }
@@ -46,13 +46,13 @@ use std::{fs, io, marker, mem, path};
 ///
 /// // foreign module pattern
 /// #[dylink(library=FOOBAR)]
-/// extern "system" {
+/// extern "system-unwind" {
 ///     fn foo();
 /// }
 ///
 /// // foreign function pattern
 /// #[dylink(library=FOOBAR)]
-/// extern "system" fn bar();
+/// extern "system-unwind" fn bar();
 ///```
 pub use dylink_macro::dylink;
 
