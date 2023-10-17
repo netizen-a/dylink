@@ -166,6 +166,8 @@ impl Library {
 
 	/// Queries metadata about the underlying library file.
 	///
+	/// This function is equivalent to calling `metadata` using `Library::path`.
+	///
 	/// # Examples
 	///
 	/// ```no_run
@@ -184,7 +186,7 @@ impl Library {
 	/// Creates a new `Library` instance that shares the same underlying library handle as the
 	/// existing `Library` instance.
 	///
-	/// Creates two handles for a file named `foo.txt`:
+	/// Creates two handles for a file named `foo.dll`:
 	///
 	/// ```no_run
 	/// use dylink::Library;
