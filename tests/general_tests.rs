@@ -65,6 +65,21 @@ fn test_this_path() {
 	lib.close().unwrap();
 }
 
+#[cfg(any(windows, target_os="linux"))]
+#[test]
+fn test_sym_addr() {
+	let lib = lib!["libX11.so.6", "Kernel32.dll"].unwrap();
+	let sym = if cfg!(target_os="linux") {
+		lib.symbol("XOpenDisplay").unwrap()
+	} else if cfg!(windows) {
+		lib.symbol("SetLastError").unwrap()
+	} else {
+		unreachable!()
+	};
+	let base = sym.base_addr().unwrap();
+	println!("base address = {:p}", base);
+}
+
 #[cfg(feature = "unstable")]
 #[cfg(windows)]
 #[test]

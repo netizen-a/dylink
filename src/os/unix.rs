@@ -1,6 +1,7 @@
 #![allow(clippy::let_unit_value)]
 
 use super::Handle;
+#[cfg(feature = "unstable")]
 use crate::sealed::Sealed;
 use crate::Symbol;
 use std::marker::PhantomData;
@@ -177,6 +178,7 @@ pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*const ffi::c_void
 		let info = info.assume_init();
 		Ok(info.dli_fbase)
 	} else {
+		// dlerror is not available for dladdr, so we're giving a generic error.
 		Err(io::Error::new(
 			io::ErrorKind::Other,
 			"failed to get symbol info",
