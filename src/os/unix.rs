@@ -99,21 +99,6 @@ pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) ->
 	std::process::exit(exit_code)
 }
 
-#[cfg(feature = "unstable")]
-// This function doesn't use a lock because we don't check errors.
-#[cfg(any(target_os = "linux", target_os = "macos", target_env = "gnu"))]
-#[inline]
-pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
-	let c_str = ffi::CString::new(path.as_bytes()).expect("failed to create CString");
-	let result = c::dlopen(c_str.as_ptr(), c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
-	if result.is_null() {
-		false
-	} else {
-		let _ = c::dlclose(result);
-		true
-	}
-}
-
 #[cfg(any(target_env="gnu", target_os="macos"))]
 pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	use std::os::unix::ffi::OsStringExt;

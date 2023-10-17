@@ -225,15 +225,3 @@ macro_rules! lib {
 			.find_map(|elem| $crate::Library::open(elem).ok())
 	};
 }
-
-#[cfg(feature = "unstable")]
-#[cfg(any(
-	windows,
-	target_os = "linux",
-	target_os = "macos",
-	target_env = "gnu",
-	docsrs
-))]
-pub fn is_loaded<P: AsRef<path::Path>>(path: P) -> bool {
-	unsafe { imp::dylib_is_loaded(path.as_ref().as_os_str()) }
-}

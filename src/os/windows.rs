@@ -60,18 +60,6 @@ pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) ->
 	c::FreeLibraryAndExitThread(lib_handle.cast(), exit_code as u32)
 }
 
-#[cfg(feature = "unstable")]
-pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
-	let wide_str: Vec<u16> = to_wide(path);
-	let mut handle = ptr::null_mut();
-	let _ = c::GetModuleHandleExW(
-		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-		wide_str.as_ptr(),
-		&mut handle,
-	);
-	!handle.is_null()
-}
-
 impl AsHandle for Library {
 	fn as_handle(&self) -> BorrowedHandle<'_> {
 		unsafe { BorrowedHandle::borrow_raw(self as *const _ as *mut _) }

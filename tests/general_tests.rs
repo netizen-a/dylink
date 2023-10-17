@@ -81,21 +81,6 @@ fn test_sym_addr() {
 }
 
 #[cfg(feature = "unstable")]
-#[cfg(any(windows, target_os = "linux"))]
-#[test]
-fn test_is_loaded() {
-	let loaded = if cfg!(windows) {
-		is_loaded("Kernel32.dll")
-	} else if cfg!(target_os = "linux") {
-		let _lib = Library::open("libX11.so.6").unwrap();
-		is_loaded("libX11.so.6")
-	} else {
-		todo!()
-	};
-	assert!(loaded)
-}
-
-#[cfg(feature = "unstable")]
 #[cfg(not(any(windows, target_os = "aix")))]
 #[test]
 fn test_unix_sym_info() {
