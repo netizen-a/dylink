@@ -30,6 +30,7 @@ use crate::sealed::Sealed;
 pub mod os;
 pub mod sync;
 
+use core::fmt;
 use std::{fs, io, marker, mem, path};
 
 /// Macro for generating shared symbol thunks procedurally.
@@ -73,8 +74,8 @@ impl Sealed for Symbol<'_> {}
 impl Symbol<'_> {
 	/// Casts to a pointer of another type.
 	#[inline]
-	pub const fn cast<T>(&self) -> *mut T {
-		self.0 as _
+	pub fn cast<Ptr: fmt::Pointer>(&self) -> Ptr {
+		unsafe {mem::transmute_copy::<_, Ptr>(&self.0)}
 	}
 	/// Attempts to get base address of library.
 	pub fn base_addr(&self) -> io::Result<*const std::ffi::c_void> {
