@@ -1,7 +1,7 @@
 #![allow(clippy::let_unit_value)]
 
 use super::Handle;
-#[cfg(any(feature = "unstable", docsrs))]
+#[cfg(feature = "unstable")]
 use crate::sealed::Sealed;
 use crate::Symbol;
 use std::marker::PhantomData;
@@ -171,7 +171,7 @@ pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*const ffi::c_void
 	}
 }
 
-#[cfg(any(feature = "unstable", docsrs))]
+#[cfg(feature = "unstable")]
 #[derive(Debug)]
 pub struct SymInfo<'a> {
 	pub path: ffi::CString,
@@ -180,12 +180,12 @@ pub struct SymInfo<'a> {
 	pub addr: Symbol<'a>,
 }
 
-#[cfg(any(feature = "unstable", docsrs))]
+#[cfg(feature = "unstable")]
 pub trait SymExt: Sealed {
 	fn info(&self) -> io::Result<SymInfo>;
 }
 
-#[cfg(any(feature = "unstable", docsrs))]
+#[cfg(feature = "unstable")]
 impl SymExt for Symbol<'_> {
 	#[doc(alias = "dladdr")]
 	fn info(&self) -> io::Result<SymInfo> {

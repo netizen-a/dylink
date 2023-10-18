@@ -80,7 +80,7 @@ fn test_sym_addr() {
 	println!("base address = {:p}", base);
 }
 
-#[cfg(any(feature = "unstable", docsrs))]
+#[cfg(feature = "unstable")]
 #[cfg(not(any(windows, target_os = "aix")))]
 #[test]
 fn test_unix_sym_info() {
