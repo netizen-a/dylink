@@ -1,11 +1,8 @@
 # Dylink
 
-![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink) [![dylink-rs](https://github.com/Razordor/dylink/actions/workflows/rust.yml/badge.svg)](https://github.com/Razordor/dylink/actions/workflows/rust.yml) ![unsafe:yes](https://img.shields.io/badge/unsafe-yes-red)
+![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink) [![dylink-rs](https://github.com/Razordor/dylink/actions/workflows/rust.yml/badge.svg)](https://github.com/Razordor/dylink/actions/workflows/rust.yml)
 
-Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
-When functions are loaded they are evaluated through a thunk for first time calls, which loads the function from its respective library. Preceeding calls after initialization have no overhead or additional branching checks, since the thunk is replaced by the loaded function.
-
-This crate can be used with other library loaders by making a wrapper around your favorite loader and implementing the `Loader` trait.
+Dylink provides a run-time dynamic linking framework for loading dynamic libraries.
 
 ----
 
@@ -17,8 +14,6 @@ Related links:
 ## Features
 
 * Thread-safe library loading.
-* Fearless closing - closing never invalidates symbols.
-* Branchless symbols - loaded symbols have zero overhead.
 
 ## Supported platforms
 
@@ -34,7 +29,7 @@ Add this to your `Cargo.toml`
 
 ```toml
 [dependencies]
-dylink = "0.7"
+dylink = "0.8"
 ```
 
 ## Example
