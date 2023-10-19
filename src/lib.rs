@@ -1,5 +1,6 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(feature="unstable", feature(fn_ptr_trait))]
 
 //! Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
 //! When functions are loaded they are evaluated through a thunk for first time calls, which loads the function
@@ -75,6 +76,11 @@ impl Symbol<'_> {
 	#[inline]
 	pub const fn cast<T>(&self) -> *mut T {
 		self.0 as _
+	}
+	#[cfg(feature="unstable")]
+	#[inline]
+	pub const fn cast_fn<F: std::marker::FnPtr>(&self) -> F {
+		unsafe { std::mem::transmute_copy::<_, F>(&self.0) }
 	}
 	/// Attempts to get base address of library.
 	pub fn base_addr(&self) -> io::Result<*const std::ffi::c_void> {
@@ -154,7 +160,6 @@ impl Library {
 		alias = "_dyld_get_image_name",
 		alias = "GetModuleFileNameW"
 	)]
-	#[cfg(any(windows, target_os="macos", target_env="gnu"))]
 	pub fn path(&self) -> io::Result<path::PathBuf> {
 		unsafe { imp::dylib_path(self.0) }
 	}

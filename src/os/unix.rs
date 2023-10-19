@@ -5,6 +5,7 @@ use super::Handle;
 use crate::sealed::Sealed;
 use crate::Symbol;
 use std::marker::PhantomData;
+#[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, mem, path, ptr};
 
