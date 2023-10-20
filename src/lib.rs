@@ -30,7 +30,7 @@ use crate::sealed::Sealed;
 pub mod os;
 pub mod sync;
 
-use std::{fs, io, marker, path};
+use std::{fs, io, marker, path, mem};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -112,12 +112,13 @@ impl Library {
 	}
 	/// Attempts to returns a library handle to the current process.
 	///
-	/// # Errors
+	/// # Panics
 	///
-	/// May error if library process handle could not be acquired.
-	pub fn this() -> io::Result<Self> {
+	/// May panic if library process handle could not be acquired.
+	pub fn this() -> Self {
 		unsafe { imp::dylib_this() }
 			.map(Library)
+			.expect("failed to acquire library process handle")
 	}
 
 	/// Retrieves a symbol from the library if it exists
@@ -214,7 +215,14 @@ macro_rules! lib {
 	};
 }
 
-pub trait Load {
-	fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self>
-	where Self: Sized;
+/// `Weak` is a version of [`Library`] that holds a non-owning reference to the dynamic library.
+#[derive(Clone, Copy)]
+pub struct Weak(os::Handle);
+unsafe impl Send for Weak {}
+unsafe impl Sync for Weak {}
+
+impl Weak {
+	pub fn upgrade(&self) -> Option<Library> {
+		mem::ManuallyDrop::new(Library(self.0)).try_clone().ok()
+	}
 }

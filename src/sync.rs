@@ -46,7 +46,7 @@ impl<'a> LibLock<'a> {
 	pub fn symbol(&'a self, name: &str) -> io::Result<Symbol> {
 		let lib = self.hlib.get_or_init(|| {
 			if self.libs.is_empty() {
-				Library::this().unwrap()
+				Library::this()
 			} else {
 				self.libs
 					.iter()

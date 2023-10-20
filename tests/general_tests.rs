@@ -56,7 +56,7 @@ fn test_metadata() {
 
 #[test]
 fn test_this_path() {
-	let lib = Library::this().unwrap();
+	let lib = Library::this();
 	let path = lib.path().unwrap();
 	let metadata = lib.metadata();
 	println!("path = {}", path.display());
