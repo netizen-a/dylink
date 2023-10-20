@@ -1,6 +1,6 @@
-#[cfg(any(unix, docsrs))]
+#[cfg(unix)]
 pub mod unix;
-#[cfg(any(windows, docsrs))]
+#[cfg(windows)]
 pub mod windows;
 
 pub(crate) type Handle = *mut std::ffi::c_void;

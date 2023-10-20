@@ -87,6 +87,9 @@ impl Symbol<'_> {
 ///
 /// Dynamic libraries are automatically dereferenced when they go out of scope.
 /// Errors detected on closing are ignored by the implementation of `Drop`.
+///
+/// Threads executed by the dll must be terminated before the Library can be freed
+/// or a race condition may occur.
 #[derive(Debug)]
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
@@ -103,10 +106,6 @@ impl Library {
 	///
 	/// Upon loading or unloading the library, an optional entry point may be executed
 	/// for each library.
-	///
-	/// If the thread is about to terminate, Windows may encounter a race condition
-	/// between freeing the library and thread termination. There is currently no clean way
-	/// of handling this in rust that I've found thus far.
 	#[doc(alias = "dlopen", alias = "LoadLibrary")]
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
 		unsafe { imp::dylib_open(path.as_ref().as_os_str()) }.map(Library)
