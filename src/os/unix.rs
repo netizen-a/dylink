@@ -1,7 +1,7 @@
 #![allow(clippy::let_unit_value)]
+#![allow(unused_imports)]
 
 use super::Handle;
-#[cfg(feature = "unstable")]
 use crate::sealed::Sealed;
 use crate::Symbol;
 use std::marker::PhantomData;
@@ -94,13 +94,6 @@ pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Res
 	}
 }
 
-#[inline]
-pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) -> ! {
-	let _ = dylib_close(lib_handle);
-	std::process::exit(exit_code)
-}
-
-#[cfg(any(target_env="gnu", target_os="macos"))]
 pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
 
@@ -156,8 +149,12 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 		}
 		Err(io::Error::new(io::ErrorKind::NotFound, "path not found"))
 	}
+	#[cfg(not(any(target_env="gnu", target_os="macos")))] {
+		std::unimplemented!()
+	}
 }
 
+#[cfg(feature="unstable")]
 pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*const ffi::c_void> {
 	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 	if c::dladdr(symbol.cast(), info.as_mut_ptr()) != 0 {

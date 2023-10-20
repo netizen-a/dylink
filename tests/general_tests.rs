@@ -52,7 +52,6 @@ fn test_metadata() {
 	let metadata = lib.metadata();
 	println!("path = {}", path.display());
 	println!("metadata = {:?}", metadata);
-	lib.close().unwrap();
 }
 
 #[test]
@@ -62,9 +61,9 @@ fn test_this_path() {
 	let metadata = lib.metadata();
 	println!("path = {}", path.display());
 	println!("metadata = {:?}", metadata);
-	lib.close().unwrap();
 }
 
+#[cfg(feature="unstable")]
 #[cfg(any(windows, target_os="linux"))]
 #[test]
 fn test_sym_addr() {
@@ -76,7 +75,7 @@ fn test_sym_addr() {
 	} else {
 		unreachable!()
 	};
-	let base = sym.base_addr().unwrap();
+	let base = sym.base_address().unwrap();
 	println!("base address = {:p}", base);
 }
 
@@ -119,7 +118,7 @@ fn test_linux_x11() {
 #[test]
 fn test_atoi_linux() {
 	use std::ffi::{c_char, c_int};
-	static THIS: sync::LibLock = sync::LibLock::this();
+	static THIS: sync::LibLock = sync::LibLock::new(&[]);
 	#[dylink(library=THIS)]
 	extern "C-unwind" {
 		fn atoi(s: *const c_char) -> c_int;

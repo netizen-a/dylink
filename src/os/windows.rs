@@ -55,11 +55,6 @@ pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Res
 	}
 }
 
-#[inline]
-pub(crate) unsafe fn dylib_close_and_exit(lib_handle: Handle, exit_code: i32) -> ! {
-	c::FreeLibraryAndExitThread(lib_handle.cast(), exit_code as u32)
-}
-
 impl AsHandle for Library {
 	fn as_handle(&self) -> BorrowedHandle<'_> {
 		unsafe { BorrowedHandle::borrow_raw(self as *const _ as *mut _) }
@@ -93,6 +88,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	}
 }
 
+#[cfg(feature="unstable")]
 pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*const ffi::c_void> {
 	let mut handle = ptr::null_mut();
 	let result = c::GetModuleHandleExW(

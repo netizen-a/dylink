@@ -1,6 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-#![cfg_attr(feature="unstable", feature(fn_ptr_trait))]
 
 //! Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
 //! When functions are loaded they are evaluated through a thunk for first time calls, which loads the function
@@ -31,7 +30,7 @@ use crate::sealed::Sealed;
 pub mod os;
 pub mod sync;
 
-use std::{fs, io, marker, mem, path};
+use std::{fs, io, marker, path};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -78,19 +77,16 @@ impl Symbol<'_> {
 		self.0 as _
 	}
 	#[cfg(feature="unstable")]
-	#[inline]
-	pub const fn cast_fn<F: std::marker::FnPtr>(&self) -> F {
-		unsafe { std::mem::transmute_copy::<_, F>(&self.0) }
-	}
 	/// Attempts to get base address of library.
-	pub fn base_addr(&self) -> io::Result<*const std::ffi::c_void> {
+	pub fn base_address(&self) -> io::Result<*const std::ffi::c_void> {
 		unsafe { imp::base_addr(self) }
 	}
 }
 
 /// An object providing access to an open dynamic library.
 ///
-/// The type `Library` provides a shared ownership to an open dynamic library.
+/// Dynamic libraries are automatically dereferenced when they go out of scope.
+/// Errors detected on closing are ignored by the implementation of `Drop`.
 #[derive(Debug)]
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
@@ -107,6 +103,10 @@ impl Library {
 	///
 	/// Upon loading or unloading the library, an optional entry point may be executed
 	/// for each library.
+	///
+	/// If the thread is about to terminate, Windows may encounter a race condition
+	/// between freeing the library and thread termination. There is currently no clean way
+	/// of handling this in rust that I've found thus far.
 	#[doc(alias = "dlopen", alias = "LoadLibrary")]
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
 		unsafe { imp::dylib_open(path.as_ref().as_os_str()) }.map(Library)
@@ -119,17 +119,6 @@ impl Library {
 	pub fn this() -> io::Result<Self> {
 		unsafe { imp::dylib_this() }
 			.map(Library)
-	}
-	/// Same as drop, but returns a result.
-	///
-	/// This method is recommended when using other crates that manipulate dynamic libraries.
-	///
-	/// # Errors
-	///
-	/// May return an error if failed to close library.
-	#[doc(alias = "dlclose")]
-	pub fn close(self) -> io::Result<()> {
-		unsafe { imp::dylib_close(mem::ManuallyDrop::new(self).0) }
 	}
 
 	/// Retrieves a symbol from the library if it exists
@@ -162,11 +151,6 @@ impl Library {
 	)]
 	pub fn path(&self) -> io::Result<path::PathBuf> {
 		unsafe { imp::dylib_path(self.0) }
-	}
-
-	/// This is the preferred way to close libraries when exiting threads.
-	pub fn close_and_exit(lib: Library, exit_code: i32) -> ! {
-		unsafe { imp::dylib_close_and_exit(lib.0, exit_code) }
 	}
 
 	/// Queries metadata about the underlying library file.
@@ -229,4 +213,9 @@ macro_rules! lib {
 		[$($name),+].into_iter()
 			.find_map(|elem| $crate::Library::open(elem).ok())
 	};
+}
+
+pub trait Load {
+	fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self>
+	where Self: Sized;
 }
