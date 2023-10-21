@@ -30,7 +30,7 @@ use crate::sealed::Sealed;
 pub mod os;
 pub mod sync;
 
-use std::{fs, io, marker, path, mem};
+use std::{fs, io, marker, path, mem, ptr};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -217,11 +217,22 @@ macro_rules! lib {
 
 /// `Weak` is a version of [`Library`] that holds a non-owning reference to the dynamic library.
 #[derive(Clone, Copy)]
-pub struct Weak(os::Handle);
-unsafe impl Send for Weak {}
-unsafe impl Sync for Weak {}
+pub struct Weak<'a>(os::Handle, marker::PhantomData<&'a ()>);
+unsafe impl Send for Weak<'_> {}
+unsafe impl Sync for Weak<'_> {}
 
-impl Weak {
+impl Weak<'_> {
+	#[cfg(feature = "unstable")]
+	pub fn try_default() -> io::Result<Weak<'static>> {
+		let handle = if cfg!(windows) {
+			let s = std::ffi::OsString::from("kernel32.dll");
+			unsafe {imp::dylib_open(&s)?}
+		} else {
+			// RTLD_DEFAULT
+			ptr::null_mut()
+		};
+		Ok(Weak(handle, marker::PhantomData))
+	}
 	pub fn upgrade(&self) -> Option<Library> {
 		mem::ManuallyDrop::new(Library(self.0)).try_clone().ok()
 	}
