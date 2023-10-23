@@ -94,3 +94,26 @@ pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> 
 		Ok(handle)
 	}
 }
+
+
+#[cfg(feature = "unstable")]
+pub(crate) unsafe fn dylib_is_loaded(path: &ffi::OsStr) -> bool {
+	let wide_str: Vec<u16> = to_wide(path);
+	let mut handle = ptr::null_mut();
+	let _ = c::GetModuleHandleExW(
+		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		wide_str.as_ptr(),
+		&mut handle,
+	);
+	!handle.is_null()
+}
+
+pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
+	let mut new_handle = ptr::null_mut();
+	let _ = c::GetModuleHandleExW(
+		c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+		handle.as_ptr().cast(),
+		&mut new_handle,
+	);
+	ptr::NonNull::new(new_handle).ok_or_else(io::Error::last_os_error)
+}

@@ -192,11 +192,23 @@ impl Library {
 	/// ```
 	#[cfg(any(windows, target_os="macos", target_env="gnu"))]
 	pub fn try_clone(&self) -> io::Result<Library> {
-		self.path().and_then(Library::open)
+		// windows has a more direct implementation of cloning here.
+		#[cfg(windows)] unsafe {
+			let handle = imp::dylib_clone(self.0)?;
+			Ok(Library(handle))
+		}
+		// unix uses indirect cloning and may fail if path fails.
+		// if there is a better way to do this on unix I'd like to know.
+		#[cfg(not(windows))] {
+			self.path().and_then(Library::open)
+		}
 	}
 }
 
 impl Drop for Library {
+	/// Drops the Library.
+	///
+	/// This will decrement the reference count.
 	fn drop(&mut self) {
 		unsafe {
 			let _ = imp::dylib_close(self.0);
