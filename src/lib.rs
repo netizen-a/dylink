@@ -132,7 +132,7 @@ impl Library {
 	/// May error if symbol is not found.
 	#[doc(alias = "dlsym")]
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<Symbol<'a>> {
-		unsafe { imp::dylib_symbol(self.0, name) }
+		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
 	}
 
 	/// Gets the path to the dynamic library file.
@@ -235,13 +235,13 @@ macro_rules! lib {
 
 /// `Weak` is a version of [`Library`] that holds a non-owning reference to the dynamic library.
 #[derive(Clone, Copy)]
-pub struct Weak<'a>(*mut ffi::c_void, marker::PhantomData<&'a ()>);
-unsafe impl Send for Weak<'_> {}
-unsafe impl Sync for Weak<'_> {}
+pub struct Weak(*mut ffi::c_void);
+unsafe impl Send for Weak {}
+unsafe impl Sync for Weak {}
 
-impl Weak<'_> {
+impl Weak {
 	#[cfg(feature = "unstable")]
-	pub fn try_default() -> io::Result<Weak<'static>> {
+	pub fn try_default() -> io::Result<Weak> {
 		let handle: *mut ffi::c_void = if cfg!(windows) {
 			let s = std::ffi::OsString::from("kernel32.dll");
 			unsafe {imp::dylib_open(&s)?}.as_ptr()
@@ -249,13 +249,13 @@ impl Weak<'_> {
 			// RTLD_DEFAULT
 			ptr::null_mut()
 		};
-		Ok(Weak(handle, marker::PhantomData))
+		Ok(Weak(handle))
 	}
+	/// Attempts to upgrade the `Weak` pointer to a `Library`
 	pub fn upgrade(&self) -> Option<Library> {
-		if let Some(p) = ptr::NonNull::new(self.0) {
-			mem::ManuallyDrop::new(Library(p)).try_clone().ok()
-		} else {
-			None
-		}
+		let p = ptr::NonNull::new(self.0)?;
+		// if try_clone fails, then the library may have
+		// been closed prematurely.
+		mem::ManuallyDrop::new(Library(p)).try_clone().ok()
 	}
 }

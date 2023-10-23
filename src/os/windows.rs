@@ -36,9 +36,9 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 }
 
 #[inline]
-pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Result<Symbol<'a>> {
+pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: *mut ffi::c_void, name: &str) -> io::Result<Symbol<'a>> {
 	let c_str = ffi::CString::new(name).unwrap();
-	let addr: *const ffi::c_void = unsafe { c::GetProcAddress(lib_handle.as_ptr(), c_str.as_ptr()) };
+	let addr: *const ffi::c_void = unsafe { c::GetProcAddress(lib_handle, c_str.as_ptr()) };
 	if addr.is_null() {
 		Err(io::Error::last_os_error())
 	} else {
