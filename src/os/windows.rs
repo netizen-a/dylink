@@ -17,27 +17,18 @@ fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
 pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	let wide_str: Vec<u16> = to_wide(path);
 	let handle = c::LoadLibraryExW(wide_str.as_ptr(), ptr::null_mut(), 0);
-	if handle.is_null() {
-		Err(io::Error::last_os_error())
-	} else {
-		Ok(handle.cast())
-	}
+	ptr::NonNull::new(handle).ok_or_else(io::Error::last_os_error)
 }
 
 #[inline]
 pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	let mut handle: *mut ffi::c_void = ptr::null_mut();
-	let result = c::GetModuleHandleExW(0, ptr::null(), &mut handle);
-	if result == 0 {
-		Err(io::Error::last_os_error())
-	} else {
-		Ok(handle.cast())
-	}
+	c::GetModuleHandleExW(0, ptr::null(), &mut handle);
+	ptr::NonNull::new(handle).ok_or_else(io::Error::last_os_error)
 }
-
 #[inline]
 pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
-	if c::FreeLibrary(lib_handle.cast()) == 0 {
+	if c::FreeLibrary(lib_handle.as_ptr()) == 0 {
 		Err(io::Error::last_os_error())
 	} else {
 		Ok(())
@@ -47,7 +38,7 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 #[inline]
 pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Result<Symbol<'a>> {
 	let c_str = ffi::CString::new(name).unwrap();
-	let addr: *const ffi::c_void = unsafe { c::GetProcAddress(lib_handle.cast(), c_str.as_ptr()) };
+	let addr: *const ffi::c_void = unsafe { c::GetProcAddress(lib_handle.as_ptr(), c_str.as_ptr()) };
 	if addr.is_null() {
 		Err(io::Error::last_os_error())
 	} else {
@@ -71,7 +62,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	const MAX_PATH: usize = 260;
 	let mut file_name = vec![0u16; MAX_PATH];
 	loop {
-		let _ = c::GetModuleFileNameW(handle, file_name.as_mut_ptr(), file_name.len() as c::DWORD);
+		let _ = c::GetModuleFileNameW(handle.as_ptr(), file_name.as_mut_ptr(), file_name.len() as c::DWORD);
 		let last_error = io::Error::last_os_error();
 		match last_error.raw_os_error().unwrap_unchecked() {
 			0 => {
@@ -89,7 +80,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 }
 
 #[cfg(feature="unstable")]
-pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*const ffi::c_void> {
+pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> {
 	let mut handle = ptr::null_mut();
 	let result = c::GetModuleHandleExW(
 		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT

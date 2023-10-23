@@ -3,4 +3,5 @@ pub mod unix;
 #[cfg(windows)]
 pub mod windows;
 
-pub(crate) type Handle = *mut std::ffi::c_void;
+// an owned handle may not be null
+pub(crate) type Handle = std::ptr::NonNull<std::ffi::c_void>;
