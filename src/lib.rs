@@ -91,7 +91,10 @@ impl Symbol<'_> {
 ///
 /// Threads executed by the dll must be terminated before the Library can be freed
 /// or a race condition may occur.
+///
+/// The `Library` type is guarenteed access to the null pointer optimization.
 #[derive(Debug)]
+#[repr(transparent)]
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
