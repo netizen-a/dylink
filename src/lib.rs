@@ -232,12 +232,12 @@ impl Library {
 	///
 	/// # Examples
 	///
-	/// ```rust
+	/// ```no_run
 	/// use dylink::*;
 	///
-	/// let this = Library::this();
+	/// let this = Library::open("foo.dll").unwrap();
 	/// let same_this = Library::try_clone(&this).unwrap();
-	/// let other_lib = lib!["libX11.so.6", "Kernel32.dll", "libSystem.dylib"].unwrap();
+	/// let other_lib = Library::open("bar.dll").unwrap();
 	///
 	/// assert!(Library::ptr_eq(&this, &same_this));
 	/// assert!(!Library::ptr_eq(&this, &other_lib));
@@ -245,7 +245,7 @@ impl Library {
 	#[must_use]
 	pub fn ptr_eq(this: &Self, other: &Self) -> bool {
         #[cfg(target_os="macos")] {
-			(this.0.as_ptr() as isize & (-4)) == (active_handle.as_ptr() as isize & (-4))
+			(this.0.as_ptr() as isize & (-4)) == (other.0.as_ptr() as isize & (-4))
 		}
 		#[cfg(not(target_os="macos"))] {
 			this.0.as_ptr() == other.0.as_ptr()

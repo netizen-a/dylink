@@ -34,7 +34,7 @@ extern "C" {
 
 pub const RTLD_LOCAL: ffi::c_int = 0;
 pub const RTLD_NOW: ffi::c_int = 0x2;
-#[cfg(feature = "unstable")]
+#[cfg(target_os="macos")]
 pub const RTLD_NOLOAD: ffi::c_int = 0x4;
 
 #[cfg(target_env = "gnu")]
