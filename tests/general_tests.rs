@@ -75,7 +75,7 @@ fn test_try_clone() {
 	println!("lib: {:?}", lib);
 }
 
-#[cfg(feature="unstable")]
+
 #[cfg(any(windows, target_os="linux"))]
 #[test]
 fn test_sym_addr() {
@@ -87,7 +87,7 @@ fn test_sym_addr() {
 	} else {
 		unreachable!()
 	};
-	let base = sym.base_address().unwrap();
+	let base = sym.base_addr().unwrap();
 	println!("base address = {:p}", base);
 }
 

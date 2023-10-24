@@ -78,9 +78,8 @@ impl Symbol<'_> {
 	pub const fn cast<T>(&self) -> *mut T {
 		self.0 as _
 	}
-	#[cfg(feature="unstable")]
-	/// Attempts to get base address of library.
-	pub fn base_address(&self) -> io::Result<*mut std::ffi::c_void> {
+	/// Attempts to get the base address of the library.
+	pub fn base_addr(&self) -> io::Result<*mut std::ffi::c_void> {
 		unsafe { imp::base_addr(self) }
 	}
 }

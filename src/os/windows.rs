@@ -79,7 +79,6 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	}
 }
 
-#[cfg(feature="unstable")]
 pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> {
 	let mut handle = ptr::null_mut();
 	let result = c::GetModuleHandleExW(

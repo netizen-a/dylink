@@ -154,7 +154,6 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	}
 }
 
-#[cfg(feature="unstable")]
 pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> {
 	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 	if c::dladdr(symbol.cast(), info.as_mut_ptr()) != 0 {
