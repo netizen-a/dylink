@@ -129,6 +129,22 @@ impl Library {
 	/// # Errors
 	///
 	/// May error if symbol is not found.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// # #[repr(transparent)]
+	/// # struct Display(*const c_void);
+	/// # use std::ffi::*;
+	/// use std::mem;
+	/// use dylink::Library;
+	///
+	/// type PfnXOpenDisplay = extern "C" fn (display_name: *const c_char) -> *mut Display;
+	///
+	/// let lib = Library::open("libX11.so.6").unwrap();
+	/// let sym = lib.symbol("XOpenDisplay").unwrap();
+	/// let xopendisplay: PfnXOpenDisplay = unsafe {mem::transmute(sym.cast::<()>())};
+	/// ```
 	#[doc(alias = "dlsym")]
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<Symbol<'a>> {
 		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
@@ -147,6 +163,19 @@ impl Library {
 	/// # Errors
 	///
 	/// This function will return an error if there is no path associated with the library handle.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::Library;
+	///
+	/// fn main() -> std::io::Result<()> {
+	///     let mut lib = Library::open("foo.dll")?;
+	///     let path = lib.path()?;
+	/// 	println!("pathname: {}", path.display());
+	///     Ok(())
+	/// }
+	/// ```
 	#[doc(
 		alias = "dlinfo",
 		alias = "_dyld_get_image_name",
