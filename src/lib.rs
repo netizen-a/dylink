@@ -94,8 +94,8 @@ impl Symbol<'_> {
 ///
 /// Threads executed by a dynamic library must be terminated before the Library can be freed
 /// or a race condition may occur. Additionally, upon loading or unloading the library, an
-/// optional entry point may be executed for each library, which may impose requirements on the
-/// user to fullfill in order to use the library.
+/// optional entry point may be executed for each library, which may impose arbitrary requirements on the
+/// user for the access to the library to be sound.
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Library(os::Handle);
