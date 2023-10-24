@@ -90,8 +90,12 @@ impl Symbol<'_> {
 /// Dynamic libraries are automatically dereferenced when they go out of scope.
 /// Errors detected on closing are ignored by the implementation of `Drop`.
 ///
-/// Threads executed by the dll must be terminated before the Library can be freed
-/// or a race condition may occur.
+/// # Safety
+///
+/// Threads executed by a dynamic library must be terminated before the Library can be freed
+/// or a race condition may occur. Additionally, upon loading or unloading the library, an
+/// optional entry point may be executed for each library, which may impose requirements on the
+/// user to fullfill in order to use the library.
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Library(os::Handle);
@@ -104,11 +108,6 @@ impl Library {
 	/// The library maintains an internal reference count that increments
 	/// for every time the library is opened. Library symbols are eagerly resolved
 	/// before the function returns.
-	///
-	/// # Safety
-	///
-	/// Upon loading or unloading the library, an optional entry point may be executed
-	/// for each library.
 	#[doc(alias = "dlopen", alias = "LoadLibrary")]
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
 		unsafe { imp::dylib_open(path.as_ref().as_os_str()) }.map(Library)
