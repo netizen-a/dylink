@@ -30,8 +30,7 @@ use crate::sealed::Sealed;
 pub mod os;
 pub mod sync;
 
-use core::ffi;
-use std::{fs, io, marker, path, mem, ptr};
+use std::{fs, io, marker, path};
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
@@ -229,33 +228,4 @@ macro_rules! lib {
 		[$($name),+].into_iter()
 			.find_map(|elem| $crate::Library::open(elem).ok())
 	};
-}
-
-// weak may be null, but library may not be.
-
-/// `Weak` is a version of [`Library`] that holds a non-owning reference to the dynamic library.
-#[derive(Clone, Copy)]
-pub struct Weak(*mut ffi::c_void);
-unsafe impl Send for Weak {}
-unsafe impl Sync for Weak {}
-
-impl Weak {
-	#[cfg(feature = "unstable")]
-	pub fn try_default() -> io::Result<Weak> {
-		let handle: *mut ffi::c_void = if cfg!(windows) {
-			let s = std::ffi::OsString::from("kernel32.dll");
-			unsafe {imp::dylib_open(&s)?}.as_ptr()
-		} else {
-			// RTLD_DEFAULT
-			ptr::null_mut()
-		};
-		Ok(Weak(handle))
-	}
-	/// Attempts to upgrade the `Weak` pointer to a `Library`
-	pub fn upgrade(&self) -> Option<Library> {
-		let p = ptr::NonNull::new(self.0)?;
-		// if try_clone fails, then the library may have
-		// been closed prematurely.
-		mem::ManuallyDrop::new(Library(p)).try_clone().ok()
-	}
 }
