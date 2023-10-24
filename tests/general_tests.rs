@@ -65,7 +65,7 @@ fn test_this_path() {
 
 #[test]
 fn test_try_clone() {
-	let lib = Library::this();
+	let lib = lib!["libX11.so.6", "Kernel32.dll", "libSystem.dylib"].unwrap();
 	let other = lib.try_clone().expect("failed to clone handle");
 	assert!(Library::ptr_eq(&lib, &other));
 	let t = std::thread::spawn(move || {

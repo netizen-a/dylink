@@ -23,9 +23,7 @@ impl<'a> LibLock<'a> {
 	/// mechanism in case the shared LibLock is in a seperate directory or may have a variety
 	/// of names.
 	///
-	/// # Panics
-	///
-	/// panics if `libs` is empty.
+	/// If `libs` is empty then the program attempts to load itself.
 	///
 	/// # Examples
 	/// ```rust
@@ -34,7 +32,6 @@ impl<'a> LibLock<'a> {
 	/// ```
 	#[inline]
 	pub const fn new(libs: &'a [&'a str]) -> Self {
-		assert!(!libs.is_empty(), "`libs` cannot be empty");
 		Self {
 			libs,
 			hlib: sync::OnceLock::new(),
@@ -48,10 +45,14 @@ impl<'a> LibLock<'a> {
 	/// May panic if [`LibLock`] failed to be initialized.
 	pub fn symbol(&'a self, name: &str) -> io::Result<Symbol> {
 		let lib = self.hlib.get_or_init(|| {
-			self.libs
-				.iter()
-				.find_map(|path| Library::open(path).ok())
-				.expect("failed to initialize `LibLock`")
+			if self.libs.is_empty() {
+				Library::this()
+			} else {
+				self.libs
+					.iter()
+					.find_map(|path| Library::open(path).ok())
+					.expect("failed to initialize `LibLock`")
+			}
 		});
 		lib.symbol(name)
 	}

@@ -48,11 +48,11 @@ pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	let _lock = dylib_guard();
 	let c_str = ffi::CString::new(path.as_bytes())?;
 	let handle: *mut ffi::c_void = c::dlopen(c_str.as_ptr(), c::RTLD_NOW | c::RTLD_LOCAL);
-	if handle.is_null() {
+	if let Some(ret) = ptr::NonNull::new(handle) {
+		Ok(ret)
+	} else {
 		let err = c_dlerror().unwrap();
 		Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
-	} else {
-		Ok(handle.cast())
 	}
 }
 
@@ -60,18 +60,18 @@ pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	let _lock = dylib_guard();
 	let handle: *mut ffi::c_void = c::dlopen(ptr::null(), c::RTLD_NOW | c::RTLD_LOCAL);
-	if handle.is_null() {
+	if let Some(ret) = ptr::NonNull::new(handle) {
+		Ok(ret)
+	} else {
 		let err = c_dlerror().unwrap();
 		Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
-	} else {
-		Ok(handle.cast())
 	}
 }
 
 #[inline]
 pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	let _lock = dylib_guard();
-	if c::dlclose(lib_handle.cast()) != 0 {
+	if c::dlclose(lib_handle.as_ptr()) != 0 {
 		let err = c_dlerror().unwrap();
 		Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
 	} else {
@@ -80,12 +80,12 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 }
 
 #[inline]
-pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Result<Symbol<'a>> {
+pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: *mut ffi::c_void, name: &str) -> io::Result<Symbol<'a>> {
 	let _lock = dylib_guard();
 	let c_str = ffi::CString::new(name).unwrap();
 
 	let _ = c_dlerror(); // clear existing errors
-	let handle: *mut ffi::c_void = c::dlsym(lib_handle.cast(), c_str.as_ptr()).cast_mut();
+	let handle: *mut ffi::c_void = c::dlsym(lib_handle, c_str.as_ptr()).cast_mut();
 
 	if let Some(err) = c_dlerror() {
 		Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
@@ -95,64 +95,81 @@ pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: Handle, name: &str) -> io::Res
 }
 
 pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
+    // Use pattern matching and descriptive error messages
+    match dylib_this() {
+        Ok(this_handle) if (cfg!(target_os = "macos") && (this_handle.as_ptr() as isize & (-4)) == (handle.as_ptr() as isize & (-4)))
+		|| this_handle == handle => std::env::current_exe(),
+        _ => {
+            #[cfg(target_env = "gnu")]
+            {
+                if let Some(path) = get_link_map_path(handle) {
+                    Ok(path)
+                } else {
+                    Err(io::Error::new(io::ErrorKind::NotFound, "Library path not found"))
+                }
+            }
+            #[cfg(target_os = "macos")]
+            {
+                if let Some(path) = get_macos_image_path(handle) {
+                    Ok(path)
+                } else {
+                    Err(io::Error::new(io::ErrorKind::NotFound, "Library path not found"))
+                }
+            }
+            #[cfg(not(any(target_env = "gnu", target_os = "macos")))]
+            {
+                // Handle other platforms or configurations
+                Err(io::Error::new(io::ErrorKind::Other, "Unsupported platform"))
+            }
+        }
+    }
+}
+
+#[cfg(target_env = "gnu")]
+unsafe fn get_link_map_path(handle: Handle) -> Option<path::PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
-
-	if let Ok(this_handle) = dylib_this() {
-		dylib_close(this_handle)?;
-		// This handles an edge case where link_map can't see the current executable.
-		if (cfg!(target_os = "macos") && (this_handle as isize & (-4)) == (handle as isize & (-4)))
-			|| this_handle == handle
-		{
-			return std::env::current_exe();
-		}
-	}
-
-	#[cfg(target_env = "gnu")]
+    let mut map_ptr = ptr::null_mut::<c::link_map>();
+	if c::dlinfo(
+		handle.as_ptr(),
+		c::RTLD_DI_LINKMAP,
+		&mut map_ptr as *mut _ as *mut _,
+	) == 0
 	{
-		let mut map_ptr = ptr::null_mut::<c::link_map>();
-		if c::dlinfo(
-			handle as *mut _,
-			c::RTLD_DI_LINKMAP,
-			&mut map_ptr as *mut _ as *mut _,
-		) == 0
-		{
-			let path = ffi::CStr::from_ptr((*map_ptr).l_name).to_owned();
-			let path = ffi::OsString::from_vec(path.into_bytes());
-			if path.len() > 0 {
-				Ok(path::PathBuf::from(path))
-			} else {
-				Err(io::Error::new(io::ErrorKind::NotFound, "path not found"))
-			}
+		let path = ffi::CStr::from_ptr((*map_ptr).l_name).to_owned();
+		let path = ffi::OsString::from_vec(path.into_bytes());
+		if path.len() > 0 {
+			Some(path::PathBuf::from(path))
 		} else {
-			let err = c_dlerror().unwrap();
-			Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
+			None
 		}
-	}
-	#[cfg(target_os = "macos")]
-	{
-		let _guard = LOCK.write();
-		for x in (0..c::_dyld_image_count()).rev() {
-			let image_name = c::_dyld_get_image_name(x);
-			// test if iterator is out of bounds.
-			if image_name.is_null() {
-				std::unreachable!("dylink encountered a potential race condition. Please submit an issue at `https://github.com/Razordor/dylink/issues`")
-			}
-			let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
-			if !active_handle.is_null() {
-				let _ = c::dlclose(active_handle);
-			}
-			if (handle as isize & (-4)) == (active_handle as isize & (-4)) {
-				let pathname = ffi::CStr::from_ptr(image_name).to_owned();
-				let pathname = ffi::OsString::from_vec(pathname.into_bytes());
-				return Ok(path::PathBuf::from(pathname));
-			}
-		}
-		Err(io::Error::new(io::ErrorKind::NotFound, "path not found"))
-	}
-	#[cfg(not(any(target_env="gnu", target_os="macos")))] {
-		std::unimplemented!()
+	} else {
+		None
 	}
 }
+
+#[cfg(target_os = "macos")]
+unsafe fn get_macos_image_path(handle: Handle) -> Option<path::PathBuf> {
+	use std::os::unix::ffi::OsStringExt;
+    let _guard = LOCK.write();
+	for x in (0..c::_dyld_image_count()).rev() {
+		let image_name = c::_dyld_get_image_name(x);
+		// test if iterator is out of bounds.
+		if image_name.is_null() {
+			std::unreachable!("dylink encountered a potential race condition. Please submit an issue at `https://github.com/Razordor/dylink/issues`")
+		}
+		let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
+		if !active_handle.is_null() {
+			let _ = c::dlclose(active_handle);
+		}
+		if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
+			let pathname = ffi::CStr::from_ptr(image_name).to_owned();
+			let pathname = ffi::OsString::from_vec(pathname.into_bytes());
+			return Some(path::PathBuf::from(pathname));
+		}
+	}
+	None
+}
+
 
 pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> {
 	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
