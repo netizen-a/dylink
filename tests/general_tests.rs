@@ -63,6 +63,18 @@ fn test_this_path() {
 	println!("metadata = {:?}", metadata);
 }
 
+#[test]
+fn test_try_clone() {
+	let lib = Library::this();
+	let other = lib.try_clone().expect("failed to clone handle");
+	assert!(Library::ptr_eq(&lib, &other));
+	let t = std::thread::spawn(move || {
+		println!("other: {:?}", other);
+	});
+	t.join().unwrap();
+	println!("lib: {:?}", lib);
+}
+
 #[cfg(feature="unstable")]
 #[cfg(any(windows, target_os="linux"))]
 #[test]

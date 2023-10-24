@@ -27,7 +27,12 @@
 mod sealed;
 use crate::sealed::Sealed;
 
-pub mod os;
+pub(crate) mod os;
+#[cfg(unix)]
+use os::unix as imp;
+#[cfg(windows)]
+use os::windows as imp;
+
 pub mod sync;
 
 use std::{fs, io, marker, path};
@@ -56,10 +61,7 @@ use std::{fs, io, marker, path};
 ///```
 pub use dylink_macro::dylink;
 
-#[cfg(unix)]
-use os::unix as imp;
-#[cfg(windows)]
-use os::windows as imp;
+
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
@@ -90,8 +92,6 @@ impl Symbol<'_> {
 ///
 /// Threads executed by the dll must be terminated before the Library can be freed
 /// or a race condition may occur.
-///
-/// The `Library` type is guarenteed access to the null pointer optimization.
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Library(os::Handle);
@@ -118,6 +118,7 @@ impl Library {
 	/// # Panics
 	///
 	/// May panic if library process handle could not be acquired.
+	#[must_use]
 	pub fn this() -> Self {
 		unsafe { imp::dylib_this() }
 			.map(Library)
@@ -171,7 +172,6 @@ impl Library {
 	///     Ok(())
 	/// }
 	/// ```
-	#[cfg(any(windows, target_os="macos", target_env="gnu"))]
 	pub fn metadata(&self) -> io::Result<fs::Metadata> {
 		self.path().and_then(fs::metadata)
 	}
@@ -189,7 +189,6 @@ impl Library {
 	///     Ok(())
 	/// }
 	/// ```
-	#[cfg(any(windows, target_os="macos", target_env="gnu"))]
 	pub fn try_clone(&self) -> io::Result<Library> {
 		// windows has a more direct implementation of cloning here.
 		#[cfg(windows)] unsafe {
@@ -202,6 +201,17 @@ impl Library {
 			self.path().and_then(Library::open)
 		}
 	}
+
+	/// This function ignores tags emplaced into the handle
+	#[must_use]
+	pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+        #[cfg(target_os="macos")] {
+			(this.0.as_ptr() as isize & (-4)) == (active_handle.as_ptr() as isize & (-4))
+		}
+		#[cfg(not(target_os="macos"))] {
+			this.0.as_ptr() == other.0.as_ptr()
+		}
+    }
 }
 
 impl Drop for Library {
