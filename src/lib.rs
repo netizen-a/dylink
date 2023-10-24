@@ -8,7 +8,7 @@
 //!
 //! # Platform support
 //! Platform support typically varies between functions, however unless otherwise specified, functions
-//! are minimally supported on Windows, Linux, and MacOS.
+//! are supported on Windows, Linux, and MacOS.
 //!
 //! # Basic Example
 //!
@@ -202,7 +202,20 @@ impl Library {
 		}
 	}
 
-	/// This function ignores tags emplaced into the handle
+	/// Returns `true` if the two `Library`s have the same handle. This function ignores tags emplaced into library handles.
+	///
+	/// # Examples
+	///
+	/// ```rust
+	/// use dylink::*;
+	///
+	/// let this = Library::this();
+	/// let same_this = Library::try_clone(&this).unwrap();
+	/// let other_lib = lib!["libX11.so.6", "Kernel32.dll", "libSystem.dylib"].unwrap();
+	///
+	/// assert!(Library::ptr_eq(&this, &same_this));
+	/// assert!(!Library::ptr_eq(&this, &other_lib));
+	/// ```
 	#[must_use]
 	pub fn ptr_eq(this: &Self, other: &Self) -> bool {
         #[cfg(target_os="macos")] {
