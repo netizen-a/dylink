@@ -14,6 +14,19 @@ use std::sync;
 
 mod c;
 
+
+#[cfg(target_os="macos")]
+#[inline]
+fn unlikely(cond: bool) -> bool {
+	#[cold]
+	fn unlikely_function() {}
+	if cond {
+		unlikely_function();
+	}
+	cond
+}
+
+
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_env = "gnu")))]
 #[inline]
 fn dylib_guard<'a>() -> sync::LockResult<sync::MutexGuard<'a, ()>> {
@@ -110,11 +123,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
             }
             #[cfg(target_os = "macos")]
             {
-                if let Some(path) = get_macos_image_path(handle) {
-                    Ok(path)
-                } else {
-                    Err(io::Error::new(io::ErrorKind::NotFound, "Library path not found"))
-                }
+                get_macos_image_path(handle)
             }
             #[cfg(not(any(target_env = "gnu", target_os = "macos")))]
             {
@@ -137,8 +146,8 @@ unsafe fn get_link_map_path(handle: Handle) -> Option<path::PathBuf> {
 	{
 		let path = ffi::CStr::from_ptr((*map_ptr).l_name).to_owned();
 		let path = ffi::OsString::from_vec(path.into_bytes());
-		if path.len() > 0 {
-			Some(path::PathBuf::from(path))
+		if !path.is_empty() {
+			Some(path.into())
 		} else {
 			None
 		}
@@ -148,14 +157,17 @@ unsafe fn get_link_map_path(handle: Handle) -> Option<path::PathBuf> {
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn get_macos_image_path(handle: Handle) -> Option<path::PathBuf> {
+unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
     let _guard = LOCK.write();
 	for x in (0..c::_dyld_image_count()).rev() {
 		let image_name = c::_dyld_get_image_name(x);
 		// test if iterator is out of bounds.
-		if image_name.is_null() {
-			std::unreachable!("dylink encountered a potential race condition. Please submit an issue at `https://github.com/Razordor/dylink/issues`")
+		if unlikely(image_name.is_null()) {
+			return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "dylink encountered a potential race condition. Please submit an issue at `https://github.com/Razordor/dylink/issues`",
+            ));
 		}
 		let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
 		if !active_handle.is_null() {
@@ -164,10 +176,10 @@ unsafe fn get_macos_image_path(handle: Handle) -> Option<path::PathBuf> {
 		if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
 			let pathname = ffi::CStr::from_ptr(image_name).to_owned();
 			let pathname = ffi::OsString::from_vec(pathname.into_bytes());
-			return Some(path::PathBuf::from(pathname));
+			return Ok(path::PathBuf::from(pathname));
 		}
 	}
-	None
+	Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"))
 }
 
 
