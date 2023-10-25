@@ -60,21 +60,30 @@ impl AsRawHandle for Library {
 
 pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	const MAX_PATH: usize = 260;
+	const ERROR_INSUFFICIENT_BUFFER: i32 = 0x7A;
+
 	let mut file_name = vec![0u16; MAX_PATH];
 	loop {
 		let _ = c::GetModuleFileNameW(handle.as_ptr(), file_name.as_mut_ptr(), file_name.len() as c::DWORD);
 		let last_error = io::Error::last_os_error();
 		match last_error.raw_os_error().unwrap_unchecked() {
 			0 => {
-				// must be truncated for metadata to work.
+				// The function succeeded.
+                // Truncate the vector to remove unused zero bytes.
 				if let Some(new_len) = file_name.iter().rposition(|a| *a != 0) {
 					file_name.truncate(new_len + 1)
 				}
 				let os_str = ffi::OsString::from_wide(&file_name);
 				break Ok(os_str.into());
 			}
-			0x7A => file_name.resize(file_name.len() * 2, 0),
-			_ => break Err(last_error),
+			ERROR_INSUFFICIENT_BUFFER => {
+				// The buffer is too small; double its size.
+				file_name.resize(file_name.len() * 2, 0)
+			}
+			_ => {
+				// An unexpected error occurred; return an error.
+				return Err(last_error);
+			}
 		}
 	}
 }
