@@ -108,7 +108,6 @@ pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: *mut ffi::c_void, name: &str) 
 }
 
 pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
-    // Use pattern matching and descriptive error messages
     match dylib_this() {
         Ok(this_handle) if (cfg!(target_os = "macos") && (this_handle.as_ptr() as isize & (-4)) == (handle.as_ptr() as isize & (-4)))
 		|| this_handle == handle => std::env::current_exe(),
