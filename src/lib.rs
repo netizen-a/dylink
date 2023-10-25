@@ -230,6 +230,8 @@ impl Library {
 
 	/// Returns `true` if the two `Library`s have the same handle. This function ignores tags emplaced into library handles.
 	///
+	/// This function may not provide any meaningful result on unix platforms that are not MacOS or Linux.
+	///
 	/// # Examples
 	///
 	/// ```no_run
