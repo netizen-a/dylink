@@ -45,7 +45,7 @@ impl<'a> LibLock<'a> {
 	/// # Errors
 	///
 	/// May error if [`LibLock`] failed to be initialized.
-	pub fn symbol(&'a self, name: &str) -> io::Result<Symbol> {
+	pub fn symbol(&self, name: &str) -> io::Result<Symbol> {
 		let lib = std::panic::catch_unwind(|| {
 			self.hlib.get_or_init(|| {
 				if self.libs.is_empty() {
@@ -54,7 +54,7 @@ impl<'a> LibLock<'a> {
 					self.libs
 						.iter()
 						.find_map(|path| Library::open(path).ok())
-						.expect("failed to initialize `LibLock`")
+						.unwrap()
 				}
 			})
 		});
