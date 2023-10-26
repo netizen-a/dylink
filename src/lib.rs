@@ -1,11 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
-//! Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
-//! When functions are loaded they are evaluated through a thunk for first time calls, which loads the function
-//! from its respective library. Preceeding calls after initialization have no overhead or additional branching
-//! checks, since the thunk is replaced by the loaded function.
-//!
+
 //! # Platform support
 //! Platform support typically varies between functions, however unless otherwise specified, functions
 //! are supported on Windows, Linux, and MacOS.
