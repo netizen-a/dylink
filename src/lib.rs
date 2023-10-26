@@ -27,7 +27,7 @@
 mod sealed;
 use crate::sealed::Sealed;
 
-pub(crate) mod os;
+pub mod os;
 #[cfg(unix)]
 use os::unix as imp;
 #[cfg(windows)]

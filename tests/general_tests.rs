@@ -95,7 +95,7 @@ fn test_sym_addr() {
 #[test]
 fn test_unix_sym_info() {
 	use dylink::os::unix::SymExt;
-	let this = Library::this().unwrap();
+	let this = Library::this();
 	let symbol = this.symbol("atoi").unwrap();
 	let info = symbol.info();
 	println!("{:?}", info);

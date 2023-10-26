@@ -213,31 +213,31 @@ pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
 
 #[cfg(feature = "unstable")]
 #[derive(Debug)]
-pub struct SymInfo<'a> {
-	pub path: ffi::CString,
-	pub base: *mut ffi::c_void,
-	pub name: ffi::CString,
-	pub addr: Symbol<'a>,
+pub struct DlInfo {
+	pub dli_fname: ffi::CString,
+	pub dli_fbase: *mut ffi::c_void,
+	pub dli_sname: ffi::CString,
+	pub dli_saddr: *mut ffi::c_void,
 }
 
 #[cfg(feature = "unstable")]
 pub trait SymExt: Sealed {
-	fn info(&self) -> io::Result<SymInfo>;
+	fn info(&self) -> io::Result<DlInfo>;
 }
 
 #[cfg(feature = "unstable")]
 impl SymExt for Symbol<'_> {
 	#[doc(alias = "dladdr")]
-	fn info(&self) -> io::Result<SymInfo> {
+	fn info(&self) -> io::Result<DlInfo> {
 		let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 		unsafe {
 			if c::dladdr(self.0 as *const _, info.as_mut_ptr()) != 0 {
 				let info = info.assume_init();
-				Ok(SymInfo {
-					path: ffi::CStr::from_ptr(info.dli_fname).to_owned(),
-					base: info.dli_fbase,
-					name: ffi::CStr::from_ptr(info.dli_sname).to_owned(),
-					addr: Symbol(info.dli_saddr, PhantomData),
+				Ok(DlInfo {
+					dli_fname: ffi::CStr::from_ptr(info.dli_fname).to_owned(),
+					dli_fbase: info.dli_fbase,
+					dli_sname: ffi::CStr::from_ptr(info.dli_sname).to_owned(),
+					dli_saddr: info.dli_saddr,
 				})
 			} else {
 				// dlerror isn't available for dlinfo, so I can only provide a general error message here
