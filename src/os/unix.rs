@@ -200,6 +200,17 @@ pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> 
 	}
 }
 
+pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
+	let this = dylib_this()?;
+	if this == handle {
+		Ok(this)
+	} else {
+		dylib_close(this)?;
+		let path = dylib_path(handle)?;
+		dylib_open(path.as_os_str())
+	}
+}
+
 #[cfg(feature = "unstable")]
 #[derive(Debug)]
 pub struct SymInfo<'a> {

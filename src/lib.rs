@@ -220,18 +220,8 @@ impl Library {
 	/// ```
 	#[inline]
 	pub fn try_clone(&self) -> io::Result<Library> {
-		// windows has a more direct implementation of cloning here.
-		#[cfg(windows)]
-		unsafe {
-			let handle = imp::dylib_clone(self.0)?;
-			Ok(Library(handle))
-		}
-		// unix uses indirect cloning and may fail if path fails.
-		// if there is a better way to do this on unix I'd like to know.
-		#[cfg(not(windows))]
-		{
-			self.path().and_then(Library::open)
-		}
+		let handle = unsafe { imp::dylib_clone(self.0)? };
+		Ok(Library(handle))
 	}
 
 	/// Returns `true` if the two `Library`s have the same handle. This function ignores tags emplaced into library handles.
