@@ -56,7 +56,6 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 	}
 }
 
-#[inline]
 pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	let _lock = dylib_guard();
 	let c_str = ffi::CString::new(path.as_bytes())?;
@@ -69,7 +68,6 @@ pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	}
 }
 
-#[inline]
 pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	let _lock = dylib_guard();
 	let handle: *mut ffi::c_void = c::dlopen(ptr::null(), c::RTLD_NOW | c::RTLD_LOCAL);
@@ -81,7 +79,6 @@ pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	}
 }
 
-#[inline]
 pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	let _lock = dylib_guard();
 	if c::dlclose(lib_handle.as_ptr()) != 0 {
@@ -92,7 +89,6 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	}
 }
 
-#[inline]
 pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: *mut ffi::c_void, name: &str) -> io::Result<Symbol<'a>> {
 	let _lock = dylib_guard();
 	let c_str = ffi::CString::new(name).unwrap();
@@ -225,9 +221,10 @@ impl SymExt for Symbol<'_> {
 					addr: Symbol(info.dli_saddr, PhantomData),
 				})
 			} else {
+				// dlerror isn't available for dlinfo, so I can only provide a general error message here
 				Err(io::Error::new(
 					io::ErrorKind::Other,
-					"failed to get symbol info",
+					"Failed to retrieve symbol information",
 				))
 			}
 		}

@@ -13,20 +13,18 @@ fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
 	path.encode_wide().chain(std::iter::once(0u16)).collect()
 }
 
-#[inline]
 pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	let wide_str: Vec<u16> = to_wide(path);
 	let handle = c::LoadLibraryExW(wide_str.as_ptr(), ptr::null_mut(), 0);
 	ptr::NonNull::new(handle).ok_or_else(io::Error::last_os_error)
 }
 
-#[inline]
 pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	let mut handle: *mut ffi::c_void = ptr::null_mut();
 	c::GetModuleHandleExW(0, ptr::null(), &mut handle);
 	ptr::NonNull::new(handle).ok_or_else(io::Error::last_os_error)
 }
-#[inline]
+
 pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	if c::FreeLibrary(lib_handle.as_ptr()) == 0 {
 		Err(io::Error::last_os_error())
@@ -35,7 +33,6 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	}
 }
 
-#[inline]
 pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: *mut ffi::c_void, name: &str) -> io::Result<Symbol<'a>> {
 	let c_str = ffi::CString::new(name).unwrap();
 	let addr: *const ffi::c_void = unsafe { c::GetProcAddress(lib_handle, c_str.as_ptr()) };

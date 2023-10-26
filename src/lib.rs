@@ -79,6 +79,7 @@ impl Symbol<'_> {
 		self.0 as _
 	}
 	/// Attempts to get the base address of the library.
+	#[inline]
 	pub fn base_addr(&self) -> io::Result<*mut std::ffi::c_void> {
 		unsafe { imp::base_addr(self) }
 	}
@@ -108,6 +109,7 @@ impl Library {
 	/// for every time the library is opened. Library symbols are eagerly resolved
 	/// before the function returns.
 	#[doc(alias = "dlopen", alias = "LoadLibrary")]
+	#[inline]
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
 		unsafe { imp::dylib_open(path.as_ref().as_os_str()) }.map(Library)
 	}
@@ -117,6 +119,7 @@ impl Library {
 	///
 	/// May panic if library process handle could not be acquired.
 	#[must_use]
+	#[inline]
 	pub fn this() -> Self {
 		unsafe { imp::dylib_this() }
 			.map(Library)
@@ -144,6 +147,7 @@ impl Library {
 	/// let xopendisplay: PfnXOpenDisplay = unsafe {mem::transmute(sym.cast::<()>())};
 	/// ```
 	#[doc(alias = "dlsym")]
+	#[inline]
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<Symbol<'a>> {
 		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
 	}
@@ -179,6 +183,7 @@ impl Library {
 		alias = "_dyld_get_image_name",
 		alias = "GetModuleFileNameW"
 	)]
+	#[inline]
 	pub fn path(&self) -> io::Result<path::PathBuf> {
 		unsafe { imp::dylib_path(self.0) }
 	}
@@ -215,6 +220,7 @@ impl Library {
 	///     Ok(())
 	/// }
 	/// ```
+	#[inline]
 	pub fn try_clone(&self) -> io::Result<Library> {
 		// windows has a more direct implementation of cloning here.
 		#[cfg(windows)] unsafe {
@@ -244,6 +250,7 @@ impl Library {
 	/// assert!(Library::ptr_eq(&this, &same_this));
 	/// assert!(!Library::ptr_eq(&this, &other_lib));
 	/// ```
+	#[inline(always)]
 	#[must_use]
 	pub fn ptr_eq(this: &Self, other: &Self) -> bool {
         #[cfg(target_os="macos")] {
