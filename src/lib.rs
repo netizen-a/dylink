@@ -79,7 +79,7 @@ impl Symbol<'_> {
 	/// Attempts to get the base address of the library.
 	#[inline]
 	pub fn base_addr(&self) -> io::Result<*mut std::ffi::c_void> {
-		unsafe { imp::base_addr(self) }
+		unsafe { imp::base_addr(self.0) }
 	}
 }
 
@@ -207,7 +207,7 @@ impl Library {
 	/// Creates a new `Library` instance that shares the same underlying library handle as the
 	/// existing `Library` instance.
 	///
-	/// Creates two handles for a file named `foo.dll`:
+	/// Creates two handles for a library named `foo.dll`:
 	///
 	/// ```no_run
 	/// use dylink::Library;

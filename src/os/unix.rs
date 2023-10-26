@@ -186,9 +186,9 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 	Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"))
 }
 
-pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut ffi::c_void> {
 	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
-	if c::dladdr(symbol.cast(), info.as_mut_ptr()) != 0 {
+	if c::dladdr(symbol, info.as_mut_ptr()) != 0 {
 		let info = info.assume_init();
 		Ok(info.dli_fbase)
 	} else {

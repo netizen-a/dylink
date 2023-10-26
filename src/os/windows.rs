@@ -92,11 +92,11 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	}
 }
 
-pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut ffi::c_void> {
 	let mut handle = ptr::null_mut();
 	let result = c::GetModuleHandleExW(
 		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT | c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-		symbol.cast(),
+		symbol,
 		&mut handle,
 	);
 	if result == 0 {
