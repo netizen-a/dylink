@@ -41,26 +41,36 @@ impl<'a> LibLock<'a> {
 	/// May block if another thread is currently attempting to initialize the cell.
 	///
 	/// This will lazily initialize the LibLock.
-	/// # Panics
-	/// May panic if [`LibLock`] failed to be initialized.
+	///
+	/// # Errors
+	///
+	/// May error if [`LibLock`] failed to be initialized.
 	pub fn symbol(&'a self, name: &str) -> io::Result<Symbol> {
-		let lib = self.hlib.get_or_init(|| {
-			if self.libs.is_empty() {
-				Library::this()
-			} else {
-				self.libs
-					.iter()
-					.find_map(|path| Library::open(path).ok())
-					.expect("failed to initialize `LibLock`")
-			}
+		let lib = std::panic::catch_unwind(|| {
+			self.hlib.get_or_init(|| {
+				if self.libs.is_empty() {
+					Library::this()
+				} else {
+					self.libs
+						.iter()
+						.find_map(|path| Library::open(path).ok())
+						.expect("failed to initialize `LibLock`")
+				}
+			})
 		});
-		lib.symbol(name)
+		match lib {
+			Ok(lib) => lib.symbol(name),
+			Err(_) => Err(io::Error::new(
+				io::ErrorKind::Other,
+				"Library initialization failed",
+			)),
+		}
 	}
 	/// Gets the reference to the underlying value.
 	///
 	/// Returns `None` if the cell is empty, or being initialized. This
 	/// method never blocks.
-	#[cfg(feature="unstable")]
+	#[cfg(feature = "unstable")]
 	#[inline]
 	pub fn get(&self) -> Option<&Library> {
 		self.hlib.get()
@@ -70,19 +80,19 @@ impl<'a> LibLock<'a> {
 	/// Has no effect and returns `None` if the `LibLock` hasn't been initialized.
 	///
 	/// Safety is guaranteed by requiring a mutable reference.
-	#[cfg(feature="unstable")]
+	#[cfg(feature = "unstable")]
 	#[inline]
 	pub fn take(&mut self) -> Option<Library> {
 		self.hlib.take()
 	}
 
-	#[cfg(feature="unstable")]
+	#[cfg(feature = "unstable")]
 	#[inline]
 	pub fn set(&self, value: Library) -> Result<(), Library> {
 		self.hlib.set(value)
 	}
 
-	#[cfg(feature="unstable")]
+	#[cfg(feature = "unstable")]
 	#[inline]
 	pub fn into_inner(self) -> Option<Library> {
 		self.hlib.into_inner()

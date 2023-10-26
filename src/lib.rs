@@ -61,8 +61,6 @@ use std::{fs, io, marker, path};
 ///```
 pub use dylink_macro::dylink;
 
-
-
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
@@ -223,13 +221,15 @@ impl Library {
 	#[inline]
 	pub fn try_clone(&self) -> io::Result<Library> {
 		// windows has a more direct implementation of cloning here.
-		#[cfg(windows)] unsafe {
+		#[cfg(windows)]
+		unsafe {
 			let handle = imp::dylib_clone(self.0)?;
 			Ok(Library(handle))
 		}
 		// unix uses indirect cloning and may fail if path fails.
 		// if there is a better way to do this on unix I'd like to know.
-		#[cfg(not(windows))] {
+		#[cfg(not(windows))]
+		{
 			self.path().and_then(Library::open)
 		}
 	}
@@ -253,13 +253,15 @@ impl Library {
 	#[inline(always)]
 	#[must_use]
 	pub fn ptr_eq(this: &Self, other: &Self) -> bool {
-        #[cfg(target_os="macos")] {
+		#[cfg(target_os = "macos")]
+		{
 			(this.0.as_ptr() as isize & (-4)) == (other.0.as_ptr() as isize & (-4))
 		}
-		#[cfg(not(target_os="macos"))] {
+		#[cfg(not(target_os = "macos"))]
+		{
 			this.0.as_ptr() == other.0.as_ptr()
 		}
-    }
+	}
 }
 
 impl Drop for Library {

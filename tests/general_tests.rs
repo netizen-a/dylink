@@ -75,12 +75,11 @@ fn test_try_clone() {
 	println!("lib: {:?}", lib);
 }
 
-
-#[cfg(any(windows, target_os="linux"))]
+#[cfg(any(windows, target_os = "linux"))]
 #[test]
 fn test_sym_addr() {
 	let lib = lib!["libX11.so.6", "Kernel32.dll"].unwrap();
-	let sym = if cfg!(target_os="linux") {
+	let sym = if cfg!(target_os = "linux") {
 		lib.symbol("XOpenDisplay").unwrap()
 	} else if cfg!(windows) {
 		lib.symbol("SetLastError").unwrap()

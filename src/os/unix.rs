@@ -14,8 +14,7 @@ use std::sync;
 
 mod c;
 
-
-#[cfg(target_os="macos")]
+#[cfg(target_os = "macos")]
 #[inline]
 fn unlikely(cond: bool) -> bool {
 	#[cold]
@@ -25,7 +24,6 @@ fn unlikely(cond: bool) -> bool {
 	}
 	cond
 }
-
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_env = "gnu")))]
 #[inline]
@@ -89,7 +87,10 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	}
 }
 
-pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: *mut ffi::c_void, name: &str) -> io::Result<Symbol<'a>> {
+pub(crate) unsafe fn dylib_symbol<'a>(
+	lib_handle: *mut ffi::c_void,
+	name: &str,
+) -> io::Result<Symbol<'a>> {
 	let _lock = dylib_guard();
 	let c_str = ffi::CString::new(name).unwrap();
 
@@ -104,35 +105,43 @@ pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: *mut ffi::c_void, name: &str) 
 }
 
 pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
-    match dylib_this() {
-        Ok(this_handle) if (cfg!(target_os = "macos") && (this_handle.as_ptr() as isize & (-4)) == (handle.as_ptr() as isize & (-4)))
-		|| this_handle == handle => std::env::current_exe(),
-        _ => {
-            #[cfg(target_env = "gnu")]
-            {
-                if let Some(path) = get_link_map_path(handle) {
-                    Ok(path)
-                } else {
-                    Err(io::Error::new(io::ErrorKind::NotFound, "Library path not found"))
-                }
-            }
-            #[cfg(target_os = "macos")]
-            {
-                get_macos_image_path(handle)
-            }
-            #[cfg(not(any(target_env = "gnu", target_os = "macos")))]
-            {
-                // Handle other platforms or configurations
-                Err(io::Error::new(io::ErrorKind::Other, "Unsupported platform"))
-            }
-        }
-    }
+	match dylib_this() {
+		Ok(this_handle)
+			if (cfg!(target_os = "macos")
+				&& (this_handle.as_ptr() as isize & (-4)) == (handle.as_ptr() as isize & (-4)))
+				|| this_handle == handle =>
+		{
+			std::env::current_exe()
+		}
+		_ => {
+			#[cfg(target_env = "gnu")]
+			{
+				if let Some(path) = get_link_map_path(handle) {
+					Ok(path)
+				} else {
+					Err(io::Error::new(
+						io::ErrorKind::NotFound,
+						"Library path not found",
+					))
+				}
+			}
+			#[cfg(target_os = "macos")]
+			{
+				get_macos_image_path(handle)
+			}
+			#[cfg(not(any(target_env = "gnu", target_os = "macos")))]
+			{
+				// Handle other platforms or configurations
+				Err(io::Error::new(io::ErrorKind::Other, "Unsupported platform"))
+			}
+		}
+	}
 }
 
 #[cfg(target_env = "gnu")]
 unsafe fn get_link_map_path(handle: Handle) -> Option<path::PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
-    let mut map_ptr = ptr::null_mut::<c::link_map>();
+	let mut map_ptr = ptr::null_mut::<c::link_map>();
 	if c::dlinfo(
 		handle.as_ptr(),
 		c::RTLD_DI_LINKMAP,
@@ -154,7 +163,7 @@ unsafe fn get_link_map_path(handle: Handle) -> Option<path::PathBuf> {
 #[cfg(target_os = "macos")]
 unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
-    let _guard = LOCK.write();
+	let _guard = LOCK.write();
 	for x in (0..c::_dyld_image_count()).rev() {
 		let image_name = c::_dyld_get_image_name(x);
 		// test if iterator is out of bounds.
@@ -176,7 +185,6 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 	}
 	Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"))
 }
-
 
 pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> {
 	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();

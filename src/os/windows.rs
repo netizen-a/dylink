@@ -33,7 +33,10 @@ pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	}
 }
 
-pub(crate) unsafe fn dylib_symbol<'a>(lib_handle: *mut ffi::c_void, name: &str) -> io::Result<Symbol<'a>> {
+pub(crate) unsafe fn dylib_symbol<'a>(
+	lib_handle: *mut ffi::c_void,
+	name: &str,
+) -> io::Result<Symbol<'a>> {
 	let c_str = ffi::CString::new(name).unwrap();
 	let addr: *const ffi::c_void = unsafe { c::GetProcAddress(lib_handle, c_str.as_ptr()) };
 	if addr.is_null() {
@@ -61,12 +64,16 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 
 	let mut file_name = vec![0u16; MAX_PATH];
 	loop {
-		let _ = c::GetModuleFileNameW(handle.as_ptr(), file_name.as_mut_ptr(), file_name.len() as c::DWORD);
+		let _ = c::GetModuleFileNameW(
+			handle.as_ptr(),
+			file_name.as_mut_ptr(),
+			file_name.len() as c::DWORD,
+		);
 		let last_error = io::Error::last_os_error();
 		match last_error.raw_os_error().unwrap_unchecked() {
 			0 => {
 				// The function succeeded.
-                // Truncate the vector to remove unused zero bytes.
+				// Truncate the vector to remove unused zero bytes.
 				if let Some(new_len) = file_name.iter().rposition(|a| *a != 0) {
 					file_name.truncate(new_len + 1)
 				}
@@ -88,8 +95,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 pub(crate) unsafe fn base_addr(symbol: &Symbol) -> io::Result<*mut ffi::c_void> {
 	let mut handle = ptr::null_mut();
 	let result = c::GetModuleHandleExW(
-		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT
-		| c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT | c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
 		symbol.cast(),
 		&mut handle,
 	);
