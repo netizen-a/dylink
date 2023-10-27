@@ -67,7 +67,7 @@ fn test_this_path() {
 fn test_try_clone() {
 	let lib = Library::this();
 	let other = lib.try_clone().expect("failed to clone handle");
-	assert!(Library::ptr_eq(&lib, &other));
+	assert_eq!(lib, other);
 	let t = std::thread::spawn(move || {
 		println!("other: {:?}", other);
 	});

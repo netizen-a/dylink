@@ -48,7 +48,6 @@ impl Symbol<'_> {
 
 /// An object providing access to an open dynamic library.
 ///
-/// Dynamic libraries are automatically dereferenced when they go out of scope.
 /// Errors detected on closing are ignored by the implementation of `Drop`.
 ///
 /// # Safety
@@ -57,7 +56,7 @@ impl Symbol<'_> {
 /// or a race condition may occur. Additionally, upon loading or unloading the library, an
 /// optional entry point may be executed for each library, which may impose arbitrary requirements on the
 /// user for the access to the library to be sound.
-#[derive(Debug)]
+#[derive(Debug, Eq)]
 #[repr(transparent)]
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
@@ -186,33 +185,17 @@ impl Library {
 		let handle = unsafe { imp::dylib_clone(self.0)? };
 		Ok(Library(handle))
 	}
+}
 
-	/// Returns `true` if the two `Library`s have the same handle. This function ignores tags emplaced into library handles.
-	///
-	/// This function may not provide any meaningful result on unix platforms that are not MacOS or Linux.
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use dylink::*;
-	///
-	/// let this = Library::open("foo.dll").unwrap();
-	/// let same_this = Library::try_clone(&this).unwrap();
-	/// let other_lib = Library::open("bar.dll").unwrap();
-	///
-	/// assert!(Library::ptr_eq(&this, &same_this));
-	/// assert!(!Library::ptr_eq(&this, &other_lib));
-	/// ```
-	#[inline(always)]
-	#[must_use]
-	pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+impl PartialEq<Library> for Library {
+	fn eq(&self, other: &Library) -> bool {
 		#[cfg(target_os = "macos")]
 		{
-			(this.0.as_ptr() as isize & (-4)) == (other.0.as_ptr() as isize & (-4))
+			(self.0.as_ptr() as isize & (-4)) == (other.0.as_ptr() as isize & (-4))
 		}
 		#[cfg(not(target_os = "macos"))]
 		{
-			this.0.as_ptr() == other.0.as_ptr()
+			self.0.as_ptr() == other.0.as_ptr()
 		}
 	}
 }
