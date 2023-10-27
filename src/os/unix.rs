@@ -1,3 +1,4 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![allow(clippy::let_unit_value)]
 #![allow(unused_imports)]
 

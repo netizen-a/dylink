@@ -1,3 +1,4 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use std::marker::PhantomData;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
