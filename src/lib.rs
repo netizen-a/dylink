@@ -1,24 +1,13 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
-
+//! Dylink provides a run-time dynamic linking framework for loading dynamic libraries.
+//! You can load libraries directly through [`Library`], which enables diverse error handling,
+//! or you can load libraries indirectly through [`LibLock`](crate::sync::LibLock) and `dylink`.
+//!
 //! # Platform support
 //! Platform support typically varies between functions, however unless otherwise specified, functions
 //! are supported on Windows, Linux, and MacOS.
-//!
-//! # Basic Example
-//!
-//! ```rust
-//! use dylink::*;
-//!
-//! static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
-//!
-//! #[dylink(library=KERNEL32)]
-//! extern "system-unwind" {
-//!     fn GetLastError() -> u32;
-//!     fn SetLastError(_: u32);
-//! }
-//! ```
 
 mod sealed;
 use crate::sealed::Sealed;
@@ -33,28 +22,6 @@ pub mod sync;
 
 use std::{fs, io, marker, path};
 
-/// Macro for generating shared symbol thunks procedurally.
-///
-/// May currently be used in 2 patterns:
-/// * foreign modules
-/// * foreign functions
-///
-/// More may patterns may be added in the future if needed.
-/// # Examples
-///```rust
-/// use dylink::*;
-/// static FOOBAR: sync::LibLock = sync::LibLock::new(&["foobar.dll"]);
-///
-/// // foreign module pattern
-/// #[dylink(library=FOOBAR)]
-/// extern "system-unwind" {
-///     fn foo();
-/// }
-///
-/// // foreign function pattern
-/// #[dylink(library=FOOBAR)]
-/// extern "system-unwind" fn bar();
-///```
 pub use dylink_macro::dylink;
 
 #[doc = include_str!("../README.md")]

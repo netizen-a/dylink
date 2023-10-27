@@ -4,6 +4,9 @@
 
 Dylink provides a run-time dynamic linking framework for loading dynamic libraries.
 
+This crate may be useful if the dynamic library you are loading is not always guarenteed
+to exist, which may enable you to provide fallbacks in your code.
+
 ----
 
 Related links:

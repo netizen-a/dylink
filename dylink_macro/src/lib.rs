@@ -11,8 +11,31 @@ use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned, Expr, Token};
 use attr_data::*;
 use syn::ForeignItem;
 
-//TODO: maybe allow fail to return default instead of panic
 
+/// Macro for generating shared symbol thunks procedurally.
+///
+/// May currently be used in 2 patterns:
+/// * foreign modules
+/// * foreign functions
+///
+/// Using an `unwind` friendly abi should be used whenever possible to
+/// prevent undefined behavior from occuring.
+///
+/// # Examples
+///```rust
+/// use dylink::*;
+/// static FOOBAR: sync::LibLock = sync::LibLock::new(&["foobar.dll"]);
+///
+/// // foreign module pattern
+/// #[dylink(library=FOOBAR)]
+/// extern "system-unwind" {
+///     fn foo();
+/// }
+///
+/// // foreign function pattern
+/// #[dylink(library=FOOBAR)]
+/// extern "system-unwind" fn bar();
+///```
 #[proc_macro_attribute]
 pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 	let punct = Parser::parse2(
