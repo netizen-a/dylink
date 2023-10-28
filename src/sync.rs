@@ -46,6 +46,8 @@ impl<'a> LibLock<'a> {
 	///
 	/// May error if [`LibLock`] failed to be initialized.
 	pub fn symbol(&self, name: &str) -> io::Result<Symbol> {
+		// yes this is cursed, no I can't do anything about it until get_or_try_init hits stable.
+		// Fundamentally this function is designed to error and not panic hence catch_unwind.
 		let lib = std::panic::catch_unwind(|| {
 			self.hlib.get_or_init(|| {
 				if self.libs.is_empty() {
