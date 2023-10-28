@@ -216,7 +216,7 @@ impl Drop for Library {
 /// `lib!` allows `Library`s to be defined with the same syntax as an array expression.
 /// ```rust
 /// use dylink::*;
-/// let lib: Option<Library> = lib!["libX11.so.6", "Kernel32.dll", "libSystem.dylib"];
+/// let lib: Option<Library> = lib!["libvulkan.dylib", "libvulkan.1.dylib", "libMoltenVK.dylib"];
 /// ```
 #[macro_export]
 macro_rules! lib {
