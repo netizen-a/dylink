@@ -1,8 +1,5 @@
 use dylink::*;
 
-#[cfg(target_os = "linux")]
-static LIB_X11: sync::LibLock = sync::LibLock::new(&["libX11.so.6"]);
-
 #[test]
 fn test_this_path() {
 	let lib = Library::this();

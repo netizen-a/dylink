@@ -2,6 +2,9 @@
 
 use dylink::*;
 
+#[cfg(target_os = "linux")]
+static LIB_X11: sync::LibLock = sync::LibLock::new(&["libX11.so.6"]);
+
 #[test]
 fn test_linux_x11() {
 	use std::ffi::{c_char, c_void, CStr};

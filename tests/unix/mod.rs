@@ -1,7 +1,7 @@
 #![cfg(unix)]
 
-mod linux;
-mod macos;
+pub mod linux;
+pub mod macos;
 
 #[cfg(feature = "unstable")]
 #[cfg(not(any(windows, target_os = "aix")))]
