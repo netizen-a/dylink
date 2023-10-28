@@ -1,3 +1,4 @@
+// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![allow(clippy::upper_case_acronyms)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]

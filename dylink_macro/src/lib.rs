@@ -11,7 +11,6 @@ use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned, Expr, Token};
 use attr_data::*;
 use syn::ForeignItem;
 
-
 /// Macro for generating shared symbol thunks procedurally.
 ///
 /// May currently be used in 2 patterns:
