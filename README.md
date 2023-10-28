@@ -38,33 +38,42 @@ dylink = "0.8"
 
 ## Examples
 
-Below is an example of opening a library manually through `Library`.
+Below is an example of opening a library manually through `Library` on Windows.
 
 ```rust
 use dylink::*;
 use std::mem;
 
-let lib = Library::open("Kernel32.dll").expect("failed to open library");
+// Open the Kernel32.dll library.
+let lib = Library::open("Kernel32.dll").expect("Failed to open library");
+
+// Get the symbol for the GetLastError function.
 let sym = lib.symbol("GetLastError").unwrap();
 
+// Cast the symbol to the appropriate function signature.
 let get_last_error: unsafe extern "system" fn() -> u32 = unsafe {mem::transmute(sym.cast::<()>())};
 
+// Call the function and assert its return value.
 assert_eq!(unsafe {get_last_error()}, 0);
 ```
 
-Below is an example on how to use the `dylink` attribute on windows.
+Below is an example on how to use the `dylink` attribute on Windows. This example demonstrates the
+lazy loading capability of the `dylink` crate by interacting with functions from the Kernel32.dll library.
 
 ```rust
 use dylink::*;
 
+// Define a static LibLock for the Kernel32.dll library.
 static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
 
+// Use the `dylink` attribute to declare functions from the Kernel32.dll.
 #[dylink(library=KERNEL32)]
 extern "system-unwind" {
     fn GetLastError() -> u32;
     fn SetLastError(_: u32);
 }
 
+// Use the declared functions, which will be loaded lazily when called.
 unsafe {
    SetLastError(52);
    assert_eq!(52, GetLastError());
