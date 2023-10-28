@@ -17,6 +17,7 @@ Related links:
 ## Features
 
 * Thread-safe library loading.
+* Macro attribute
 
 ## Supported platforms
 
@@ -35,9 +36,23 @@ Add this to your `Cargo.toml`
 dylink = "0.8"
 ```
 
-## Example
+## Examples
 
-Below is a basic working example on how to use the macro on windows.
+Below is an example of opening a library manually through `Library`.
+
+```rust
+use dylink::*;
+use std::mem;
+
+let lib = Library::open("Kernel32.dll").expect("failed to open library");
+let sym = lib.symbol("GetLastError").unwrap();
+
+let get_last_error: unsafe extern "system" fn() -> u32 = unsafe {mem::transmute(sym.cast::<()>())};
+
+assert_eq!(unsafe {get_last_error()}, 0);
+```
+
+Below is an example on how to use the `dylink` attribute on windows.
 
 ```rust
 use dylink::*;
