@@ -1,5 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-#[doc(cfg(unix))]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
 #[cfg(any(unix, docsrs))]
 pub mod unix;
 #[cfg(windows)]
