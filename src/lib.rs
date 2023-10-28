@@ -134,7 +134,7 @@ impl Library {
 	/// fn main() -> std::io::Result<()> {
 	///     let mut lib = Library::open("foo.dll")?;
 	///     let path = lib.path()?;
-	/// 	println!("pathname: {}", path.display());
+	///     println!("pathname: {}", path.display());
 	///     Ok(())
 	/// }
 	/// ```
