@@ -13,7 +13,7 @@ fn test_linux_x11() {
 	struct Display(*const c_void);
 
 	#[dylink(library = LIB_X11)]
-	extern "C" {
+	extern "C-unwind" {
 		fn XOpenDisplay(display_name: *const c_char) -> *mut Display;
 		fn XCloseDisplay(display: *mut Display);
 	}

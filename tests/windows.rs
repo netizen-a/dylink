@@ -9,13 +9,13 @@ static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
 #[test]
 fn test_macro() {
 	#[dylink(library = KERNEL32)]
-	extern "stdcall" {
+	extern "system-unwind" {
 		fn SetLastError(_: u32);
 	}
 
 	// macro output: function
 	#[dylink(library = KERNEL32)]
-	extern "system" fn GetLastError() -> u32;
+	extern "system-unwind" fn GetLastError() -> u32;
 
 	unsafe {
 		SetLastError(53);
@@ -31,10 +31,10 @@ fn test_macro_impl() {
 
 	impl Foo {
 		#[dylink(library = KERNEL32, link_name = "SetLastError")]
-		extern "stdcall" fn set_last_error(self: Foo);
+		extern "system-unwind" fn set_last_error(self: Foo);
 
 		#[dylink(library = KERNEL32)]
-		extern "system" fn GetLastError() -> Foo;
+		extern "system-unwind" fn GetLastError() -> Foo;
 	}
 
 	let foo = Foo(23);

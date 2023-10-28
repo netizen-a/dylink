@@ -11,7 +11,7 @@ pub struct Dl_info {
 	pub dli_saddr: *mut ffi::c_void,
 }
 
-extern "C" {
+extern "C-unwind" {
 	pub fn dlopen(filename: *const ffi::c_char, flag: ffi::c_int) -> *mut ffi::c_void;
 	pub fn dlerror() -> *const ffi::c_char;
 	pub fn dlsym(handle: *mut ffi::c_void, symbol: *const ffi::c_char) -> *const ffi::c_void;
@@ -28,7 +28,7 @@ extern "C" {
 }
 
 #[cfg(target_os = "macos")]
-extern "C" {
+extern "C-unwind" {
 	pub fn _dyld_image_count() -> u32;
 	pub fn _dyld_get_image_name(image_index: u32) -> *const ffi::c_char;
 }

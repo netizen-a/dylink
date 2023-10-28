@@ -100,7 +100,7 @@ impl Library {
 	/// use std::{mem, ffi};
 	/// use dylink::Library;
 	///
-	/// type PfnXOpenDisplay = extern "C" fn (display_name: *const ffi::c_char) -> *mut Display;
+	/// type PfnXOpenDisplay = extern "C-unwind" fn (display_name: *const ffi::c_char) -> *mut Display;
 	///
 	/// let lib = Library::open("libX11.so.6").unwrap();
 	/// let sym = lib.symbol("XOpenDisplay").unwrap();
