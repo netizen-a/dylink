@@ -15,17 +15,6 @@ use std::sync;
 
 mod c;
 
-#[cfg(target_os = "macos")]
-#[inline]
-fn unlikely(cond: bool) -> bool {
-	#[cold]
-	fn unlikely_function() {}
-	if cond {
-		unlikely_function();
-	}
-	cond
-}
-
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_env = "gnu")))]
 #[inline]
 fn dylib_guard<'a>() -> sync::LockResult<sync::MutexGuard<'a, ()>> {
@@ -168,11 +157,8 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 	for x in (0..c::_dyld_image_count()).rev() {
 		let image_name = c::_dyld_get_image_name(x);
 		// test if iterator is out of bounds.
-		if unlikely(image_name.is_null()) {
-			return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "dylink encountered a potential race condition. Please submit an issue at `https://github.com/Razordor/dylink/issues`",
-            ));
+		if image_name.is_null() {
+			unreachable!("dylink encountered a potential race condition. Please submit an issue at `https://github.com/Razordor/dylink/issues`");
 		}
 		let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
 		if !active_handle.is_null() {
