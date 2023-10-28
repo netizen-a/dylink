@@ -53,8 +53,10 @@ let sym = lib.symbol("GetLastError").unwrap();
 // Cast the symbol to the appropriate function signature.
 let get_last_error: unsafe extern "system" fn() -> u32 = unsafe {mem::transmute(sym.cast::<()>())};
 
+let result = unsafe {get_last_error()};
+
 // Call the function and assert its return value.
-assert_eq!(unsafe {get_last_error()}, 0);
+assert_eq!(result, 0);
 ```
 
 Below is an example on how to use the `dylink` attribute on Windows. This example demonstrates the

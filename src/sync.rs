@@ -26,6 +26,7 @@ impl<'a> LibLock<'a> {
 	/// If `libs` is empty then the program attempts to load itself.
 	///
 	/// # Examples
+	///
 	/// ```rust
 	/// # use dylink::*;
 	/// static KERNEL32: sync::LibLock = sync::LibLock::new(&["kernel32.dll"]);
@@ -44,7 +45,20 @@ impl<'a> LibLock<'a> {
 	///
 	/// # Errors
 	///
-	/// May error if [`LibLock`] failed to be initialized.
+	/// If [`LibLock`] failed to be initialized, then this call will return an error.
+	///
+	/// If the requested symbol does not exist in the dynamic library, then this call will return an error.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::*;
+	/// use std::mem;
+	///
+	/// let kernel32 = sync::LibLock::new(&["foo.dll"]);
+	/// let sym = kernel32.symbol("my_symbol").unwrap();
+	/// let my_symbol: unsafe extern "C" fn() = unsafe {mem::transmute(sym.cast::<()>())};
+	/// ```
 	pub fn symbol(&self, name: &str) -> io::Result<Symbol> {
 		// yes this is cursed, no I can't do anything about it until get_or_try_init hits stable.
 		// Fundamentally this function is designed to error and not panic hence catch_unwind.
