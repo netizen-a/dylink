@@ -5,7 +5,7 @@
 use super::Handle;
 use crate::sealed::Sealed;
 use crate::Symbol;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::{atomic::{Ordering, AtomicU32}, Once}};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, mem, path, ptr};
@@ -22,18 +22,9 @@ fn dylib_guard<'a>() -> sync::LockResult<sync::MutexGuard<'a, ()>> {
 	LOCK.lock()
 }
 
-#[cfg(any(target_os = "linux", target_env = "gnu"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_env = "gnu"))]
 #[inline(always)]
 fn dylib_guard() {}
-
-#[cfg(target_os = "macos")]
-static LOCK: sync::RwLock<()> = sync::RwLock::new(());
-
-#[cfg(target_os = "macos")]
-#[inline]
-fn dylib_guard<'a>() -> sync::LockResult<sync::RwLockReadGuard<'a, ()>> {
-	LOCK.read()
-}
 
 unsafe fn c_dlerror() -> Option<ffi::CString> {
 	let raw = c::dlerror();
@@ -150,45 +141,50 @@ unsafe fn get_link_map_path(handle: Handle) -> Option<path::PathBuf> {
 	}
 }
 
+
+#[cfg(target_os = "macos")]
+fn get_image_count() -> &'static AtomicU32 {
+	static IMAGE_COUNT: AtomicU32 = AtomicU32::new(0);
+	static START: Once = Once::new();
+	extern "C" fn increment_count(_: *const c::mach_header, _: isize) {
+		IMAGE_COUNT.fetch_add(1, Ordering::SeqCst);
+	}
+	extern "C" fn decrement_count(_: *const c::mach_header, _: isize) {
+		IMAGE_COUNT.fetch_sub(1, Ordering::SeqCst);
+	}
+	START.call_once(|| unsafe {
+		c::_dyld_register_func_for_add_image(increment_count);
+		c::_dyld_register_func_for_remove_image(decrement_count);
+	});
+
+	&IMAGE_COUNT
+}
+
 #[cfg(target_os = "macos")]
 unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
-	let _guard = LOCK.write();
-	let mut _retry = 0;
-	let mut i = c::_dyld_image_count() - 1;
-	while i > 0 {
-		let image_name = c::_dyld_get_image_name(i);
-		// test if iterator is out of bounds.
-		if image_name.is_null() {
-			i = c::_dyld_image_count() - 1;
-			_retry += 1;
 
-			// If it retries too often then the retry method has failed.
-			// At least one of these things is happening:
-			//     1) the user is doing something super unsafe and unloaded the library before it gets to this point.
-			//     2) the user is doing a lot of multithreading and the retry method can't keep up.
-			//     3) something outside my expectations has occured like macos changing how their API works, idk.
-			debug_assert!(
-				_retry < 100,
-				"`get_macos_image_path` retry limit exceeded; _dyld_get_image_name({i}) == null"
-			);
-			// Rust tests bypass the locks for some reason, so this retry mechanism is used to brute force thread-safety.
-			// It's not the most elegant solution (it's ugly for sure), but it works for now.
-			continue;
-		}
-
-		let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
-		if !active_handle.is_null() {
-			let _ = c::dlclose(active_handle);
-		}
-		if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
-			let pathname = ffi::CStr::from_ptr(image_name).to_owned();
-			let pathname = ffi::OsString::from_vec(pathname.into_bytes());
-			return Ok(path::PathBuf::from(pathname));
-		}
-		i -= 1;
-	}
-	Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"))
+	let count: &AtomicU32 = get_image_count();
+	let mut path = Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"));
+	count.fetch_update(
+		Ordering::SeqCst,
+		Ordering::SeqCst,
+		|i|{
+			let image_name = c::_dyld_get_image_name(i);
+			for j in (0..i).rev() {
+				let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
+				if !active_handle.is_null() {
+					let _ = c::dlclose(active_handle);
+				}
+				if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
+					let pathname = ffi::CStr::from_ptr(image_name).to_owned();
+					let pathname = ffi::OsString::from_vec(pathname.into_bytes());
+					path = Ok(path::PathBuf::from(pathname));
+				}
+			}
+			Some(i)
+		});
+	path
 }
 
 pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut ffi::c_void> {
