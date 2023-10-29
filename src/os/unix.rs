@@ -155,12 +155,12 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
 	let _guard = LOCK.write();
 	let mut _retry = 0;
-	let mut i = 0;
-	while i < c::_dyld_image_count() {
+	let mut i = c::_dyld_image_count() - 1;
+	while i > 0 {
 		let image_name = c::_dyld_get_image_name(i);
 		// test if iterator is out of bounds.
 		if image_name.is_null() {
-			i = 0;
+			i = c::_dyld_image_count() - 1;
 			_retry += 1;
 
 			// If it retries too often then the retry method has failed.
@@ -186,7 +186,7 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 			let pathname = ffi::OsString::from_vec(pathname.into_bytes());
 			return Ok(path::PathBuf::from(pathname));
 		}
-		i += 1;
+		i -= 1;
 	}
 	Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"))
 }
