@@ -158,8 +158,12 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 	let mut i = c::_dyld_image_count() - 1;
 	while i > 0 {
 		let image_name = c::_dyld_get_image_name(i);
+		debug_assert!(
+			image_name.is_null(),
+			"`get_macos_image_path` retry limit exceeded; _dyld_get_image_name({i}) == null"
+		);
 		// test if iterator is out of bounds.
-		if image_name.is_null() {
+		/*if image_name.is_null() {
 			i = c::_dyld_image_count() - 1;
 			_retry += 1;
 
@@ -175,7 +179,7 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 			// Rust tests bypass the locks for some reason, so this retry mechanism is used to brute force thread-safety.
 			// It's not the most elegant solution (it's ugly for sure), but it works for now.
 			continue;
-		}
+		}*/
 
 		let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
 		if !active_handle.is_null() {
