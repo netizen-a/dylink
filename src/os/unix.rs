@@ -166,12 +166,12 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 
 	let count: &AtomicU32 = get_image_count();
 	let mut path = Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"));
-	count.fetch_update(
+	let _ = count.fetch_update(
 		Ordering::SeqCst,
 		Ordering::SeqCst,
 		|i|{
-			let image_name = c::_dyld_get_image_name(i);
 			for j in (0..i).rev() {
+				let image_name = c::_dyld_get_image_name(j);
 				let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
 				if !active_handle.is_null() {
 					let _ = c::dlclose(active_handle);
