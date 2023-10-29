@@ -154,12 +154,29 @@ unsafe fn get_link_map_path(handle: Handle) -> Option<path::PathBuf> {
 unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
 	let _guard = LOCK.write();
-	for x in (0..c::_dyld_image_count()).rev() {
-		let image_name = c::_dyld_get_image_name(x);
+	let mut _retry = 0;
+	let mut i = 0;
+	while i < c::_dyld_image_count() {
+		let image_name = c::_dyld_get_image_name(i);
 		// test if iterator is out of bounds.
 		if image_name.is_null() {
-			unreachable!("dylink encountered a potential race condition. Please submit an issue at `https://github.com/Razordor/dylink/issues`");
+			i = 0;
+			_retry += 1;
+
+			// If it retries too often then the retry method has failed.
+			// At least one of these things is happening:
+			//     1) the user is doing something super unsafe and unloaded the library before it gets to this point.
+			//     2) the user is doing a lot of multithreading and the retry method can't keep up.
+			//     3) something outside my expectations has occured like macos changing how their API works, idk.
+			debug_assert!(
+				_retry < 100,
+				"retry limit exceeded; potential race condition at index {i}. Please submit an issue at `https://github.com/Razordor/dylink/issues`"
+			);
+			// Rust tests bypass the locks for some reason, so this retry mechanism is used to brute force thread-safety.
+			// It's not the most elegant solution (it's ugly for sure), but it works for now.
+			continue;
 		}
+
 		let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
 		if !active_handle.is_null() {
 			let _ = c::dlclose(active_handle);
@@ -169,6 +186,7 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 			let pathname = ffi::OsString::from_vec(pathname.into_bytes());
 			return Ok(path::PathBuf::from(pathname));
 		}
+		i += 1;
 	}
 	Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"))
 }

@@ -62,3 +62,26 @@ fn test_metadata() {
 	let metadata = lib.metadata();
 	println!("metadata = {:?}", metadata);
 }
+
+
+// test to see if there are race conditions when getting a path.
+#[test]
+fn test_path_soundness() {
+	let mut vlib = vec![];
+	for _ in 0..300 {
+		vlib.push(Library::open("libX11.so.6").unwrap())
+	}
+	let t = std::thread::spawn( || {
+		let mut other_vlib = vec![];
+		for _ in 0..300 {
+			other_vlib.push(Library::open("libX11.so.6").unwrap())
+		}
+		for lib in other_vlib.drain(0..) {
+			let _ = lib.path().unwrap();
+		}
+	});
+	for lib in vlib.drain(0..) {
+		let _ = lib.path().unwrap();
+	}
+	t.join().unwrap();
+}
