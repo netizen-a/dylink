@@ -170,7 +170,7 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 			//     3) something outside my expectations has occured like macos changing how their API works, idk.
 			debug_assert!(
 				_retry < 100,
-				"retry limit exceeded; potential race condition at index {i}. Please submit an issue at `https://github.com/Razordor/dylink/issues`"
+				"`get_macos_image_path` retry limit exceeded; _dyld_get_image_name({i}) == null"
 			);
 			// Rust tests bypass the locks for some reason, so this retry mechanism is used to brute force thread-safety.
 			// It's not the most elegant solution (it's ugly for sure), but it works for now.
