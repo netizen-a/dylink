@@ -180,6 +180,7 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 					let pathname = ffi::CStr::from_ptr(image_name).to_owned();
 					let pathname = ffi::OsString::from_vec(pathname.into_bytes());
 					path = Ok(path::PathBuf::from(pathname));
+					break;
 				}
 			}
 			Some(i)
