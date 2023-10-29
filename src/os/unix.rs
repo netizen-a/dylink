@@ -8,7 +8,7 @@ use crate::Symbol;
 use std::{marker::PhantomData, sync::{atomic::{Ordering, AtomicU32}, Once}};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
-use std::{ffi, io, mem, path, ptr};
+use std::{ffi, io, mem, path::PathBuf, ptr};
 
 #[cfg(not(any(target_os = "linux", target_env = "gnu")))]
 use std::sync;
@@ -85,7 +85,7 @@ pub(crate) unsafe fn dylib_symbol<'a>(
 	}
 }
 
-pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
+pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<PathBuf> {
 	match dylib_this() {
 		Ok(this_handle)
 			if (cfg!(target_os = "macos")
@@ -120,7 +120,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 }
 
 #[cfg(target_env = "gnu")]
-unsafe fn get_link_map_path(handle: Handle) -> Option<path::PathBuf> {
+unsafe fn get_link_map_path(handle: Handle) -> Option<PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
 	let mut map_ptr = ptr::null_mut::<c::link_map>();
 	if c::dlinfo(
@@ -129,8 +129,8 @@ unsafe fn get_link_map_path(handle: Handle) -> Option<path::PathBuf> {
 		&mut map_ptr as *mut _ as *mut _,
 	) == 0
 	{
-		let path = ffi::CStr::from_ptr((*map_ptr).l_name).to_owned();
-		let path = ffi::OsString::from_vec(path.into_bytes());
+		let path = ffi::CStr::from_ptr((*map_ptr).l_name);
+		let path = ffi::OsStr::from_bytes(path.to_bytes());
 		if !path.is_empty() {
 			Some(path.into())
 		} else {
@@ -161,11 +161,11 @@ fn get_image_count() -> &'static AtomicU32 {
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
+unsafe fn get_macos_image_path(handle: Handle) -> io::Result<PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
 
 	let count: &AtomicU32 = get_image_count();
-	let mut path = Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"));
+	let mut result = Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"));
 	let _ = count.fetch_update(
 		Ordering::SeqCst,
 		Ordering::SeqCst,
@@ -177,15 +177,15 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<path::PathBuf> {
 					let _ = c::dlclose(active_handle);
 				}
 				if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
-					let pathname = ffi::CStr::from_ptr(image_name).to_owned();
-					let pathname = ffi::OsString::from_vec(pathname.into_bytes());
-					path = Ok(path::PathBuf::from(pathname));
+					let path = ffi::CStr::from_ptr(image_name);
+					let path = ffi::OsStr::from_bytes(path.to_bytes());
+					result = Ok(path.into());
 					break;
 				}
 			}
 			Some(i)
 		});
-	path
+	result
 }
 
 pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut ffi::c_void> {
