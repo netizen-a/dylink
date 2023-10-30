@@ -11,6 +11,30 @@ use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned, Expr, Token};
 use attr_data::*;
 use syn::ForeignItem;
 
+/// Macro for generating shared symbol thunks procedurally.
+///
+/// May currently be used in 2 patterns:
+/// * foreign modules
+/// * foreign functions
+///
+/// Using an `unwind` friendly abi should be used whenever possible to
+/// prevent undefined behavior from occuring.
+///
+/// # Examples
+///```rust
+/// use dylink::*;
+/// static FOOBAR: sync::LibLock = sync::LibLock::new(&["foobar.dll"]);
+///
+/// // foreign module pattern
+/// #[dylink(library=FOOBAR)]
+/// extern "system-unwind" {
+///     fn foo();
+/// }
+///
+/// // foreign function pattern
+/// #[dylink(library=FOOBAR)]
+/// extern "system-unwind" fn bar();
+///```
 #[proc_macro_attribute]
 pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 	let punct = Parser::parse2(
@@ -187,25 +211,22 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		#lint
 		#[inline]
 		#vis #asyncness unsafe #abi fn #generics #fn_name (#(#param_ty_list),* #variadic) #output {
-			use std::sync::atomic::{AtomicPtr, Ordering};
+			use ::std::sync::atomic::{AtomicPtr, Ordering};
 			static FUNC: AtomicPtr<()> = AtomicPtr::new(
 				initializer as *mut ()
 			);
 
 			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
-				let symbol = ::dylink::LibraryLock::lock(&#library)
-					.unwrap()
-					.find_and_swap(&FUNC,#link_name);
-				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = match symbol {
-					None => panic!("Dylink Error: failed to load `{}`", stringify!(#fn_name)),
-					Some(_) => std::mem::transmute(FUNC.load(Ordering::Relaxed)),
-				};
+				let symbol = ::dylink::sync::LibLock::symbol(&#library, #link_name)
+					.expect(&format!("Dylink Error: failed to load `{}`", stringify!(#fn_name)));
+				FUNC.store(symbol.cast::<()>(), Ordering::Relaxed);
+				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = ::std::mem::transmute(symbol);
 				pfn(#(#internal_param_list),*)
 			}
 
 			let symbol: *mut () = FUNC.load(Ordering::Relaxed);
-			std::sync::atomic::compiler_fence(Ordering::Acquire);
-			let pfn : #abi fn (#(#internal_param_ty_list),*) #output = std::mem::transmute(symbol);
+			::std::sync::atomic::compiler_fence(Ordering::Acquire);
+			let pfn : #abi fn (#(#internal_param_ty_list),*) #output = ::std::mem::transmute(symbol);
 			pfn(#(#param_list),*)
 		}
 	}

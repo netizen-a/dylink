@@ -1,11 +1,11 @@
 # Dylink
 
-![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink) [![dylink-rs](https://github.com/Razordor/dylink/actions/workflows/rust.yml/badge.svg)](https://github.com/Razordor/dylink/actions/workflows/rust.yml) ![unsafe:yes](https://img.shields.io/badge/unsafe-yes-red)
+![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink) [![dylink-rs](https://github.com/Razordor/dylink/actions/workflows/rust.yml/badge.svg)](https://github.com/Razordor/dylink/actions/workflows/rust.yml)
 
-Dylink provides a run-time dynamic linking framework for lazily evaluating shared libraries.
-When functions are loaded they are evaluated through a thunk for first time calls, which loads the function from its respective library. Preceeding calls after initialization have no overhead or additional branching checks, since the thunk is replaced by the loaded function.
+Dylink provides a run-time dynamic linking framework for loading dynamic libraries.
 
-This crate can be used with other library loaders by making a wrapper around your favorite loader and implementing the `Loader` trait.
+This crate may be useful if the dynamic library you are loading is not always guarenteed
+to exist, which may enable you to provide fallbacks in your code.
 
 ----
 
@@ -17,8 +17,7 @@ Related links:
 ## Features
 
 * Thread-safe library loading.
-* Fearless closing - closing never invalidates symbols.
-* Branchless symbols - loaded symbols have zero overhead.
+* Macro attribute
 
 ## Supported platforms
 
@@ -34,24 +33,49 @@ Add this to your `Cargo.toml`
 
 ```toml
 [dependencies]
-dylink = "0.7"
+dylink = "0.8"
 ```
 
-## Example
+## Examples
 
-Below is a basic working example on how to use the macro on windows.
+Below is an example of opening a library manually through `Library` on Windows.
+
+```rust
+use dylink::*;
+use std::mem;
+
+// Open the Kernel32.dll library.
+let lib = Library::open("Kernel32.dll").expect("Failed to open library");
+
+// Get the symbol for the GetLastError function.
+let sym = lib.symbol("GetLastError").unwrap();
+
+// Cast the symbol to the appropriate function signature.
+let get_last_error: unsafe extern "system" fn() -> u32 = unsafe {mem::transmute(sym.cast::<()>())};
+
+let result = unsafe {get_last_error()};
+
+// Call the function and assert its return value.
+assert_eq!(result, 0);
+```
+
+Below is an example on how to use the `dylink` attribute on Windows. This example demonstrates the
+lazy loading capability of the `dylink` crate by interacting with functions from the Kernel32.dll library.
 
 ```rust
 use dylink::*;
 
-static KERNEL32: Library<SystemLoader> = Library::new(&["Kernel32.dll"]);
+// Define a static LibLock for the Kernel32.dll library.
+static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
 
+// Use the `dylink` attribute to declare functions from the Kernel32.dll.
 #[dylink(library=KERNEL32)]
-extern "stdcall" {
+extern "system-unwind" {
     fn GetLastError() -> u32;
     fn SetLastError(_: u32);
 }
 
+// Use the declared functions, which will be loaded lazily when called.
 unsafe {
    SetLastError(52);
    assert_eq!(52, GetLastError());
