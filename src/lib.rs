@@ -169,6 +169,8 @@ impl Library {
 	/// Creates a new `Library` instance that shares the same underlying library handle as the
 	/// existing `Library` instance.
 	///
+	/// # Examples
+	///
 	/// Creates two handles for a library named `foo.dll`:
 	///
 	/// ```no_run
