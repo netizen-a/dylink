@@ -5,10 +5,16 @@
 use super::Handle;
 use crate::sealed::Sealed;
 use crate::Symbol;
-use std::{marker::PhantomData, sync::{atomic::{Ordering, AtomicU32}, Once}};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, mem, path::PathBuf, ptr};
+use std::{
+	marker::PhantomData,
+	sync::{
+		atomic::{AtomicU32, Ordering},
+		Once,
+	},
+};
 
 #[cfg(not(any(target_os = "linux", target_env = "gnu")))]
 use std::sync;
@@ -141,7 +147,6 @@ unsafe fn get_link_map_path(handle: Handle) -> Option<PathBuf> {
 	}
 }
 
-
 #[cfg(target_os = "macos")]
 fn get_image_count() -> &'static AtomicU32 {
 	static IMAGE_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -166,25 +171,22 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<PathBuf> {
 
 	let count: &AtomicU32 = get_image_count();
 	let mut result = Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"));
-	let _ = count.fetch_update(
-		Ordering::SeqCst,
-		Ordering::SeqCst,
-		|i|{
-			for j in (0..i).rev() {
-				let image_name = c::_dyld_get_image_name(j);
-				let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
-				if !active_handle.is_null() {
-					let _ = c::dlclose(active_handle);
-				}
-				if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
-					let path = ffi::CStr::from_ptr(image_name);
-					let path = ffi::OsStr::from_bytes(path.to_bytes());
-					result = Ok(path.into());
-					break;
-				}
+	let _ = count.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
+		for image_index in (0..image_index).rev() {
+			let image_name = c::_dyld_get_image_name(image_index);
+			let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
+			if !active_handle.is_null() {
+				let _ = c::dlclose(active_handle);
 			}
-			Some(i)
-		});
+			if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
+				let path = ffi::CStr::from_ptr(image_name);
+				let path = ffi::OsStr::from_bytes(path.to_bytes());
+				result = Ok(path.into());
+				break;
+			}
+		}
+		Some(image_index)
+	});
 	result
 }
 

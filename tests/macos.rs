@@ -31,7 +31,7 @@ fn test_path_soundness() {
 	for _ in 0..300 {
 		vlib.push(Library::open("libSystem.dylib").unwrap())
 	}
-	let t = std::thread::spawn( || {
+	let t = std::thread::spawn(|| {
 		let mut other_vlib = vec![];
 		for _ in 0..300 {
 			other_vlib.push(Library::open("libSystem.dylib").unwrap())

@@ -1,7 +1,7 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![allow(non_camel_case_types)]
 
-use std::ffi;
+use std::{ffi, ptr};
 
 #[repr(C)]
 pub struct Dl_info {
@@ -27,13 +27,22 @@ extern "C-unwind" {
 	) -> ffi::c_int;
 }
 
-// opaque type because I don't care about the contents atm.
+#[cfg(target_os = "macos")]
+type cpu_type_t = ffi::c_int;
+#[cfg(target_os = "macos")]
+type cpu_subtype_t = ffi::c_int;
+
 #[cfg(target_os = "macos")]
 #[repr(C)]
 pub struct mach_header {
-    _data: [u8; 0],
-    _marker:
-        core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+	pub magic: ffi::c_ulong,       /* mach magic number identifier */
+	pub cputype: cpu_type_t,       /* cpu specifier */
+	pub cpusubtype: cpu_subtype_t, /* machine specifier */
+	pub filetype: ffi::c_ulong,    /* type of file */
+	pub ncmds: ffi::c_ulong,       /* number of load commands */
+	pub sizeofcmds: ffi::c_ulong,  /* the size of all the load commands */
+	pub flags: ffi::c_ulong,       /* flags */
+	_marker: std::marker::PhantomPinned,
 }
 
 #[cfg(target_os = "macos")]
@@ -44,6 +53,8 @@ extern "C-unwind" {
 	pub fn _dyld_get_image_name(image_index: u32) -> *const ffi::c_char;
 	pub fn _dyld_register_func_for_add_image(func: PfnImageCallback);
 	pub fn _dyld_register_func_for_remove_image(func: PfnImageCallback);
+	// returns base address
+	pub fn _dyld_get_image_header(image_index: u32) -> *const mach_header;
 }
 
 pub const RTLD_LOCAL: ffi::c_int = 0;
@@ -58,6 +69,7 @@ pub const RTLD_DI_LINKMAP: ffi::c_int = 2;
 pub type ElfW_Addr = usize;
 
 #[cfg(target_env = "gnu")]
+#[derive(Debug)]
 #[repr(C)]
 pub struct ElfW_Dyn {
 	d_tag: usize,
@@ -65,6 +77,7 @@ pub struct ElfW_Dyn {
 }
 
 #[cfg(target_env = "gnu")]
+#[derive(Debug)]
 #[repr(C)]
 pub struct link_map {
 	pub l_addr: ElfW_Addr,

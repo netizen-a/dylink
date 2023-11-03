@@ -18,7 +18,7 @@ version = "0.9"
 path="./dylink_macro"
 
 [package.metadata.docs.rs]
-rustc-args = ["--cfg", "docsrs"]
+rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
 
 [features]

@@ -63,7 +63,6 @@ fn test_metadata() {
 	println!("metadata = {:?}", metadata);
 }
 
-
 // test to see if there are race conditions when getting a path.
 #[test]
 fn test_path_soundness() {
@@ -71,7 +70,7 @@ fn test_path_soundness() {
 	for _ in 0..300 {
 		vlib.push(Library::open("libX11.so.6").unwrap())
 	}
-	let t = std::thread::spawn( || {
+	let t = std::thread::spawn(|| {
 		let mut other_vlib = vec![];
 		for _ in 0..300 {
 			other_vlib.push(Library::open("libX11.so.6").unwrap())
