@@ -152,9 +152,9 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<Object<'static>>> {
 			if let Some(new_len) = module_handles.iter().rposition(|a| !a.is_null()) {
 				module_handles.truncate(new_len)
 			}
-			let module_handles = module_handles
+			let module_handles: Vec<Object> = module_handles
 				.into_iter()
-				.map(Object::from_ptr)
+				.map(|o|Object::from_ptr(o))
 				.collect();
 			// box and return the slice
 			return Ok(module_handles);

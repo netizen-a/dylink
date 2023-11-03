@@ -7,15 +7,17 @@ pub struct Object<'a> {
     pub(crate) base_addr: *mut ffi::c_void,
     _marker: PhantomData<&'a ()>
 }
+unsafe impl Send for Object<'_>{}
+unsafe impl Sync for Object<'_>{}
 
 impl Object<'static> {
-    pub const fn from_ptr(base_addr: *mut ffi::c_void) -> Self {
+    pub unsafe fn from_ptr(base_addr: *mut ffi::c_void) -> Self {
         Self {
             base_addr,
             _marker: PhantomData
         }
     }
-    pub const fn into_ptr(self) -> *mut ffi::c_void {
+    pub unsafe fn into_ptr(self) -> *mut ffi::c_void {
         self.base_addr
     }
 }
