@@ -3,9 +3,10 @@ use std::marker::PhantomData;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
 use std::os::windows::prelude::*;
-use std::{ffi, io, path, ptr};
+use std::{ffi, io, path, ptr, mem};
 
 use super::Handle;
+use crate::obj::Object;
 use crate::{Library, Symbol};
 
 mod c;
@@ -101,6 +102,11 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut
 		&mut handle,
 	);
 	if result == 0 {
+		return Err(io::Error::last_os_error())
+	}
+	let mut info = mem::MaybeUninit::zeroed();
+	let result = c::GetModuleInformation(c::GetCurrentProcess(),handle, info.as_mut_ptr(),mem::size_of::<c::MODULEINFO>() as u32);
+	if result == 0 {
 		Err(io::Error::last_os_error())
 	} else {
 		Ok(handle)
@@ -117,7 +123,7 @@ pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
 	ptr::NonNull::new(new_handle).ok_or_else(io::Error::last_os_error)
 }
 
-pub(crate) unsafe fn load_objects() -> io::Result<Vec<*mut ffi::c_void>> {
+pub(crate) unsafe fn load_objects() -> io::Result<Vec<Object<'static>>> {
 	let process_handle = c::GetCurrentProcess();
 	let mut module_handles = vec![ptr::null_mut(); 1000];
 	let mut len_needed: u32 = 0;
@@ -145,6 +151,10 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<*mut ffi::c_void>> {
 			if let Some(new_len) = module_handles.iter().rposition(|a| !a.is_null()) {
 				module_handles.truncate(new_len)
 			}
+			let module_handles = module_handles
+				.into_iter()
+				.map(Object::from_ptr)
+				.collect();
 			// box and return the slice
 			return Ok(module_handles);
 		}

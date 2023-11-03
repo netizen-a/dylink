@@ -1,6 +1,5 @@
 use crate::obj::Object;
 use crate::os;
-use std::ffi;
 use std::io;
 use std::vec;
 
@@ -9,11 +8,11 @@ use os::unix as imp;
 #[cfg(windows)]
 use os::windows as imp;
 
-pub struct Objects {
-	inner: vec::IntoIter<*mut ffi::c_void>,
+pub struct Objects<'a> {
+	inner: vec::IntoIter<Object<'a>>,
 }
 
-impl Objects {
+impl Objects<'static> {
 	pub fn now() -> io::Result<Self> {
 		Ok(Self {
 			inner: unsafe { imp::load_objects()?.into_iter() },
@@ -21,9 +20,9 @@ impl Objects {
 	}
 }
 
-impl Iterator for Objects {
-	type Item = Object;
+impl <'a> Iterator for Objects<'a> {
+	type Item = Object<'a>;
 	fn next(&mut self) -> Option<Self::Item> {
-		self.inner.next().map(|base_addr| Object{base_addr})
+		self.inner.next()
 	}
 }

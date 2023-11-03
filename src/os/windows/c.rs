@@ -27,6 +27,7 @@ extern "system" {
 	pub fn FreeLibrary(hlibmodule: *mut ffi::c_void) -> ffi::c_int;
 	pub fn GetModuleFileNameW(hmodule: HMODULE, lpfilename: PWSTR, nsize: DWORD) -> DWORD;
 	pub fn GetCurrentProcess() -> HANDLE;
+	#[link_name = "K32EnumProcessModulesEx"]
 	pub fn EnumProcessModulesEx(
 		hprocess: HANDLE,
 		lphmodule: *mut HMODULE,
@@ -34,6 +35,7 @@ extern "system" {
 		lpcbneeded: *mut DWORD,
 		dwfilterflag: DWORD,
 	) -> BOOL;
+	#[link_name = "K32GetModuleInformation"]
 	pub fn GetModuleInformation(
 		hprocess: HANDLE,
 		hmodule: HMODULE,

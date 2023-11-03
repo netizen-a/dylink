@@ -87,3 +87,8 @@ fn test_path_soundness() {
 	}
 	t.join().unwrap();
 }
+
+#[test]
+fn test_objects(){
+	let _objs = iter::Objects::now().unwrap();
+}
