@@ -13,6 +13,13 @@ pub type PWSTR = *mut u16;
 pub type BOOL = i32;
 pub type DWORD = u32;
 
+#[repr(C)]
+pub struct MODULEINFO {
+	pub lpbaseofdll: *mut ffi::c_void,
+	pub sizeofimage: DWORD,
+	pub entrypoint: *mut ffi::c_void,
+}
+
 extern "system" {
 	pub fn LoadLibraryExW(lplibfilename: PCWSTR, hfile: HANDLE, dwflags: u32) -> HMODULE;
 	pub fn GetModuleHandleExW(dwflags: u32, lpmodulename: PCWSTR, phmodule: *mut HMODULE) -> BOOL;
@@ -26,6 +33,12 @@ extern "system" {
 		cb: DWORD,
 		lpcbneeded: *mut DWORD,
 		dwfilterflag: DWORD,
+	) -> BOOL;
+	pub fn GetModuleInformation(
+		hprocess: HANDLE,
+		hmodule: HMODULE,
+		lpmodinfo: *mut MODULEINFO,
+		cb: DWORD,
 	) -> BOOL;
 }
 

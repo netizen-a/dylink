@@ -117,7 +117,6 @@ pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
 	ptr::NonNull::new(new_handle).ok_or_else(io::Error::last_os_error)
 }
 
-
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<*mut ffi::c_void>> {
 	let process_handle = c::GetCurrentProcess();
 	let mut module_handles = vec![ptr::null_mut(); 1000];
@@ -128,25 +127,26 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<*mut ffi::c_void>> {
 		let result = c::EnumProcessModulesEx(
 			process_handle,
 			module_handles.as_mut_ptr(),
-			module_handles.len() as _,&mut len_needed,
-			c::LIST_MODULES_ALL
+			module_handles.len() as _,
+			&mut len_needed,
+			c::LIST_MODULES_ALL,
 		);
 		if result == 0 {
-			return Err(io::Error::last_os_error())
+			return Err(io::Error::last_os_error());
 		}
 		if len_needed as usize > module_handles.len() {
 			// We can't trust the next iteration to be bigger, so fill with null
 			module_handles.fill(ptr::null_mut());
 			let new_size: usize = (prev_size).max(len_needed as usize);
 			prev_size = new_size;
-        	module_handles.resize(new_size, ptr::null_mut());
+			module_handles.resize(new_size, ptr::null_mut());
 		} else {
 			// success, so truncate to the appropriate size
 			if let Some(new_len) = module_handles.iter().rposition(|a| !a.is_null()) {
 				module_handles.truncate(new_len)
 			}
 			// box and return the slice
-			return Ok(module_handles)
+			return Ok(module_handles);
 		}
 	}
 }
