@@ -21,13 +21,15 @@ extern "system" {
 	pub fn GetModuleFileNameW(hmodule: HMODULE, lpfilename: PWSTR, nsize: DWORD) -> DWORD;
 	pub fn GetCurrentProcess() -> HANDLE;
 	pub fn EnumProcessModulesEx(
-		hProcess: HANDLE,
-		lphModule: *mut HMODULE,
+		hprocess: HANDLE,
+		lphmodule: *mut HMODULE,
 		cb: DWORD,
-		lpcbNeeded: *mut DWORD,
-		dwFilterFlag: DWORD,
+		lpcbneeded: *mut DWORD,
+		dwfilterflag: DWORD,
 	) -> BOOL;
 }
 
 pub const GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT: DWORD = 0x00000002u32;
 pub const GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS: DWORD = 0x00000004u32;
+
+pub const LIST_MODULES_ALL: DWORD = 0x03;

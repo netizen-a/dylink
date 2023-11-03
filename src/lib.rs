@@ -19,6 +19,8 @@ use os::unix as imp;
 use os::windows as imp;
 
 pub mod sync;
+pub mod iter;
+pub mod obj;
 
 use std::{fs, io, marker, path};
 
