@@ -109,7 +109,8 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut
 	if result == 0 {
 		Err(io::Error::last_os_error())
 	} else {
-		Ok(handle)
+		let info = info.assume_init();
+		Ok(info.lpbaseofdll)
 	}
 }
 
