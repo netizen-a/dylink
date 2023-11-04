@@ -125,10 +125,11 @@ pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
 }
 
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<Object<'static>>> {
+	const INITIAL_SIZE: usize = 1000;
 	let process_handle = c::GetCurrentProcess();
-	let mut module_handles = vec![ptr::null_mut(); 1000];
+	let mut module_handles = vec![ptr::null_mut(); INITIAL_SIZE];
 	let mut len_needed: u32 = 0;
-	let mut prev_size = 0;
+	let mut prev_size = INITIAL_SIZE;
 
 	loop {
 		let result = c::EnumProcessModulesEx(
@@ -144,7 +145,8 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<Object<'static>>> {
 		if len_needed as usize > module_handles.len() {
 			// We can't trust the next iteration to be bigger, so fill with null
 			module_handles.fill(ptr::null_mut());
-			let new_size: usize = (prev_size).max(len_needed as usize);
+			// make the new size sufficiently bigger, and always grow instead of shrink.
+			let new_size: usize = (prev_size).max(len_needed as usize + 30);
 			prev_size = new_size;
 			module_handles.resize(new_size, ptr::null_mut());
 		} else {
