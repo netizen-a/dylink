@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
 use std::os::windows::prelude::*;
-use std::{ffi, io, path, ptr, mem};
+use std::{ffi, io, mem, path, ptr};
 
 use super::Handle;
 use crate::obj::Object;
@@ -102,10 +102,15 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut
 		&mut handle,
 	);
 	if result == 0 {
-		return Err(io::Error::last_os_error())
+		return Err(io::Error::last_os_error());
 	}
 	let mut info = mem::MaybeUninit::zeroed();
-	let result = c::GetModuleInformation(c::GetCurrentProcess(),handle, info.as_mut_ptr(),mem::size_of::<c::MODULEINFO>() as u32);
+	let result = c::GetModuleInformation(
+		c::GetCurrentProcess(),
+		handle,
+		info.as_mut_ptr(),
+		mem::size_of::<c::MODULEINFO>() as u32,
+	);
 	if result == 0 {
 		Err(io::Error::last_os_error())
 	} else {
@@ -156,7 +161,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<Object<'static>>> {
 			}
 			let module_handles: Vec<Object> = module_handles
 				.into_iter()
-				.map(|o|Object::from_ptr(o))
+				.map(|o| Object::from_ptr(o))
 				.collect();
 			// box and return the slice
 			return Ok(module_handles);

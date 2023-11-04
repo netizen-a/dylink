@@ -20,7 +20,7 @@ impl Objects<'static> {
 	}
 }
 
-impl <'a> Iterator for Objects<'a> {
+impl<'a> Iterator for Objects<'a> {
 	type Item = Object<'a>;
 	fn next(&mut self) -> Option<Self::Item> {
 		self.inner.next()

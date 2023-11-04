@@ -89,11 +89,11 @@ fn test_path_soundness() {
 }
 
 #[test]
-fn test_objects(){
+fn test_objects() {
 	let library = Library::open("kernel32.dll").unwrap();
 	let sym = library.symbol("GetLastError").unwrap();
-	let lib_object = unsafe {obj::Object::from_ptr(sym.base_addr().unwrap())};
+	let lib_object = unsafe { obj::Object::from_ptr(sym.base_addr().unwrap()) };
 	let mut objs = iter::Objects::now().unwrap();
-	let exists = objs.any(|obj|{lib_object == obj});
+	let exists = objs.any(|obj| lib_object == obj);
 	assert!(exists);
 }
