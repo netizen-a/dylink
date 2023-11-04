@@ -1,28 +1,17 @@
-use std::{ffi, marker::PhantomData};
+use std::ffi;
 
+// Fixme: replace with respective type.
+type Header = ffi::c_void;
+
+
+// The Object points to the base address.
+
+/// Object is basically a weak pointer.
 #[derive(PartialEq, Eq)]
-pub struct Object<'a> {
-	// Base address of the object.
-	pub(crate) base_addr: *mut ffi::c_void,
-	_marker: PhantomData<&'a ()>,
-}
-unsafe impl Send for Object<'_> {}
-unsafe impl Sync for Object<'_> {}
+#[repr(transparent)]
+pub struct Object(pub(crate) *mut Header);
 
-impl Object<'static> {
-	pub unsafe fn from_ptr(base_addr: *mut ffi::c_void) -> Self {
-		Self {
-			base_addr,
-			_marker: PhantomData,
-		}
-	}
-	pub unsafe fn into_ptr(self) -> *mut ffi::c_void {
-		self.base_addr
-	}
-}
-
-impl Object<'_> {
-	pub fn is_valid() -> bool {
-		false
-	}
+impl Object {
+	// to implement upgrade I need a way of testing if the image is a library type.
+	//pub fn upgrade();
 }

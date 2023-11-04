@@ -8,20 +8,27 @@ use os::unix as imp;
 #[cfg(windows)]
 use os::windows as imp;
 
-pub struct Objects<'a> {
-	inner: vec::IntoIter<Object<'a>>,
+pub struct Objects {
+	inner: vec::IntoIter<Object>,
 }
 
-impl Objects<'static> {
+// this impl block represents data coming from the global scope.
+impl Objects {
 	pub fn now() -> io::Result<Self> {
+		let inner = unsafe { imp::load_objects()?
+			.into_iter()
+			.map(Object)
+			.collect::<Vec<Object>>()
+			.into_iter()
+		};
 		Ok(Self {
-			inner: unsafe { imp::load_objects()?.into_iter() },
+			inner,
 		})
 	}
 }
 
-impl<'a> Iterator for Objects<'a> {
-	type Item = Object<'a>;
+impl<'a> Iterator for Objects {
+	type Item = Object;
 	fn next(&mut self) -> Option<Self::Item> {
 		self.inner.next()
 	}

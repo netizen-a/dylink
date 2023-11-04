@@ -104,18 +104,11 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut
 	if result == 0 {
 		return Err(io::Error::last_os_error());
 	}
-	let mut info = mem::MaybeUninit::zeroed();
-	let result = c::GetModuleInformation(
-		c::GetCurrentProcess(),
-		handle,
-		info.as_mut_ptr(),
-		mem::size_of::<c::MODULEINFO>() as u32,
-	);
 	if result == 0 {
 		Err(io::Error::last_os_error())
 	} else {
-		let info = info.assume_init();
-		Ok(info.lpbaseofdll)
+		// The handle doubles as the base address (this may not be true the other way around though).
+		Ok(handle)
 	}
 }
 
@@ -129,7 +122,7 @@ pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
 	ptr::NonNull::new(new_handle).ok_or_else(io::Error::last_os_error)
 }
 
-pub(crate) unsafe fn load_objects() -> io::Result<Vec<Object<'static>>> {
+pub(crate) unsafe fn load_objects() -> io::Result<Vec<*mut ffi::c_void>> {
 	const INITIAL_SIZE: usize = 1000;
 	let process_handle = c::GetCurrentProcess();
 	let mut module_handles = vec![ptr::null_mut(); INITIAL_SIZE];
@@ -159,10 +152,6 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<Object<'static>>> {
 			if let Some(new_len) = module_handles.iter().rposition(|a| !a.is_null()) {
 				module_handles.truncate(new_len)
 			}
-			let module_handles: Vec<Object> = module_handles
-				.into_iter()
-				.map(|o| Object::from_ptr(o))
-				.collect();
 			// box and return the slice
 			return Ok(module_handles);
 		}

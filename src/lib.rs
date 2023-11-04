@@ -189,6 +189,9 @@ impl Library {
 		let handle = unsafe { imp::dylib_clone(self.0)? };
 		Ok(Library(handle))
 	}
+	pub fn downgrade(this: &Library) -> obj::Object {
+		obj::Object(this.0.as_ptr())
+	}
 }
 
 impl PartialEq<Library> for Library {
