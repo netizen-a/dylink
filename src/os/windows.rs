@@ -164,3 +164,11 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<img::Weak>> {
 		}
 	}
 }
+
+pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
+	if let Some(addr) = ptr::NonNull::new(addr) {
+		dylib_clone(addr).ok()
+	} else {
+		None
+	}
+}
