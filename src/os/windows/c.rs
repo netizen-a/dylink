@@ -12,12 +12,18 @@ pub type PCSTR = *const ffi::c_char;
 pub type PWSTR = *mut u16;
 pub type BOOL = i32;
 pub type DWORD = u32;
+pub type WORD = u16;
 
 #[repr(C)]
-pub struct MODULEINFO {
-	pub lpbaseofdll: *mut ffi::c_void,
-	pub sizeofimage: DWORD,
-	pub entrypoint: *mut ffi::c_void,
+pub struct MEMORY_BASIC_INFORMATION {
+	baseaddress: *mut ffi::c_void,
+	allocationbase: *mut ffi::c_void,
+	allocationprotect: DWORD,
+	partitionid: WORD,
+	regionsize: usize,
+	state: DWORD,
+	protect: DWORD,
+	r#type: DWORD,
 }
 
 extern "system" {
@@ -34,13 +40,6 @@ extern "system" {
 		cb: DWORD,
 		lpcbneeded: *mut DWORD,
 		dwfilterflag: DWORD,
-	) -> BOOL;
-	#[link_name = "K32GetModuleInformation"]
-	pub fn GetModuleInformation(
-		hprocess: HANDLE,
-		hmodule: HMODULE,
-		lpmodinfo: *mut MODULEINFO,
-		cb: DWORD,
 	) -> BOOL;
 }
 

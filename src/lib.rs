@@ -19,7 +19,7 @@ use os::unix as imp;
 use os::windows as imp;
 
 pub mod iter;
-pub mod obj;
+pub mod img;
 pub mod sync;
 
 use std::{fs, io, marker, path};
@@ -63,6 +63,7 @@ impl Symbol<'_> {
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
+impl crate::sealed::Sealed for Library {}
 
 impl Library {
 	/// Attempts to open a dynamic library file.
@@ -189,9 +190,6 @@ impl Library {
 		let handle = unsafe { imp::dylib_clone(self.0)? };
 		Ok(Library(handle))
 	}
-	pub fn downgrade(this: &Library) -> obj::Object {
-		obj::Object(this.0.as_ptr())
-	}
 }
 
 impl PartialEq<Library> for Library {
@@ -215,6 +213,13 @@ impl Drop for Library {
 		unsafe {
 			let _ = imp::dylib_close(self.0);
 		}
+	}
+}
+
+#[cfg(feature = "unstable")]
+impl img::Image for Library {
+	fn base_addr(&self) -> *mut std::ffi::c_void {
+		todo!()
 	}
 }
 

@@ -33,7 +33,7 @@ fn dylib_guard<'a>() -> sync::LockResult<sync::MutexGuard<'a, ()>> {
 fn dylib_guard() {}
 
 unsafe fn c_dlerror() -> Option<ffi::CString> {
-	let raw = c::dlerror();
+	let raw = libc::dlerror();
 	if raw.is_null() {
 		None
 	} else {
@@ -44,7 +44,7 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	let _lock = dylib_guard();
 	let c_str = ffi::CString::new(path.as_bytes())?;
-	let handle: *mut ffi::c_void = c::dlopen(c_str.as_ptr(), c::RTLD_NOW | c::RTLD_LOCAL);
+	let handle: *mut ffi::c_void = libc::dlopen(c_str.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL);
 	if let Some(ret) = ptr::NonNull::new(handle) {
 		Ok(ret)
 	} else {
@@ -55,7 +55,7 @@ pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 
 pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	let _lock = dylib_guard();
-	let handle: *mut ffi::c_void = c::dlopen(ptr::null(), c::RTLD_NOW | c::RTLD_LOCAL);
+	let handle: *mut ffi::c_void = libc::dlopen(ptr::null(), libc::RTLD_NOW | libc::RTLD_LOCAL);
 	if let Some(ret) = ptr::NonNull::new(handle) {
 		Ok(ret)
 	} else {
@@ -66,7 +66,7 @@ pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 
 pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
 	let _lock = dylib_guard();
-	if c::dlclose(lib_handle.as_ptr()) != 0 {
+	if libc::dlclose(lib_handle.as_ptr()) != 0 {
 		let err = c_dlerror().unwrap();
 		Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
 	} else {
@@ -82,7 +82,7 @@ pub(crate) unsafe fn dylib_symbol<'a>(
 	let c_str = ffi::CString::new(name).unwrap();
 
 	let _ = c_dlerror(); // clear existing errors
-	let handle: *mut ffi::c_void = c::dlsym(lib_handle, c_str.as_ptr()).cast_mut();
+	let handle: *mut ffi::c_void = libc::dlsym(lib_handle, c_str.as_ptr());
 
 	if let Some(err) = c_dlerror() {
 		Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
@@ -129,9 +129,9 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<PathBuf> {
 unsafe fn get_link_map_path(handle: Handle) -> Option<PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
 	let mut map_ptr = ptr::null_mut::<c::link_map>();
-	if c::dlinfo(
+	if libc::dlinfo(
 		handle.as_ptr(),
-		c::RTLD_DI_LINKMAP,
+		libc::RTLD_DI_LINKMAP,
 		&mut map_ptr as *mut _ as *mut _,
 	) == 0
 	{
@@ -191,8 +191,8 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<PathBuf> {
 }
 
 pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut ffi::c_void> {
-	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
-	if c::dladdr(symbol, info.as_mut_ptr()) != 0 {
+	let mut info = mem::MaybeUninit::<libc::Dl_info>::zeroed();
+	if libc::dladdr(symbol, info.as_mut_ptr()) != 0 {
 		let info = info.assume_init();
 		Ok(info.dli_fbase)
 	} else {
@@ -252,4 +252,8 @@ impl SymExt for Symbol<'_> {
 			}
 		}
 	}
+}
+
+pub(crate) unsafe fn load_objects() -> io::Result<Vec<*mut ffi::c_void>> {
+	todo!()
 }
