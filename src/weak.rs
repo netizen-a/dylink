@@ -19,11 +19,11 @@ impl Weak {
 }
 
 pub trait Image: crate::sealed::Sealed {
-	fn base_addr(&self) -> *mut ffi::c_void;
+	fn addr(&self) -> *mut ffi::c_void;
 }
 
 impl Image for Weak {
-	fn base_addr(&self) -> *mut ffi::c_void {
+	fn addr(&self) -> *mut ffi::c_void {
 		self.base_addr
 	}
 }

@@ -1,4 +1,4 @@
-use crate::img;
+use crate::weak;
 use crate::os;
 use std::io;
 use std::vec;
@@ -9,7 +9,7 @@ use os::unix as imp;
 use os::windows as imp;
 
 pub struct Images {
-	inner: vec::IntoIter<img::Weak>,
+	inner: vec::IntoIter<weak::Weak>,
 }
 
 // this impl block represents data coming from the global scope.
@@ -24,7 +24,7 @@ impl Images {
 }
 
 impl<'a> Iterator for Images {
-	type Item = img::Weak;
+	type Item = weak::Weak;
 	fn next(&mut self) -> Option<Self::Item> {
 		self.inner.next()
 	}

@@ -6,7 +6,7 @@ use std::os::windows::prelude::*;
 use std::{ffi, io, mem, path, ptr};
 
 use super::Handle;
-use crate::img;
+use crate::weak;
 use crate::{Library, Symbol};
 
 mod c;
@@ -122,7 +122,7 @@ pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
 	ptr::NonNull::new(new_handle).ok_or_else(io::Error::last_os_error)
 }
 
-pub(crate) unsafe fn load_objects() -> io::Result<Vec<img::Weak>> {
+pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	const INITIAL_SIZE: usize = 1000;
 	let process_handle = c::GetCurrentProcess();
 	let mut module_handles = vec![ptr::null_mut(); INITIAL_SIZE];
@@ -155,10 +155,10 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<img::Weak>> {
 				module_handles.truncate(new_len)
 			}
 			let module_handles = module_handles.into_iter()
-				.map(|base_addr| img::Weak {
+				.map(|base_addr| weak::Weak {
 					base_addr,
 				})
-				.collect::<Vec<img::Weak>>();
+				.collect::<Vec<weak::Weak>>();
 			// box and return the slice
 			return Ok(module_handles);
 		}

@@ -19,7 +19,7 @@ use os::unix as imp;
 use os::windows as imp;
 
 pub mod iter;
-pub mod img;
+pub mod weak;
 pub mod sync;
 
 use std::{fs, io, marker, path};
@@ -217,7 +217,7 @@ impl Drop for Library {
 }
 
 #[cfg(feature = "unstable")]
-impl img::Image for Library {
+impl weak::Image for Library {
 	fn base_addr(&self) -> *mut std::ffi::c_void {
 		todo!()
 	}
