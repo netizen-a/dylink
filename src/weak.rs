@@ -20,6 +20,8 @@ impl Weak {
 
 pub trait Image: crate::sealed::Sealed {
 	fn addr(&self) -> *mut ffi::c_void;
+	// This should be implemented next version bump
+	// fn path(&self) -> io::Result<path::PathBuf>
 }
 
 impl Image for Weak {
@@ -27,10 +29,3 @@ impl Image for Weak {
 		self.base_addr
 	}
 }
-
-//impl Image {
-// to implement upgrade I need a way of testing if the image is a library type.
-//pub fn upgrade();
-//pub fn name();
-//pub fn base_addr();
-//}

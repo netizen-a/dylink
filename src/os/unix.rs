@@ -171,9 +171,8 @@ fn get_image_count() -> &'static AtomicU32 {
 unsafe fn get_macos_image_path(handle: Handle) -> io::Result<PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
 
-	let count: &AtomicU32 = get_image_count();
 	let mut result = Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"));
-	let _ = count.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
+	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 		for image_index in (0..image_index).rev() {
 			let image_name = c::_dyld_get_image_name(image_index);
 			let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
@@ -272,23 +271,36 @@ where F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 
 	let mut data = Vec::new();
-	loop {
-		let mut is_changed = false;
-		let _ = iter_phdr(|info, size|{
-			data.push(weak::Weak{
-				base_addr: (*info).dlpi_addr as *mut ffi::c_void
-			});
-
-			// check if fields exist
-			if mem::size_of::<libc::dl_phdr_info>() == size {
-				// check if libraries were added or removed
-				is_changed = (*info).dlpi_adds > 0 || (*info).dlpi_subs > 0
-			}
-			0
+	let _ = iter_phdr(|info, _|{
+		data.push(weak::Weak{
+			base_addr: (*info).dlpi_addr as *mut ffi::c_void
 		});
-		if !is_changed {
-			break;
-		}
-	}
+		0
+	});
 	Ok(data)
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
+	use std::os::unix::ffi::OsStringExt;
+
+	let mut data = Vec::new();
+	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
+		data.clear();
+		for image_index in (0..image_index).rev() {
+			data.push(weak::Weak{
+				base_addr: _dyld_get_image_header(image_index) as *mut ffi::c_void
+			});
+		}
+		Some(image_index)
+	});
+	Ok(data)
+}
+
+pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
+	let mut info = mem::MaybeUninit::zeroed();
+	let _ = libc::dladdr(addr, info.as_mut_ptr());
+	let info = info.assume_init();
+	let handle = libc::dlopen(info.dli_fname, libc::RTLD_NOW | libc::RTLD_LOCAL);
+	Handle::new(handle)
 }
