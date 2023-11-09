@@ -2,9 +2,11 @@
 #![allow(clippy::let_unit_value)]
 #![allow(unused_imports)]
 
+use libc::dl_iterate_phdr;
+
 use super::Handle;
 use crate::sealed::Sealed;
-use crate::Symbol;
+use crate::{Symbol, weak};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, mem, path::PathBuf, ptr};
@@ -254,6 +256,39 @@ impl SymExt for Symbol<'_> {
 	}
 }
 
-pub(crate) unsafe fn load_objects() -> io::Result<Vec<*mut ffi::c_void>> {
-	todo!()
+unsafe fn iter_phdr<F>(mut f: F) -> ffi::c_int
+where F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int
+{
+	unsafe extern "C" fn callback<F>(info: *mut libc::dl_phdr_info, size: libc::size_t, data: *mut ffi::c_void) -> ffi::c_int
+	where F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int
+	{
+		let f = data as *mut F;
+		(*f)(info, size)
+	}
+	libc::dl_iterate_phdr(Some(callback::<F>), &mut f as *mut _ as *mut _)
+}
+
+#[cfg(target_env = "gnu")]
+pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
+
+	let mut data = Vec::new();
+	loop {
+		let mut is_changed = false;
+		let _ = iter_phdr(|info, size|{
+			data.push(weak::Weak{
+				base_addr: (*info).dlpi_addr as *mut ffi::c_void
+			});
+
+			// check if fields exist
+			if mem::size_of::<libc::dl_phdr_info>() == size {
+				// check if libraries were added or removed
+				is_changed = (*info).dlpi_adds > 0 || (*info).dlpi_subs > 0
+			}
+			0
+		});
+		if !is_changed {
+			break;
+		}
+	}
+	Ok(data)
 }
