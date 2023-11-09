@@ -2,6 +2,7 @@
 #![allow(clippy::let_unit_value)]
 #![allow(unused_imports)]
 
+#[cfg(target_env="gnu")]
 use libc::dl_iterate_phdr;
 
 use super::Handle;
@@ -175,9 +176,9 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<PathBuf> {
 	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 		for image_index in (0..image_index).rev() {
 			let image_name = c::_dyld_get_image_name(image_index);
-			let active_handle = c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
+			let active_handle = libc::dlopen(image_name, libc::RTLD_NOW | libc::RTLD_LOCAL | libc::RTLD_NOLOAD);
 			if !active_handle.is_null() {
-				let _ = c::dlclose(active_handle);
+				let _ = libc::dlclose(active_handle);
 			}
 			if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
 				let path = ffi::CStr::from_ptr(image_name);
@@ -255,6 +256,7 @@ impl SymExt for Symbol<'_> {
 	}
 }
 
+#[cfg(target_env="gnu")]
 unsafe fn iter_phdr<F>(mut f: F) -> ffi::c_int
 where F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int
 {
@@ -289,7 +291,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 		data.clear();
 		for image_index in (0..image_index).rev() {
 			data.push(weak::Weak{
-				base_addr: _dyld_get_image_header(image_index) as *mut ffi::c_void
+				base_addr: c::_dyld_get_image_header(image_index) as *mut ffi::c_void
 			});
 		}
 		Some(image_index)
