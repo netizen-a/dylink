@@ -301,8 +301,11 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 
 pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
 	let mut info = mem::MaybeUninit::zeroed();
-	let _ = libc::dladdr(addr, info.as_mut_ptr());
-	let info = info.assume_init();
-	let handle = libc::dlopen(info.dli_fname, libc::RTLD_NOW | libc::RTLD_LOCAL);
-	Handle::new(handle)
+	if libc::dladdr(addr, info.as_mut_ptr()) != 0 {
+		let info = info.assume_init();
+		let handle = libc::dlopen(info.dli_fname, libc::RTLD_NOW | libc::RTLD_LOCAL);
+		Handle::new(handle)
+	} else {
+		None
+	}
 }

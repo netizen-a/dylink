@@ -218,7 +218,7 @@ impl Drop for Library {
 
 #[cfg(feature = "unstable")]
 impl weak::Image for Library {
-	fn base_addr(&self) -> *mut std::ffi::c_void {
+	fn addr(&self) -> *mut std::ffi::c_void {
 		todo!()
 	}
 }
