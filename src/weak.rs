@@ -6,7 +6,9 @@ use crate::os::windows as imp;
 
 use crate::Library;
 
-// Represents an executable image. It essentially functions as a weak pointer and holds a base address.
+/// Represents an executable image.
+///
+/// This object can be obtained through either [`Images`](crate::iter::Images) or [`Library`].
 pub struct Weak{
 	pub(crate) base_addr: *mut ffi::c_void,
 	pub(crate) path_name: Option<path::PathBuf>,
