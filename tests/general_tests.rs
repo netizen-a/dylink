@@ -1,4 +1,4 @@
-use dylink::{*, weak::Image};
+use dylink::*;
 
 #[test]
 fn test_this_path() {
@@ -30,9 +30,10 @@ fn test_try_clone() {
 fn test_iter_images() {
 	let images = iter::Images::now().unwrap();
 	for weak in images {
-		print!("base addr: {:p},", weak.addr());
+		print!("weak addr: {:p},", weak.addr());
 		if let Some(dylib) = weak.upgrade() {
-			println!("upgraded: {}", dylib.path().unwrap().display())
+			println!("upgraded = {}", dylib.path().unwrap().display());
+			assert_eq!(weak.addr(), dylib.addr());
 		} else {
 			println!("failed to upgrade");
 		}

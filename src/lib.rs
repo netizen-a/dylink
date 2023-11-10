@@ -216,10 +216,9 @@ impl Drop for Library {
 	}
 }
 
-#[cfg(feature = "unstable")]
-impl weak::Image for Library {
+impl Image for Library {
 	fn addr(&self) -> *mut std::ffi::c_void {
-		todo!()
+		unsafe {imp::get_addr(self.0)}
 	}
 }
 
@@ -236,4 +235,10 @@ macro_rules! lib {
 		[$($name),+].into_iter()
 			.find_map(|elem| $crate::Library::open(elem).ok())
 	};
+}
+
+pub trait Image: crate::sealed::Sealed {
+	fn addr(&self) -> *mut std::ffi::c_void;
+	// This should be implemented next version bump
+	// fn path(&self) -> Option<path::PathBuf>
 }

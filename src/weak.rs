@@ -18,13 +18,9 @@ impl Weak {
 	}
 }
 
-pub trait Image: crate::sealed::Sealed {
-	fn addr(&self) -> *mut ffi::c_void;
-	// This should be implemented next version bump
-	// fn path(&self) -> Option<path::PathBuf>
-}
 
-impl Image for Weak {
+
+impl crate::Image for Weak {
 	fn addr(&self) -> *mut ffi::c_void {
 		self.base_addr
 	}

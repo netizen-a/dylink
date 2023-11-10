@@ -309,3 +309,42 @@ pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
 		None
 	}
 }
+
+
+#[cfg(target_env = "gnu")]
+pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
+	use std::os::unix::ffi::OsStringExt;
+	let mut map_ptr = ptr::null_mut::<c::link_map>();
+	if libc::dlinfo(
+		handle.as_ptr(),
+		libc::RTLD_DI_LINKMAP,
+		&mut map_ptr as *mut _ as *mut _,
+	) == 0
+	{
+		(*map_ptr).l_addr as *mut ffi::c_void
+	} else {
+		ptr::null_mut()
+	}
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
+	use std::os::unix::ffi::OsStringExt;
+
+	let mut result = ptr::null_mut();
+	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
+		for image_index in (0..image_index).rev() {
+			let image_name = c::_dyld_get_image_name(image_index);
+			let active_handle = libc::dlopen(image_name, libc::RTLD_NOW | libc::RTLD_LOCAL | libc::RTLD_NOLOAD);
+			if !active_handle.is_null() {
+				let _ = libc::dlclose(active_handle);
+			}
+			if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
+				result = c::_dyld_get_image_header(image_index) as *mut ffi::c_void;
+				break;
+			}
+		}
+		Some(image_index)
+	});
+	result
+}

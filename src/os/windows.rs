@@ -172,3 +172,8 @@ pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
 		None
 	}
 }
+
+#[inline]
+pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
+	handle.as_ptr()
+}
