@@ -168,7 +168,7 @@ fn get_image_count() -> &'static AtomicU32 {
 }
 
 #[cfg(target_os = "macos")]
-unsafe fn get_macos_image_path(handle: Handle) -> io::Result<PathBuf> {
+unsafe fn get_macos_image_path(handle: super::Handle) -> io::Result<PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
 
 	let mut result = Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"));
@@ -312,7 +312,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
 			let weak_ptr = weak::Weak {
 				base_addr: c::_dyld_get_image_header(image_index) as *const super::Header,
-				path_name: PathBuf::from(path),
+				path_name: Some(PathBuf::from(path)),
 			};
 			data.push(weak_ptr);
 		}
