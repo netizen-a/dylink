@@ -58,7 +58,7 @@ impl Symbol<'_> {
 /// or a race condition may occur. Additionally, upon loading or unloading the library, an
 /// optional entry point may be executed for each library, which may impose arbitrary requirements on the
 /// user for the access to the library to be sound.
-#[derive(Debug, Eq)]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
@@ -166,23 +166,10 @@ impl Library {
     ///
     /// let weak_this = Library::downgrade(&this);
     /// ```
-	pub fn downgrade(this: &Library) -> weak::Weak {
+	pub fn downgrade(this: &Self) -> weak::Weak {
 		weak::Weak {
 			base_addr: Image::as_ptr(this),
 			path_name: Image::path(this).ok(),
-		}
-	}
-}
-
-impl PartialEq<Library> for Library {
-	fn eq(&self, other: &Library) -> bool {
-		#[cfg(target_os = "macos")]
-		{
-			(self.0.as_ptr() as isize & (-4)) == (other.0.as_ptr() as isize & (-4))
-		}
-		#[cfg(not(target_os = "macos"))]
-		{
-			self.0.as_ptr() == other.0.as_ptr()
 		}
 	}
 }
