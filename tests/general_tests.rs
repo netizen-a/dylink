@@ -30,12 +30,13 @@ fn test_try_clone() {
 fn test_iter_images() {
 	let images = iter::Images::now().unwrap();
 	for weak in images {
-		print!("weak addr: {:p},", weak.addr());
+		print!("weak addr: {:p}, ", weak.addr());
 		if let Some(dylib) = weak.upgrade() {
 			println!("upgraded = {}", dylib.path().unwrap().display());
 			assert_eq!(weak.addr(), dylib.addr());
+			assert_eq!(weak.path().ok(), dylib.path().ok());
 		} else {
-			println!("failed to upgrade");
+			println!("upgrade failed");
 		}
 	}
 }

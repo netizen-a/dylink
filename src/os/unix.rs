@@ -271,12 +271,21 @@ where F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int
 
 #[cfg(target_env = "gnu")]
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
-
 	let mut data = Vec::new();
 	let _ = iter_phdr(|info, _|{
-		data.push(weak::Weak{
-			base_addr: (*info).dlpi_addr as *mut ffi::c_void
-		});
+
+		let path_name = if (*info).dlpi_name.is_null() {
+			None
+		} else {
+			let path = ffi::CStr::from_ptr((*info).dlpi_name);
+			let path = ffi::OsStr::from_bytes(path.to_bytes());
+			Some(PathBuf::from(path))
+		};
+		let weak_ptr = weak::Weak{
+			base_addr: (*info).dlpi_addr as *mut ffi::c_void,
+			path_name,
+		};
+		data.push(weak_ptr);
 		0
 	});
 	Ok(data)
@@ -290,9 +299,13 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 		data.clear();
 		for image_index in 0..image_index {
-			data.push(weak::Weak{
-				base_addr: c::_dyld_get_image_header(image_index) as *mut ffi::c_void
-			});
+			let path = ffi::CStr::from_ptr(c::_dyld_get_image_name(image_index));
+			let path = ffi::OsStr::from_bytes(path.to_bytes());
+			let weak_ptr = weak::Weak{
+				base_addr: c::_dyld_get_image_header(image_index) as *mut ffi::c_void,
+				path_name: PathBuf::from(path)
+			};
+			data.push(weak_ptr);
 		}
 		Some(image_index)
 	});

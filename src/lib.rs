@@ -115,41 +115,7 @@ impl Library {
 		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
 	}
 
-	/// Gets the path to the dynamic library file.
-	///
-	/// # Platform-specific behavior
-	/// This function currently corresponds to the `dlinfo` function on Linux, `_dyld_get_image_name` on MacOS,
-	/// and `GetModuleFileNameW` function on Windows. Note that, this [may change in the future][changes]
-	///
-	/// [changes]: io#platform-specific-behavior
-	///
-	/// *Note: This function is not guarenteed to return the same path as the one passed in to open the library.*
-	///
-	/// # Errors
-	///
-	/// This function will return an error if there is no path associated with the library handle.
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use dylink::Library;
-	///
-	/// fn main() -> std::io::Result<()> {
-	///     let mut lib = Library::open("foo.dll")?;
-	///     let path = lib.path()?;
-	///     println!("pathname: {}", path.display());
-	///     Ok(())
-	/// }
-	/// ```
-	#[doc(
-		alias = "dlinfo",
-		alias = "_dyld_get_image_name",
-		alias = "GetModuleFileNameW"
-	)]
-	#[inline]
-	pub fn path(&self) -> io::Result<path::PathBuf> {
-		unsafe { imp::dylib_path(self.0) }
-	}
+
 
 	/// Queries metadata about the underlying library file.
 	///
@@ -190,6 +156,14 @@ impl Library {
 		let handle = unsafe { imp::dylib_clone(self.0)? };
 		Ok(Library(handle))
 	}
+
+	// Creates a new [`Weak`](crate::weak::Weak) pointer to this Library.
+	pub fn downgrade(this: &Library) -> weak::Weak {
+		weak::Weak {
+			base_addr: Image::addr(this),
+			path_name: Image::path(this).ok(),
+		}
+	}
 }
 
 impl PartialEq<Library> for Library {
@@ -220,6 +194,41 @@ impl Image for Library {
 	fn addr(&self) -> *mut std::ffi::c_void {
 		unsafe {imp::get_addr(self.0)}
 	}
+	/// Gets the path to the dynamic library file.
+	///
+	/// # Platform-specific behavior
+	/// This function currently corresponds to the `dlinfo` function on Linux, `_dyld_get_image_name` on MacOS,
+	/// and `GetModuleFileNameW` function on Windows. Note that, this [may change in the future][changes]
+	///
+	/// [changes]: io#platform-specific-behavior
+	///
+	/// *Note: This function is not guarenteed to return the same path as the one passed in to open the library.*
+	///
+	/// # Errors
+	///
+	/// This function will return an error if there is no path associated with the library handle.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::*;
+	///
+	/// fn main() -> std::io::Result<()> {
+	///     let mut lib = Library::open("foo.dll")?;
+	///     let path = lib.path()?;
+	///     println!("pathname: {}", path.display());
+	///     Ok(())
+	/// }
+	/// ```
+	#[doc(
+		alias = "dlinfo",
+		alias = "_dyld_get_image_name",
+		alias = "GetModuleFileNameW"
+	)]
+	#[inline]
+	fn path(&self) -> io::Result<path::PathBuf> {
+		unsafe { imp::dylib_path(self.0) }
+	}
 }
 
 /// Creates an `Option<Library>` that may contain a loaded library.
@@ -238,7 +247,9 @@ macro_rules! lib {
 }
 
 pub trait Image: crate::sealed::Sealed {
+
+	/// Returns the base address of the image. This function may return null
+	/// if the image is no longer valid.
 	fn addr(&self) -> *mut std::ffi::c_void;
-	// This should be implemented next version bump
-	// fn path(&self) -> Option<path::PathBuf>
+	fn path(&self) -> io::Result<path::PathBuf>;
 }
