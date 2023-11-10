@@ -333,7 +333,7 @@ pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
 
 // returns null if handle is invalid
 #[cfg(target_env = "gnu")]
-pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
+pub(crate) unsafe fn get_addr(handle: Handle) -> *const ffi::c_void {
 	use std::os::unix::ffi::OsStringExt;
 	let mut map_ptr = ptr::null_mut::<c::link_map>();
 	if libc::dlinfo(
@@ -342,18 +342,18 @@ pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
 		&mut map_ptr as *mut _ as *mut _,
 	) == 0
 	{
-		(*map_ptr).l_addr as *mut ffi::c_void
+		(*map_ptr).l_addr as *const ffi::c_void
 	} else {
-		ptr::null_mut()
+		ptr::null()
 	}
 }
 
 // returns null if handle is invalid
 #[cfg(target_os = "macos")]
-pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
+pub(crate) unsafe fn get_addr(handle: Handle) -> *const ffi::c_void {
 	use std::os::unix::ffi::OsStringExt;
 
-	let mut result = ptr::null_mut();
+	let mut result = ptr::null();
 	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 		for image_index in (0..image_index).rev() {
 			let image_name = c::_dyld_get_image_name(image_index);
@@ -365,7 +365,7 @@ pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
 				let _ = libc::dlclose(active_handle);
 			}
 			if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
-				result = c::_dyld_get_image_header(image_index) as *mut ffi::c_void;
+				result = c::_dyld_get_image_header(image_index) as *const ffi::c_void;
 				break;
 			}
 		}

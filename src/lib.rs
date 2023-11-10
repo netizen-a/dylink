@@ -158,7 +158,7 @@ impl Library {
 	// Creates a new [`Weak`](crate::weak::Weak) pointer to this Library.
 	pub fn downgrade(this: &Library) -> weak::Weak {
 		weak::Weak {
-			base_addr: Image::addr(this),
+			base_addr: Image::as_ptr(this),
 			path_name: Image::path(this).ok(),
 		}
 	}
@@ -189,7 +189,7 @@ impl Drop for Library {
 }
 
 impl Image for Library {
-	fn addr(&self) -> *mut std::ffi::c_void {
+	fn as_ptr(&self) -> *const std::ffi::c_void {
 		unsafe { imp::get_addr(self.0) }
 	}
 	/// Gets the path to the dynamic library file.
@@ -244,8 +244,12 @@ macro_rules! lib {
 	};
 }
 
+/// A trait for objects that represent executable images.
 pub trait Image: crate::sealed::Sealed {
 	/// Returns the base address of the image.
-	fn addr(&self) -> *mut std::ffi::c_void;
+	///
+	/// The pointer is only valid if there are some strong references to the image.
+	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
+	fn as_ptr(&self) -> *const std::ffi::c_void;
 	fn path(&self) -> io::Result<path::PathBuf>;
 }

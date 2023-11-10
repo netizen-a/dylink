@@ -102,9 +102,6 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut
 		&mut handle,
 	);
 	if result == 0 {
-		return Err(io::Error::last_os_error());
-	}
-	if result == 0 {
 		Err(io::Error::last_os_error())
 	} else {
 		// The handle doubles as the base address (this may not be true the other way around though).
@@ -176,6 +173,6 @@ pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
 }
 
 #[inline]
-pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
+pub(crate) unsafe fn get_addr(handle: Handle) -> *const ffi::c_void {
 	handle.as_ptr()
 }

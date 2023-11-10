@@ -3,6 +3,7 @@ use crate::os::unix as imp;
 #[cfg(windows)]
 use crate::os::windows as imp;
 use std::{ffi, io, path};
+use crate::os;
 
 use crate::Library;
 
@@ -10,21 +11,25 @@ use crate::Library;
 ///
 /// This object can be obtained through either [`Images`](crate::iter::Images) or [`Library`].
 pub struct Weak {
-	pub(crate) base_addr: *mut ffi::c_void,
+	pub(crate) base_addr: *const ffi::c_void,
 	pub(crate) path_name: Option<path::PathBuf>,
 }
 impl crate::sealed::Sealed for Weak {}
 
 impl Weak {
 	pub fn upgrade(&self) -> Option<Library> {
-		unsafe { imp::dylib_upgrade(self.base_addr) }.map(Library)
+		unsafe { imp::dylib_upgrade(self.base_addr.cast_mut()) }.map(Library)
 	}
 }
 
 impl crate::Image for Weak {
 	#[inline]
-	fn addr(&self) -> *mut ffi::c_void {
-		self.base_addr
+	fn as_ptr(&self) -> *const ffi::c_void {
+		if os::is_dangling(self.base_addr) {
+			std::ptr::null()
+		} else {
+			self.base_addr
+		}
 	}
 	#[inline]
 	fn path(&self) -> io::Result<path::PathBuf> {
