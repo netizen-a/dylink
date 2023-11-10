@@ -10,6 +10,7 @@ use os::unix as imp;
 use os::windows as imp;
 
 // This is an iterator and not a vector because the data should be assumed stale.
+#[derive(Debug, Clone)]
 pub struct Images {
 	inner: vec::IntoIter<weak::Weak>,
 }
@@ -27,6 +28,16 @@ impl Iterator for Images {
 	#[inline]
 	fn next(&mut self) -> Option<Self::Item> {
 		self.inner.next()
+	}
+	#[inline]
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		self.inner.size_hint()
+	}
+	#[inline]
+	fn count(self) -> usize
+		where
+			Self: Sized, {
+		self.inner.count()
 	}
 }
 

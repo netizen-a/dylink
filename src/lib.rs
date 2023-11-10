@@ -251,7 +251,7 @@ pub trait Image: crate::sealed::Sealed {
 	/// [`null`]: core::ptr::null "ptr::null"
 	fn as_ptr(&self) -> *const os::Header;
 	fn path(&self) -> io::Result<path::PathBuf>;
-	/// Returns `true` if the two `Image`s point to the same base address in a vein similar to `[ptr::eq]`.
+	/// Returns `true` if the two `Image`s point to the same base address in a vein similar to [`ptr::eq`].
 	/// This function ignores metadata of `dyn Trait` pointers.
 	///
 	/// [`ptr::eq`]: core::ptr::eq "ptr::eq"

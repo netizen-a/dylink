@@ -10,6 +10,7 @@ use crate::Library;
 /// Represents an executable image.
 ///
 /// This object can be obtained through either [`Images`](crate::iter::Images) or [`Library`].
+#[derive(Debug, Clone)]
 pub struct Weak {
 	pub(crate) base_addr: *const os::Header,
 	pub(crate) path_name: Option<path::PathBuf>,
