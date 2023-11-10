@@ -25,6 +25,7 @@ impl Images {
 
 impl<'a> Iterator for Images {
 	type Item = weak::Weak;
+	#[inline]
 	fn next(&mut self) -> Option<Self::Item> {
 		self.inner.next()
 	}
