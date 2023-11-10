@@ -154,10 +154,11 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			if let Some(new_len) = module_handles.iter().rposition(|a| !a.is_null()) {
 				module_handles.truncate(new_len)
 			}
-			let module_handles = module_handles.into_iter()
+			let module_handles = module_handles
+				.into_iter()
 				.map(|base_addr| weak::Weak {
 					base_addr,
-					path_name: dylib_path(ptr::NonNull::new_unchecked(base_addr)).ok()
+					path_name: dylib_path(ptr::NonNull::new_unchecked(base_addr)).ok(),
 				})
 				.collect::<Vec<weak::Weak>>();
 			// box and return the slice

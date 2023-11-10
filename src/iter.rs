@@ -1,5 +1,5 @@
-use crate::weak;
 use crate::os;
+use crate::weak;
 use std::io;
 use std::vec;
 
@@ -15,10 +15,7 @@ pub struct Images {
 // this impl block represents data coming from the global scope.
 impl Images {
 	pub fn now() -> io::Result<Self> {
-		let inner = unsafe {
-			imp::load_objects()?
-				.into_iter()
-		};
+		let inner = unsafe { imp::load_objects()?.into_iter() };
 		Ok(Self { inner })
 	}
 }

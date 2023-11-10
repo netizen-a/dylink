@@ -19,8 +19,8 @@ use os::unix as imp;
 use os::windows as imp;
 
 pub mod iter;
-pub mod weak;
 pub mod sync;
+pub mod weak;
 
 use std::{fs, io, marker, path};
 
@@ -115,8 +115,6 @@ impl Library {
 		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
 	}
 
-
-
 	/// Queries metadata about the underlying library file.
 	///
 	/// This function is equivalent to calling `metadata` using `Library::path`.
@@ -192,7 +190,7 @@ impl Drop for Library {
 
 impl Image for Library {
 	fn addr(&self) -> *mut std::ffi::c_void {
-		unsafe {imp::get_addr(self.0)}
+		unsafe { imp::get_addr(self.0) }
 	}
 	/// Gets the path to the dynamic library file.
 	///
@@ -247,7 +245,6 @@ macro_rules! lib {
 }
 
 pub trait Image: crate::sealed::Sealed {
-
 	/// Returns the base address of the image.
 	fn addr(&self) -> *mut std::ffi::c_void;
 	fn path(&self) -> io::Result<path::PathBuf>;

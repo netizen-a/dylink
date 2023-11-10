@@ -1,15 +1,15 @@
-use std::{ffi, path, io};
 #[cfg(unix)]
 use crate::os::unix as imp;
 #[cfg(windows)]
 use crate::os::windows as imp;
+use std::{ffi, io, path};
 
 use crate::Library;
 
 /// Represents an executable image.
 ///
 /// This object can be obtained through either [`Images`](crate::iter::Images) or [`Library`].
-pub struct Weak{
+pub struct Weak {
 	pub(crate) base_addr: *mut ffi::c_void,
 	pub(crate) path_name: Option<path::PathBuf>,
 }
@@ -17,11 +17,9 @@ impl crate::sealed::Sealed for Weak {}
 
 impl Weak {
 	pub fn upgrade(&self) -> Option<Library> {
-		unsafe {imp::dylib_upgrade(self.base_addr)}.map(Library)
+		unsafe { imp::dylib_upgrade(self.base_addr) }.map(Library)
 	}
 }
-
-
 
 impl crate::Image for Weak {
 	#[inline]

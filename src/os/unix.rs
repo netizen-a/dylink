@@ -2,12 +2,12 @@
 #![allow(clippy::let_unit_value)]
 #![allow(unused_imports)]
 
-#[cfg(target_env="gnu")]
+#[cfg(target_env = "gnu")]
 use libc::dl_iterate_phdr;
 
 use super::Handle;
 use crate::sealed::Sealed;
-use crate::{Symbol, weak};
+use crate::{weak, Symbol};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, mem, path::PathBuf, ptr};
@@ -176,7 +176,10 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<PathBuf> {
 	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 		for image_index in (0..image_index).rev() {
 			let image_name = c::_dyld_get_image_name(image_index);
-			let active_handle = libc::dlopen(image_name, libc::RTLD_NOW | libc::RTLD_LOCAL | libc::RTLD_NOLOAD);
+			let active_handle = libc::dlopen(
+				image_name,
+				libc::RTLD_NOW | libc::RTLD_LOCAL | libc::RTLD_NOLOAD,
+			);
 			if !active_handle.is_null() {
 				let _ = libc::dlclose(active_handle);
 			}
@@ -256,12 +259,18 @@ impl SymExt for Symbol<'_> {
 	}
 }
 
-#[cfg(target_env="gnu")]
+#[cfg(target_env = "gnu")]
 unsafe fn iter_phdr<F>(mut f: F) -> ffi::c_int
-where F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int
+where
+	F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int,
 {
-	unsafe extern "C" fn callback<F>(info: *mut libc::dl_phdr_info, size: libc::size_t, data: *mut ffi::c_void) -> ffi::c_int
-	where F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int
+	unsafe extern "C" fn callback<F>(
+		info: *mut libc::dl_phdr_info,
+		size: libc::size_t,
+		data: *mut ffi::c_void,
+	) -> ffi::c_int
+	where
+		F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int,
 	{
 		let f = data as *mut F;
 		(*f)(info, size)
@@ -272,8 +281,7 @@ where F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int
 #[cfg(target_env = "gnu")]
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	let mut data = Vec::new();
-	let _ = iter_phdr(|info, _|{
-
+	let _ = iter_phdr(|info, _| {
 		let path_name = if (*info).dlpi_name.is_null() {
 			None
 		} else {
@@ -281,7 +289,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
 			Some(PathBuf::from(path))
 		};
-		let weak_ptr = weak::Weak{
+		let weak_ptr = weak::Weak {
 			base_addr: (*info).dlpi_addr as *mut ffi::c_void,
 			path_name,
 		};
@@ -301,9 +309,9 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 		for image_index in 0..image_index {
 			let path = ffi::CStr::from_ptr(c::_dyld_get_image_name(image_index));
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
-			let weak_ptr = weak::Weak{
+			let weak_ptr = weak::Weak {
 				base_addr: c::_dyld_get_image_header(image_index) as *mut ffi::c_void,
-				path_name: PathBuf::from(path)
+				path_name: PathBuf::from(path),
 			};
 			data.push(weak_ptr);
 		}
@@ -349,7 +357,10 @@ pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
 	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 		for image_index in (0..image_index).rev() {
 			let image_name = c::_dyld_get_image_name(image_index);
-			let active_handle = libc::dlopen(image_name, libc::RTLD_NOW | libc::RTLD_LOCAL | libc::RTLD_NOLOAD);
+			let active_handle = libc::dlopen(
+				image_name,
+				libc::RTLD_NOW | libc::RTLD_LOCAL | libc::RTLD_NOLOAD,
+			);
 			if !active_handle.is_null() {
 				let _ = libc::dlclose(active_handle);
 			}
