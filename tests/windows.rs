@@ -2,10 +2,8 @@
 
 use dylink::*;
 
-#[cfg(windows)]
 static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
 
-#[cfg(windows)]
 #[test]
 fn test_macro() {
 	#[dylink(library = KERNEL32)]
@@ -23,7 +21,6 @@ fn test_macro() {
 	}
 }
 
-#[cfg(windows)]
 #[test]
 fn test_macro_impl() {
 	#[repr(transparent)]
