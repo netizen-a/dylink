@@ -323,7 +323,7 @@ pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
 	}
 }
 
-
+// returns null if handle is invalid
 #[cfg(target_env = "gnu")]
 pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
 	use std::os::unix::ffi::OsStringExt;
@@ -340,6 +340,7 @@ pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
 	}
 }
 
+// returns null if handle is invalid
 #[cfg(target_os = "macos")]
 pub(crate) unsafe fn get_addr(handle: Handle) -> *mut ffi::c_void {
 	use std::os::unix::ffi::OsStringExt;

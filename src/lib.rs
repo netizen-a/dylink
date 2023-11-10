@@ -248,8 +248,7 @@ macro_rules! lib {
 
 pub trait Image: crate::sealed::Sealed {
 
-	/// Returns the base address of the image. This function may return null
-	/// if the image is no longer valid.
+	/// Returns the base address of the image.
 	fn addr(&self) -> *mut std::ffi::c_void;
 	fn path(&self) -> io::Result<path::PathBuf>;
 }
