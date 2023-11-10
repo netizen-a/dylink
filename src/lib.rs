@@ -251,4 +251,7 @@ pub trait Image: crate::sealed::Sealed {
 	/// [`null`]: core::ptr::null "ptr::null"
 	fn as_ptr(&self) -> *const std::ffi::c_void;
 	fn path(&self) -> io::Result<path::PathBuf>;
+	fn ptr_eq(this: &Self, other: &Self) -> bool {
+		this.as_ptr() == other.as_ptr()
+	}
 }

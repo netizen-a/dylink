@@ -18,7 +18,7 @@ fn test_this_metadata() {
 fn test_try_clone() {
 	let lib = Library::this();
 	let other = lib.try_clone().expect("failed to clone handle");
-	assert_eq!(lib.as_ptr(), other.as_ptr());
+	assert!(Image::ptr_eq(&lib, &other));
 	let t = std::thread::spawn(move || {
 		println!("other: {:?}", other);
 	});
