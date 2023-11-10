@@ -20,7 +20,8 @@ use os::windows as imp;
 
 pub mod iter;
 pub mod sync;
-pub mod weak;
+mod weak;
+pub use weak::Weak;
 
 use std::{fs, io, marker, path};
 
@@ -42,8 +43,13 @@ impl Symbol<'_> {
 		self.0 as _
 	}
 	/// Attempts to get the base address of the library.
+	///
+	/// # Platform support
+	///
+	/// This function is supported on all platforms unconditionally, and should be
+	/// preferred over [`Image::as_ptr`] when possible.
 	#[inline]
-	pub fn base_addr(&self) -> io::Result<*mut os::Header> {
+	pub fn base_address(&self) -> io::Result<*mut os::Header> {
 		unsafe { imp::base_addr(self.0) }
 	}
 }
