@@ -17,6 +17,13 @@ pub(crate) type Handle = std::ptr::NonNull<ffi::c_void>;
 
 // This function only works for executable images.
 #[inline]
-pub(crate) fn is_dangling(addr: *const ffi::c_void) -> bool {
-	unsafe { imp::base_addr(addr.cast_mut()).is_err() }
+pub(crate) fn is_dangling(addr: *const Header) -> bool {
+	unsafe { imp::base_addr(addr.cast_mut().cast()).is_err() }
+}
+
+#[repr(C)]
+pub struct Header {
+    _data: [u8; 0],
+    _marker:
+        core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
 }

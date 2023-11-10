@@ -5,7 +5,6 @@
 #[cfg(target_env = "gnu")]
 use libc::dl_iterate_phdr;
 
-use super::Handle;
 use crate::sealed::Sealed;
 use crate::{weak, Symbol};
 #[cfg(unix)]
@@ -44,7 +43,7 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 	}
 }
 
-pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
+pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<super::Handle> {
 	let _lock = dylib_guard();
 	let c_str = ffi::CString::new(path.as_bytes())?;
 	let handle: *mut ffi::c_void = libc::dlopen(c_str.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL);
@@ -56,7 +55,7 @@ pub(crate) unsafe fn dylib_open(path: &ffi::OsStr) -> io::Result<Handle> {
 	}
 }
 
-pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
+pub(crate) unsafe fn dylib_this() -> io::Result<super::Handle> {
 	let _lock = dylib_guard();
 	let handle: *mut ffi::c_void = libc::dlopen(ptr::null(), libc::RTLD_NOW | libc::RTLD_LOCAL);
 	if let Some(ret) = ptr::NonNull::new(handle) {
@@ -67,7 +66,7 @@ pub(crate) unsafe fn dylib_this() -> io::Result<Handle> {
 	}
 }
 
-pub(crate) unsafe fn dylib_close(lib_handle: Handle) -> io::Result<()> {
+pub(crate) unsafe fn dylib_close(lib_handle: super::Handle) -> io::Result<()> {
 	let _lock = dylib_guard();
 	if libc::dlclose(lib_handle.as_ptr()) != 0 {
 		let err = c_dlerror().unwrap();
@@ -94,7 +93,7 @@ pub(crate) unsafe fn dylib_symbol<'a>(
 	}
 }
 
-pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<PathBuf> {
+pub(crate) unsafe fn dylib_path(handle: super::Handle) -> io::Result<PathBuf> {
 	match dylib_this() {
 		Ok(this_handle)
 			if (cfg!(target_os = "macos")
@@ -129,7 +128,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<PathBuf> {
 }
 
 #[cfg(target_env = "gnu")]
-unsafe fn get_link_map_path(handle: Handle) -> Option<PathBuf> {
+unsafe fn get_link_map_path(handle: super::Handle) -> Option<PathBuf> {
 	use std::os::unix::ffi::OsStringExt;
 	let mut map_ptr = ptr::null_mut::<c::link_map>();
 	if libc::dlinfo(
@@ -195,11 +194,11 @@ unsafe fn get_macos_image_path(handle: Handle) -> io::Result<PathBuf> {
 	result
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut ffi::c_void> {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut super::Header> {
 	let mut info = mem::MaybeUninit::<libc::Dl_info>::zeroed();
 	if libc::dladdr(symbol, info.as_mut_ptr()) != 0 {
 		let info = info.assume_init();
-		Ok(info.dli_fbase)
+		Ok(info.dli_fbase.cast())
 	} else {
 		// dlerror is not available for dladdr, so we're giving a generic error.
 		Err(io::Error::new(
@@ -209,7 +208,7 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut
 	}
 }
 
-pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
+pub(crate) unsafe fn dylib_clone(handle: super::Handle) -> io::Result<super::Handle> {
 	let this = dylib_this()?;
 	if this == handle {
 		Ok(this)
@@ -284,13 +283,15 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	let _ = iter_phdr(|info, _| {
 		let path_name = if (*info).dlpi_name.is_null() {
 			None
+		} else if (*info).dlpi_name.read() == 0i8 {
+			std::env::current_exe().ok()
 		} else {
 			let path = ffi::CStr::from_ptr((*info).dlpi_name);
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
 			Some(PathBuf::from(path))
 		};
 		let weak_ptr = weak::Weak {
-			base_addr: (*info).dlpi_addr as *mut ffi::c_void,
+			base_addr: (*info).dlpi_addr as *mut super::Header,
 			path_name,
 		};
 		data.push(weak_ptr);
@@ -310,7 +311,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			let path = ffi::CStr::from_ptr(c::_dyld_get_image_name(image_index));
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
 			let weak_ptr = weak::Weak {
-				base_addr: c::_dyld_get_image_header(image_index) as *mut ffi::c_void,
+				base_addr: c::_dyld_get_image_header(image_index) as *const super::Header,
 				path_name: PathBuf::from(path),
 			};
 			data.push(weak_ptr);
@@ -320,12 +321,12 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	Ok(data)
 }
 
-pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
+pub(crate) unsafe fn dylib_upgrade(addr: *const super::Header) -> Option<super::Handle> {
 	let mut info = mem::MaybeUninit::zeroed();
-	if libc::dladdr(addr, info.as_mut_ptr()) != 0 {
+	if libc::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
 		let info = info.assume_init();
 		let handle = libc::dlopen(info.dli_fname, libc::RTLD_NOW | libc::RTLD_LOCAL);
-		Handle::new(handle)
+		super::Handle::new(handle)
 	} else {
 		None
 	}
@@ -333,7 +334,7 @@ pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
 
 // returns null if handle is invalid
 #[cfg(target_env = "gnu")]
-pub(crate) unsafe fn get_addr(handle: Handle) -> *const ffi::c_void {
+pub(crate) unsafe fn get_addr(handle: super::Handle) -> *const super::Header {
 	use std::os::unix::ffi::OsStringExt;
 	let mut map_ptr = ptr::null_mut::<c::link_map>();
 	if libc::dlinfo(
@@ -342,7 +343,7 @@ pub(crate) unsafe fn get_addr(handle: Handle) -> *const ffi::c_void {
 		&mut map_ptr as *mut _ as *mut _,
 	) == 0
 	{
-		(*map_ptr).l_addr as *const ffi::c_void
+		(*map_ptr).l_addr as *const super::Header
 	} else {
 		ptr::null()
 	}
@@ -350,7 +351,7 @@ pub(crate) unsafe fn get_addr(handle: Handle) -> *const ffi::c_void {
 
 // returns null if handle is invalid
 #[cfg(target_os = "macos")]
-pub(crate) unsafe fn get_addr(handle: Handle) -> *const ffi::c_void {
+pub(crate) unsafe fn get_addr(handle: super::Handle) -> *const super::Header {
 	use std::os::unix::ffi::OsStringExt;
 
 	let mut result = ptr::null();
@@ -365,7 +366,7 @@ pub(crate) unsafe fn get_addr(handle: Handle) -> *const ffi::c_void {
 				let _ = libc::dlclose(active_handle);
 			}
 			if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
-				result = c::_dyld_get_image_header(image_index) as *const ffi::c_void;
+				result = c::_dyld_get_image_header(image_index) as *const super::Header;
 				break;
 			}
 		}

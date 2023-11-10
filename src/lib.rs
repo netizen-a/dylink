@@ -43,7 +43,7 @@ impl Symbol<'_> {
 	}
 	/// Attempts to get the base address of the library.
 	#[inline]
-	pub fn base_addr(&self) -> io::Result<*mut std::ffi::c_void> {
+	pub fn base_addr(&self) -> io::Result<*mut os::Header> {
 		unsafe { imp::base_addr(self.0) }
 	}
 }
@@ -186,7 +186,7 @@ impl Drop for Library {
 }
 
 impl Image for Library {
-	fn as_ptr(&self) -> *const std::ffi::c_void {
+	fn as_ptr(&self) -> *const os::Header {
 		unsafe { imp::get_addr(self.0) }
 	}
 	/// Gets the path to the dynamic library file.
@@ -249,9 +249,10 @@ pub trait Image: crate::sealed::Sealed {
 	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
 	///
 	/// [`null`]: core::ptr::null "ptr::null"
-	fn as_ptr(&self) -> *const std::ffi::c_void;
+	fn as_ptr(&self) -> *const os::Header;
 	fn path(&self) -> io::Result<path::PathBuf>;
-	fn ptr_eq(this: &Self, other: &Self) -> bool {
-		this.as_ptr() == other.as_ptr()
+	fn ptr_eq(&self, other: &impl Image) -> bool
+	{
+		self.as_ptr() == other.as_ptr()
 	}
 }

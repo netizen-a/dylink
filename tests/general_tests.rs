@@ -36,7 +36,7 @@ fn test_iter_images() {
 			assert_eq!(weak.as_ptr(), dylib.as_ptr());
 			assert_eq!(weak.path().ok(), dylib.path().ok());
 		} else {
-			println!("upgrade failed");
+			println!("upgrade failed = {}", weak.path().unwrap().display());
 		}
 	}
 }

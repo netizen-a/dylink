@@ -94,7 +94,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	}
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut ffi::c_void> {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut super::Header> {
 	let mut handle = ptr::null_mut();
 	let result = c::GetModuleHandleExW(
 		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT | c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
@@ -105,7 +105,7 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut
 		Err(io::Error::last_os_error())
 	} else {
 		// The handle doubles as the base address (this may not be true the other way around though).
-		Ok(handle)
+		Ok(handle.cast())
 	}
 }
 
@@ -122,7 +122,7 @@ pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	const INITIAL_SIZE: usize = 1000;
 	let process_handle = c::GetCurrentProcess();
-	let mut module_handles = vec![ptr::null_mut(); INITIAL_SIZE];
+	let mut module_handles = vec![ptr::null_mut::<super::Header>(); INITIAL_SIZE];
 	let mut len_needed: u32 = 0;
 	let mut prev_size = INITIAL_SIZE;
 
@@ -130,7 +130,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 		let cb = (module_handles.len() * mem::size_of::<c::HANDLE>()) as u32;
 		let result = c::EnumProcessModulesEx(
 			process_handle,
-			module_handles.as_mut_ptr(),
+			module_handles.as_mut_ptr().cast(),
 			cb,
 			&mut len_needed,
 			c::LIST_MODULES_ALL,
@@ -155,7 +155,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 				.into_iter()
 				.map(|base_addr| weak::Weak {
 					base_addr,
-					path_name: dylib_path(ptr::NonNull::new_unchecked(base_addr)).ok(),
+					path_name: dylib_path(ptr::NonNull::new_unchecked(base_addr.cast())).ok(),
 				})
 				.collect::<Vec<weak::Weak>>();
 			// box and return the slice
@@ -164,15 +164,15 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	}
 }
 
-pub(crate) unsafe fn dylib_upgrade(addr: *mut ffi::c_void) -> Option<Handle> {
+pub(crate) unsafe fn dylib_upgrade(addr: *mut super::Header) -> Option<Handle> {
 	if let Some(addr) = ptr::NonNull::new(addr) {
-		dylib_clone(addr).ok()
+		dylib_clone(addr.cast()).ok()
 	} else {
 		None
 	}
 }
 
 #[inline]
-pub(crate) unsafe fn get_addr(handle: Handle) -> *const ffi::c_void {
-	handle.as_ptr()
+pub(crate) unsafe fn get_addr(handle: Handle) -> *const super::Header {
+	handle.as_ptr().cast()
 }
