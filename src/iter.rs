@@ -1,6 +1,7 @@
 use crate::os;
 use crate::weak;
 use std::io;
+use std::iter::FusedIterator;
 use std::vec;
 
 #[cfg(unix)]
@@ -8,22 +9,39 @@ use os::unix as imp;
 #[cfg(windows)]
 use os::windows as imp;
 
+// This is an iterator and not a vector because the data should be assumed stale.
 pub struct Images {
 	inner: vec::IntoIter<weak::Weak>,
 }
 
-// this impl block represents data coming from the global scope.
 impl Images {
+	/// Takes a snapshot of executable images currently loaded into memory.
 	pub fn now() -> io::Result<Self> {
 		let inner = unsafe { imp::load_objects()?.into_iter() };
 		Ok(Self { inner })
 	}
 }
 
-impl<'a> Iterator for Images {
+impl Iterator for Images {
 	type Item = weak::Weak;
 	#[inline]
 	fn next(&mut self) -> Option<Self::Item> {
 		self.inner.next()
 	}
 }
+
+impl DoubleEndedIterator for Images {
+	#[inline]
+	fn next_back(&mut self) -> Option<Self::Item> {
+		self.inner.next_back()
+	}
+}
+
+impl ExactSizeIterator for Images {
+	#[inline]
+	fn len(&self) -> usize {
+		self.inner.len()
+	}
+}
+
+impl FusedIterator for Images {}
