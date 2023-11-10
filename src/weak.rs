@@ -21,7 +21,7 @@ impl Weak {
 pub trait Image: crate::sealed::Sealed {
 	fn addr(&self) -> *mut ffi::c_void;
 	// This should be implemented next version bump
-	// fn path(&self) -> io::Result<path::PathBuf>
+	// fn path(&self) -> Option<path::PathBuf>
 }
 
 impl Image for Weak {

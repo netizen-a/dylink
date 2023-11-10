@@ -289,7 +289,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	let mut data = Vec::new();
 	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 		data.clear();
-		for image_index in (0..image_index).rev() {
+		for image_index in 0..image_index {
 			data.push(weak::Weak{
 				base_addr: c::_dyld_get_image_header(image_index) as *mut ffi::c_void
 			});
