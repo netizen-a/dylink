@@ -1,9 +1,9 @@
+use crate::os;
 #[cfg(unix)]
 use crate::os::unix as imp;
 #[cfg(windows)]
 use crate::os::windows as imp;
 use std::{ffi, io, path};
-use crate::os;
 
 use crate::Library;
 

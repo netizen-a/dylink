@@ -155,7 +155,17 @@ impl Library {
 		Ok(Library(handle))
 	}
 
-	// Creates a new [`Weak`](crate::weak::Weak) pointer to this Library.
+	/// Creates a new [`Weak`](crate::weak::Weak) pointer to this Library.
+	///
+    /// # Examples
+    ///
+    /// ```
+    /// use dylink::Library;
+    ///
+    /// let this = Library::this();
+    ///
+    /// let weak_this = Library::downgrade(&this);
+    /// ```
 	pub fn downgrade(this: &Library) -> weak::Weak {
 		weak::Weak {
 			base_addr: Image::as_ptr(this),
@@ -250,6 +260,8 @@ pub trait Image: crate::sealed::Sealed {
 	///
 	/// The pointer is only valid if there are some strong references to the image.
 	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
+	///
+	/// [`null`]: core::ptr::null "ptr::null"
 	fn as_ptr(&self) -> *const std::ffi::c_void;
 	fn path(&self) -> io::Result<path::PathBuf>;
 }

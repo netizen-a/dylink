@@ -17,5 +17,5 @@ pub(crate) type Handle = std::ptr::NonNull<ffi::c_void>;
 
 #[inline]
 pub(crate) fn is_dangling(addr: *const ffi::c_void) -> bool {
-	unsafe {imp::base_addr(addr.cast_mut()).is_err()}
+	unsafe { imp::base_addr(addr.cast_mut()).is_err() }
 }
