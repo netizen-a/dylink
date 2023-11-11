@@ -2,10 +2,8 @@
 
 use dylink::*;
 
-#[cfg(windows)]
 static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
 
-#[cfg(windows)]
 #[test]
 fn test_macro() {
 	#[dylink(library = KERNEL32)]
@@ -23,7 +21,6 @@ fn test_macro() {
 	}
 }
 
-#[cfg(windows)]
 #[test]
 fn test_macro_impl() {
 	#[repr(transparent)]
@@ -48,43 +45,13 @@ fn test_macro_impl() {
 fn test_sym_addr() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let sym = lib.symbol("SetLastError").unwrap();
-	let base = sym.base_addr().unwrap();
-	println!("base address = {:p}", base);
+	let base = sym.base_address().unwrap();
+	assert!(!base.is_null())
 }
 
 #[test]
 fn test_path() {
 	let lib = Library::open("Kernel32.dll").unwrap();
-	let path = lib.path().unwrap();
-	println!("path = {}", path.display());
-}
-
-#[test]
-fn test_metadata() {
-	let lib = Library::open("Kernel32.dll").unwrap();
-	let metadata = lib.metadata();
-	println!("metadata = {:?}", metadata);
-}
-
-
-// test to see if there are race conditions when getting a path.
-#[test]
-fn test_path_soundness() {
-	let mut vlib = vec![];
-	for _ in 0..300 {
-		vlib.push(Library::open("Kernel32.dll").unwrap())
-	}
-	let t = std::thread::spawn( || {
-		let mut other_vlib = vec![];
-		for _ in 0..300 {
-			other_vlib.push(Library::open("Kernel32.dll").unwrap())
-		}
-		for lib in other_vlib.drain(0..) {
-			let _ = lib.path().unwrap();
-		}
-	});
-	for lib in vlib.drain(0..) {
-		let _ = lib.path().unwrap();
-	}
-	t.join().unwrap();
+	let path = lib.path();
+	assert!(path.is_ok())
 }

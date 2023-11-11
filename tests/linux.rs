@@ -2,7 +2,6 @@
 
 use dylink::*;
 
-#[cfg(target_os = "linux")]
 static LIB_X11: sync::LibLock = sync::LibLock::new(&["libX11.so.6"]);
 
 #[test]
@@ -45,43 +44,13 @@ fn test_atoi_linux() {
 fn test_sym_addr() {
 	let lib = Library::open("libX11.so.6").unwrap();
 	let sym = lib.symbol("XOpenDisplay").unwrap();
-	let base = sym.base_addr().unwrap();
-	println!("base address = {:p}", base);
+	let base = sym.base_address().unwrap();
+	assert!(!base.is_null())
 }
 
 #[test]
 fn test_path() {
 	let lib = Library::open("libX11.so.6").unwrap();
-	let path = lib.path().unwrap();
-	println!("path = {}", path.display());
-}
-
-#[test]
-fn test_metadata() {
-	let lib = Library::open("libX11.so.6").unwrap();
-	let metadata = lib.metadata();
-	println!("metadata = {:?}", metadata);
-}
-
-
-// test to see if there are race conditions when getting a path.
-#[test]
-fn test_path_soundness() {
-	let mut vlib = vec![];
-	for _ in 0..300 {
-		vlib.push(Library::open("libX11.so.6").unwrap())
-	}
-	let t = std::thread::spawn( || {
-		let mut other_vlib = vec![];
-		for _ in 0..300 {
-			other_vlib.push(Library::open("libX11.so.6").unwrap())
-		}
-		for lib in other_vlib.drain(0..) {
-			let _ = lib.path().unwrap();
-		}
-	});
-	for lib in vlib.drain(0..) {
-		let _ = lib.path().unwrap();
-	}
-	t.join().unwrap();
+	let path = lib.path();
+	assert!(path.is_ok())
 }

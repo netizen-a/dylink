@@ -18,9 +18,12 @@ use os::unix as imp;
 #[cfg(windows)]
 use os::windows as imp;
 
+pub mod iter;
 pub mod sync;
+mod weak;
+pub use weak::Weak;
 
-use std::{fs, io, marker, path};
+use std::{io, marker, path};
 
 pub use dylink_macro::dylink;
 
@@ -40,8 +43,13 @@ impl Symbol<'_> {
 		self.0 as _
 	}
 	/// Attempts to get the base address of the library.
+	///
+	/// # Platform support
+	///
+	/// This function is supported on all platforms unconditionally, and should be
+	/// preferred over [`Image::as_ptr`] when possible.
 	#[inline]
-	pub fn base_addr(&self) -> io::Result<*mut std::ffi::c_void> {
+	pub fn base_address(&self) -> io::Result<*mut os::Header> {
 		unsafe { imp::base_addr(self.0) }
 	}
 }
@@ -56,11 +64,12 @@ impl Symbol<'_> {
 /// or a race condition may occur. Additionally, upon loading or unloading the library, an
 /// optional entry point may be executed for each library, which may impose arbitrary requirements on the
 /// user for the access to the library to be sound.
-#[derive(Debug, Eq)]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct Library(os::Handle);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
+impl crate::sealed::Sealed for Library {}
 
 impl Library {
 	/// Attempts to open a dynamic library file.
@@ -68,6 +77,14 @@ impl Library {
 	/// The library maintains an internal reference count that increments
 	/// for every time the library is opened. Library symbols are eagerly resolved
 	/// before the function returns.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::Library;
+	///
+	/// let lib = Library::open("foo.dll").unwrap();
+	/// ```
 	#[doc(alias = "dlopen", alias = "LoadLibrary")]
 	#[inline]
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
@@ -78,6 +95,16 @@ impl Library {
 	/// # Panics
 	///
 	/// May panic if library process handle could not be acquired.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use dylink::{Library, Image};
+	///
+	/// let this = Library::this();
+	/// let path = this.path().unwrap();
+	/// println!("{}", path.display());
+	/// ```
 	#[must_use]
 	#[inline]
 	pub fn this() -> Self {
@@ -112,62 +139,10 @@ impl Library {
 		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
 	}
 
-	/// Gets the path to the dynamic library file.
-	///
-	/// # Platform-specific behavior
-	/// This function currently corresponds to the `dlinfo` function on Linux, `_dyld_get_image_name` on MacOS,
-	/// and `GetModuleFileNameW` function on Windows. Note that, this [may change in the future][changes]
-	///
-	/// [changes]: io#platform-specific-behavior
-	///
-	/// *Note: This function is not guarenteed to return the same path as the one passed in to open the library.*
-	///
-	/// # Errors
-	///
-	/// This function will return an error if there is no path associated with the library handle.
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use dylink::Library;
-	///
-	/// fn main() -> std::io::Result<()> {
-	///     let mut lib = Library::open("foo.dll")?;
-	///     let path = lib.path()?;
-	///     println!("pathname: {}", path.display());
-	///     Ok(())
-	/// }
-	/// ```
-	#[doc(
-		alias = "dlinfo",
-		alias = "_dyld_get_image_name",
-		alias = "GetModuleFileNameW"
-	)]
-	#[inline]
-	pub fn path(&self) -> io::Result<path::PathBuf> {
-		unsafe { imp::dylib_path(self.0) }
-	}
-
-	/// Queries metadata about the underlying library file.
-	///
-	/// This function is equivalent to calling `metadata` using `Library::path`.
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use dylink::Library;
-	///
-	/// fn main() -> std::io::Result<()> {
-	///     let mut lib = Library::open("foo.dll")?;
-	///     let metadata = lib.metadata()?;
-	///     Ok(())
-	/// }
-	/// ```
-	pub fn metadata(&self) -> io::Result<fs::Metadata> {
-		self.path().and_then(fs::metadata)
-	}
 	/// Creates a new `Library` instance that shares the same underlying library handle as the
 	/// existing `Library` instance.
+	///
+	/// # Examples
 	///
 	/// Creates two handles for a library named `foo.dll`:
 	///
@@ -185,17 +160,24 @@ impl Library {
 		let handle = unsafe { imp::dylib_clone(self.0)? };
 		Ok(Library(handle))
 	}
-}
 
-impl PartialEq<Library> for Library {
-	fn eq(&self, other: &Library) -> bool {
-		#[cfg(target_os = "macos")]
-		{
-			(self.0.as_ptr() as isize & (-4)) == (other.0.as_ptr() as isize & (-4))
-		}
-		#[cfg(not(target_os = "macos"))]
-		{
-			self.0.as_ptr() == other.0.as_ptr()
+	/// Creates a new [`Weak`] pointer to this Library.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::Library;
+	///
+	/// fn main() -> std::io::Result<()> {
+	///     let lib = Library::open("foo.dll")?;
+	///     let weak_lib = Library::downgrade(&lib);
+	///     Ok(())
+	/// }
+	/// ```
+	pub fn downgrade(this: &Self) -> weak::Weak {
+		weak::Weak {
+			base_addr: Image::as_ptr(this),
+			path_name: Image::path(this).ok(),
 		}
 	}
 }
@@ -208,6 +190,46 @@ impl Drop for Library {
 		unsafe {
 			let _ = imp::dylib_close(self.0);
 		}
+	}
+}
+
+impl Image for Library {
+	fn as_ptr(&self) -> *const os::Header {
+		unsafe { imp::get_addr(self.0) }
+	}
+	/// Gets the path to the dynamic library file.
+	///
+	/// # Platform-specific behavior
+	/// This function currently corresponds to the `dlinfo` function on Linux, `_dyld_get_image_name` on MacOS,
+	/// and `GetModuleFileNameW` function on Windows. Note that, this [may change in the future][changes]
+	///
+	/// [changes]: io#platform-specific-behavior
+	///
+	/// *Note: This function is not guarenteed to return the same path as the one passed in to open the library.*
+	///
+	/// # Errors
+	///
+	/// This function will return an error if there is no path associated with the library handle.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::{Library, Image};
+	///
+	/// fn main() -> std::io::Result<()> {
+	///     let mut lib = Library::open("foo.dll")?;
+	///     let path = lib.path()?;
+	///     Ok(())
+	/// }
+	/// ```
+	#[doc(
+		alias = "dlinfo",
+		alias = "_dyld_get_image_name",
+		alias = "GetModuleFileNameW"
+	)]
+	#[inline]
+	fn path(&self) -> io::Result<path::PathBuf> {
+		unsafe { imp::dylib_path(self.0) }
 	}
 }
 
@@ -224,4 +246,23 @@ macro_rules! lib {
 		[$($name),+].into_iter()
 			.find_map(|elem| $crate::Library::open(elem).ok())
 	};
+}
+
+/// A trait for objects that represent executable images.
+pub trait Image: crate::sealed::Sealed {
+	/// Returns the base address of the image.
+	///
+	/// The pointer is only valid if there are some strong references to the image.
+	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
+	///
+	/// [`null`]: core::ptr::null "ptr::null"
+	fn as_ptr(&self) -> *const os::Header;
+	fn path(&self) -> io::Result<path::PathBuf>;
+	/// Returns `true` if the two `Image`s point to the same base address in a vein similar to [`ptr::eq`].
+	/// This function ignores metadata of `dyn Trait` pointers.
+	///
+	/// [`ptr::eq`]: core::ptr::eq "ptr::eq"
+	fn ptr_eq(&self, other: &impl Image) -> bool {
+		self.as_ptr() == other.as_ptr()
+	}
 }

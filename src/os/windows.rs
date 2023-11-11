@@ -3,9 +3,10 @@ use std::marker::PhantomData;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
 use std::os::windows::prelude::*;
-use std::{ffi, io, path, ptr};
+use std::{ffi, io, mem, path, ptr};
 
 use super::Handle;
+use crate::weak;
 use crate::{Library, Symbol};
 
 mod c;
@@ -75,7 +76,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 			0 => {
 				// The function succeeded.
 				// Truncate the vector to remove unused zero bytes.
-				if let Some(new_len) = file_name.iter().rposition(|a| *a != 0) {
+				if let Some(new_len) = file_name.iter().rposition(|&a| a != 0) {
 					file_name.truncate(new_len + 1)
 				}
 				let os_str = ffi::OsString::from_wide(&file_name);
@@ -93,7 +94,7 @@ pub(crate) unsafe fn dylib_path(handle: Handle) -> io::Result<path::PathBuf> {
 	}
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut ffi::c_void> {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut super::Header> {
 	let mut handle = ptr::null_mut();
 	let result = c::GetModuleHandleExW(
 		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT | c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
@@ -103,7 +104,8 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut
 	if result == 0 {
 		Err(io::Error::last_os_error())
 	} else {
-		Ok(handle)
+		// The handle doubles as the base address (this may not be true the other way around though).
+		Ok(handle.cast())
 	}
 }
 
@@ -115,4 +117,62 @@ pub(crate) unsafe fn dylib_clone(handle: Handle) -> io::Result<Handle> {
 		&mut new_handle,
 	);
 	ptr::NonNull::new(new_handle).ok_or_else(io::Error::last_os_error)
+}
+
+pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
+	const INITIAL_SIZE: usize = 1000;
+	let process_handle = c::GetCurrentProcess();
+	let mut module_handles = vec![ptr::null_mut::<super::Header>(); INITIAL_SIZE];
+	let mut len_needed: u32 = 0;
+	let mut prev_size = INITIAL_SIZE;
+
+	loop {
+		let cb = (module_handles.len() * mem::size_of::<c::HANDLE>()) as u32;
+		let result = c::EnumProcessModulesEx(
+			process_handle,
+			module_handles.as_mut_ptr().cast(),
+			cb,
+			&mut len_needed,
+			c::LIST_MODULES_ALL,
+		);
+		if result == 0 {
+			return Err(io::Error::last_os_error());
+		}
+		len_needed /= mem::size_of::<c::HANDLE>() as u32;
+		if len_needed as usize > module_handles.len() {
+			// We can't trust the next iteration to be bigger, so fill with null
+			module_handles.fill(ptr::null_mut());
+			// make the new size sufficiently bigger, and always grow instead of shrink.
+			let new_size: usize = (prev_size).max(len_needed as usize + 30);
+			prev_size = new_size;
+			module_handles.resize(new_size, ptr::null_mut());
+		} else {
+			// success, so truncate to the appropriate size
+			if let Some(new_len) = module_handles.iter().rposition(|a| !a.is_null()) {
+				module_handles.truncate(new_len)
+			}
+			let module_handles = module_handles
+				.into_iter()
+				.map(|base_addr| weak::Weak {
+					base_addr,
+					path_name: dylib_path(ptr::NonNull::new_unchecked(base_addr.cast())).ok(),
+				})
+				.collect::<Vec<weak::Weak>>();
+			// box and return the slice
+			return Ok(module_handles);
+		}
+	}
+}
+
+pub(crate) unsafe fn dylib_upgrade(addr: *mut super::Header) -> Option<Handle> {
+	if let Some(addr) = ptr::NonNull::new(addr) {
+		dylib_clone(addr.cast()).ok()
+	} else {
+		None
+	}
+}
+
+#[inline]
+pub(crate) unsafe fn get_addr(handle: Handle) -> *const super::Header {
+	handle.as_ptr().cast()
 }
