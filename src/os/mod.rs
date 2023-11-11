@@ -23,7 +23,6 @@ pub(crate) fn is_dangling(addr: *const Header) -> bool {
 
 #[repr(C)]
 pub struct Header {
-    _data: [u8; 0],
-    _marker:
-        core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+	_data: [u8; 0],
+	_marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
 }

@@ -43,3 +43,33 @@ fn test_iter_images() -> std::io::Result<()> {
 	}
 	Ok(())
 }
+
+// test to see if there are race conditions when getting a path.
+#[test]
+fn test_path_soundness() -> std::io::Result<()> {
+	use dylink::iter::Images;
+	let images = Images::now()?;
+	let mut vlib = vec![];
+	for img in images {
+		if let Some(val) = img.upgrade() {
+			vlib.push(val)
+		}
+	}
+	let t = std::thread::spawn(|| {
+		let images = Images::now().unwrap();
+		let mut other_vlib = vec![];
+		for img in images {
+			if let Some(val) = img.upgrade() {
+				other_vlib.push(val)
+			}
+		}
+		for lib in other_vlib.drain(0..) {
+			let _ = lib.path().unwrap();
+		}
+	});
+	for lib in vlib.drain(0..) {
+		let _ = lib.path()?;
+	}
+	t.join().unwrap();
+	Ok(())
+}

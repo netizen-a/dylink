@@ -163,17 +163,17 @@ impl Library {
 
 	/// Creates a new [`Weak`] pointer to this Library.
 	///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use dylink::Library;
-    ///
-    /// fn main() -> std::io::Result<()> {
-    ///     let lib = Library::open("foo.dll")?;
-    ///     let weak_lib = Library::downgrade(&lib);
-    ///     Ok(())
-    /// }
-    /// ```
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::Library;
+	///
+	/// fn main() -> std::io::Result<()> {
+	///     let lib = Library::open("foo.dll")?;
+	///     let weak_lib = Library::downgrade(&lib);
+	///     Ok(())
+	/// }
+	/// ```
 	pub fn downgrade(this: &Self) -> weak::Weak {
 		weak::Weak {
 			base_addr: Image::as_ptr(this),
@@ -262,8 +262,7 @@ pub trait Image: crate::sealed::Sealed {
 	/// This function ignores metadata of `dyn Trait` pointers.
 	///
 	/// [`ptr::eq`]: core::ptr::eq "ptr::eq"
-	fn ptr_eq(&self, other: &impl Image) -> bool
-	{
+	fn ptr_eq(&self, other: &impl Image) -> bool {
 		self.as_ptr() == other.as_ptr()
 	}
 }

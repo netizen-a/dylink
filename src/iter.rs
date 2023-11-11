@@ -35,8 +35,9 @@ impl Iterator for Images {
 	}
 	#[inline]
 	fn count(self) -> usize
-		where
-			Self: Sized, {
+	where
+		Self: Sized,
+	{
 		self.inner.count()
 	}
 }
