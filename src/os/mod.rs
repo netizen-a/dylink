@@ -21,6 +21,10 @@ pub(crate) fn is_dangling(addr: *const Header) -> bool {
 	unsafe { imp::base_addr(addr.cast_mut().cast()).is_err() }
 }
 
+// Platform behavior:
+//     MacOS   -> mach_header
+//     Windows -> ???
+//     Linux   -> ???
 #[repr(C)]
 pub struct Header {
 	_data: [u8; 0],

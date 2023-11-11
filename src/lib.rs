@@ -87,6 +87,14 @@ impl Library {
 	/// # Panics
 	///
 	/// May panic if library process handle could not be acquired.
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use dylink::Library;
+	///
+	/// let lib = Library::this();
+	/// ```
 	#[must_use]
 	#[inline]
 	pub fn this() -> Self {

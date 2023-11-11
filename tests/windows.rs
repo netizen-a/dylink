@@ -45,7 +45,7 @@ fn test_macro_impl() {
 fn test_sym_addr() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let sym = lib.symbol("SetLastError").unwrap();
-	let base = sym.base_addr().unwrap();
+	let base = sym.base_address().unwrap();
 	println!("base address = {:p}", base);
 }
 
