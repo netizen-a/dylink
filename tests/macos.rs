@@ -16,10 +16,3 @@ fn test_path() {
 	let path = lib.path();
 	assert!(path.is_ok())
 }
-
-#[test]
-fn test_metadata() {
-	let lib = Library::open("libSystem.dylib").unwrap();
-	let metadata = lib.metadata();
-	assert!(metadata.is_ok())
-}

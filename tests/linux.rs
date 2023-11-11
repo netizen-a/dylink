@@ -54,10 +54,3 @@ fn test_path() {
 	let path = lib.path();
 	assert!(path.is_ok())
 }
-
-#[test]
-fn test_metadata() {
-	let lib = Library::open("libX11.so.6").unwrap();
-	let metadata = lib.metadata();
-	assert!(metadata.is_ok())
-}

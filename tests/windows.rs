@@ -55,10 +55,3 @@ fn test_path() {
 	let path = lib.path();
 	assert!(path.is_ok())
 }
-
-#[test]
-fn test_metadata() {
-	let lib = Library::open("Kernel32.dll").unwrap();
-	let metadata = lib.metadata();
-	assert!(metadata.is_ok())
-}

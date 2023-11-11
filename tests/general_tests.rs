@@ -8,13 +8,6 @@ fn test_this_path() {
 }
 
 #[test]
-fn test_this_metadata() {
-	let lib = Library::this();
-	let metadata = lib.metadata();
-	assert!(metadata.is_ok());
-}
-
-#[test]
 fn test_try_clone() {
 	let lib = Library::this();
 	let other = lib.try_clone().unwrap();

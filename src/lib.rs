@@ -23,7 +23,7 @@ pub mod sync;
 mod weak;
 pub use weak::Weak;
 
-use std::{fs, io, marker, path};
+use std::{io, marker, path};
 
 pub use dylink_macro::dylink;
 
@@ -139,24 +139,6 @@ impl Library {
 		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
 	}
 
-	/// Queries metadata about the underlying library file.
-	///
-	/// This function is equivalent to calling `metadata` using `Library::path`.
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use dylink::Library;
-	///
-	/// fn main() -> std::io::Result<()> {
-	///     let mut lib = Library::open("foo.dll")?;
-	///     let metadata = lib.metadata()?;
-	///     Ok(())
-	/// }
-	/// ```
-	pub fn metadata(&self) -> io::Result<fs::Metadata> {
-		self.path().and_then(fs::metadata)
-	}
 	/// Creates a new `Library` instance that shares the same underlying library handle as the
 	/// existing `Library` instance.
 	///
