@@ -11,5 +11,5 @@ fn test_unix_sym_info() {
 	let this = Library::this();
 	let symbol = this.symbol("atoi").unwrap();
 	let info = symbol.info();
-	println!("{:?}", info);
+	assert!(info.is_ok());
 }

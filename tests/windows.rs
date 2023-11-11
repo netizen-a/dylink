@@ -46,19 +46,19 @@ fn test_sym_addr() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let sym = lib.symbol("SetLastError").unwrap();
 	let base = sym.base_address().unwrap();
-	println!("base address = {:p}", base);
+	assert!(!base.is_null())
 }
 
 #[test]
 fn test_path() {
 	let lib = Library::open("Kernel32.dll").unwrap();
-	let path = lib.path().unwrap();
-	println!("path = {}", path.display());
+	let path = lib.path();
+	assert!(path.is_ok())
 }
 
 #[test]
 fn test_metadata() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let metadata = lib.metadata();
-	println!("metadata = {:?}", metadata);
+	assert!(metadata.is_ok())
 }

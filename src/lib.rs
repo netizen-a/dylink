@@ -77,6 +77,14 @@ impl Library {
 	/// The library maintains an internal reference count that increments
 	/// for every time the library is opened. Library symbols are eagerly resolved
 	/// before the function returns.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::Library;
+	///
+	/// let lib = Library::open("foo.dll").unwrap();
+	/// ```
 	#[doc(alias = "dlopen", alias = "LoadLibrary")]
 	#[inline]
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
@@ -91,9 +99,11 @@ impl Library {
 	/// # Examples
 	///
 	/// ```
-	/// use dylink::Library;
+	/// use dylink::{Library, Image};
 	///
-	/// let lib = Library::this();
+	/// let this = Library::this();
+	/// let path = this.path().unwrap();
+	/// println!("{}", path.display());
 	/// ```
 	#[must_use]
 	#[inline]
