@@ -161,16 +161,18 @@ impl Library {
 		Ok(Library(handle))
 	}
 
-	/// Creates a new [`Weak`](crate::weak::Weak) pointer to this Library.
+	/// Creates a new [`Weak`] pointer to this Library.
 	///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// use dylink::Library;
     ///
-    /// let this = Library::this();
-    ///
-    /// let weak_this = Library::downgrade(&this);
+    /// fn main() -> std::io::Result<()> {
+    ///     let lib = Library::open("foo.dll")?;
+    ///     let weak_lib = Library::downgrade(&lib);
+    ///     Ok(())
+    /// }
     /// ```
 	pub fn downgrade(this: &Self) -> weak::Weak {
 		weak::Weak {
@@ -212,12 +214,11 @@ impl Image for Library {
 	/// # Examples
 	///
 	/// ```no_run
-	/// use dylink::*;
+	/// use dylink::{Library, Image};
 	///
 	/// fn main() -> std::io::Result<()> {
 	///     let mut lib = Library::open("foo.dll")?;
 	///     let path = lib.path()?;
-	///     println!("pathname: {}", path.display());
 	///     Ok(())
 	/// }
 	/// ```

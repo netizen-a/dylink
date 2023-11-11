@@ -203,7 +203,7 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut
 		// dlerror is not available for dladdr, so we're giving a generic error.
 		Err(io::Error::new(
 			io::ErrorKind::Other,
-			"failed to get symbol info",
+			"failed to get base address",
 		))
 	}
 }
@@ -219,31 +219,28 @@ pub(crate) unsafe fn dylib_clone(handle: super::Handle) -> io::Result<super::Han
 	}
 }
 
-#[cfg(feature = "unstable")]
 #[derive(Debug)]
 pub struct DlInfo {
 	pub dli_fname: ffi::CString,
-	pub dli_fbase: *mut ffi::c_void,
+	pub dli_fbase: *mut super::Header,
 	pub dli_sname: ffi::CString,
 	pub dli_saddr: *mut ffi::c_void,
 }
 
-#[cfg(feature = "unstable")]
 pub trait SymExt: Sealed {
 	fn info(&self) -> io::Result<DlInfo>;
 }
 
-#[cfg(feature = "unstable")]
 impl SymExt for Symbol<'_> {
 	#[doc(alias = "dladdr")]
 	fn info(&self) -> io::Result<DlInfo> {
-		let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
+		let mut info = mem::MaybeUninit::<libc::Dl_info>::zeroed();
 		unsafe {
-			if c::dladdr(self.0 as *const _, info.as_mut_ptr()) != 0 {
+			if libc::dladdr(self.0 as *const _, info.as_mut_ptr()) != 0 {
 				let info = info.assume_init();
 				Ok(DlInfo {
 					dli_fname: ffi::CStr::from_ptr(info.dli_fname).to_owned(),
-					dli_fbase: info.dli_fbase,
+					dli_fbase: info.dli_fbase.cast(),
 					dli_sname: ffi::CStr::from_ptr(info.dli_sname).to_owned(),
 					dli_saddr: info.dli_saddr,
 				})

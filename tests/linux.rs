@@ -41,18 +41,20 @@ fn test_atoi_linux() {
 }
 
 #[test]
-fn test_sym_addr() {
-	let lib = Library::open("libX11.so.6").unwrap();
-	let sym = lib.symbol("XOpenDisplay").unwrap();
-	let base = sym.base_addr().unwrap();
+fn test_sym_addr() -> std::io::Result<()> {
+	let lib = Library::open("libX11.so.6")?;
+	let sym = lib.symbol("XOpenDisplay")?;
+	let base = sym.base_address()?;
 	println!("base address = {:p}", base);
+	Ok(())
 }
 
 #[test]
-fn test_path() {
-	let lib = Library::open("libX11.so.6").unwrap();
-	let path = lib.path().unwrap();
+fn test_path() -> std::io::Result<()> {
+	let lib = Library::open("libX11.so.6")?;
+	let path = lib.path()?;
 	println!("path = {}", path.display());
+	Ok(())
 }
 
 #[test]
