@@ -1,6 +1,6 @@
 [package]
 name = "dylink"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2021"
 authors = ["Jonathan Thomason"]
 license = "MIT OR Apache-2.0"
@@ -8,12 +8,12 @@ keywords = ["ffi", "dlopen", "load", "shared", "lazy"]
 categories = ["api-bindings"]
 description = "Run-time dynamic linking loader utilities"
 repository = "https://github.com/Razordor/dylink.git"
-publish = true
+publish = false
 
 [workspace]
 members = ["dylink_macro"]
 
-[dependencies]
+[target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [dependencies.dylink_macro]

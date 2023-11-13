@@ -21,10 +21,12 @@ pub(crate) fn is_dangling(addr: *const Header) -> bool {
 	unsafe { imp::base_addr(addr.cast_mut().cast()).is_err() }
 }
 
+// TODO: Next version bump this needs to be moved to a different module.
+//
 // Platform behavior:
 //     MacOS   -> mach_header
-//     Windows -> ???
-//     Linux   -> ???
+//     Windows -> IMAGE_DOS_HEADER -> IMAGE_FILE_HEADER | IMAGE_OS2_HEADER | IMAGE_VXD_HEADER
+//     Linux   -> ElfN_Ehdr
 #[repr(C)]
 pub struct Header {
 	_data: [u8; 0],
