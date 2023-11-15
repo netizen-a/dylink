@@ -76,6 +76,15 @@ pub(crate) unsafe fn dylib_close(lib_handle: super::Handle) -> io::Result<()> {
 	}
 }
 
+
+#[inline]
+pub(crate) unsafe fn dylib_c_symbol(
+	lib_handle: *mut ffi::c_void,
+	name: &ffi::CStr,
+) -> *const ffi::c_void {
+	libc::dlsym(lib_handle, name.as_ptr())
+}
+
 pub(crate) unsafe fn dylib_symbol<'a>(
 	lib_handle: *mut ffi::c_void,
 	name: &str,
@@ -84,7 +93,7 @@ pub(crate) unsafe fn dylib_symbol<'a>(
 	let c_str = ffi::CString::new(name).unwrap();
 
 	let _ = c_dlerror(); // clear existing errors
-	let handle: *mut ffi::c_void = libc::dlsym(lib_handle, c_str.as_ptr());
+	let handle: *mut ffi::c_void = dylib_c_symbol(lib_handle, &c_str).cast_mut();
 
 	if let Some(err) = c_dlerror() {
 		Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))

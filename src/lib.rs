@@ -138,6 +138,12 @@ impl Library {
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<Symbol<'a>> {
 		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
 	}
+	#[cfg(feature="unstable")]
+	#[doc(alias = "dlsym")]
+	#[inline]
+	pub fn symbol_cstr(&self, name: &std::ffi::CStr) -> *const std::ffi::c_void {
+		unsafe {imp::dylib_c_symbol(self.0.as_ptr(), name)}
+	}
 
 	/// Creates a new `Library` instance that shares the same underlying library handle as the
 	/// existing `Library` instance.
