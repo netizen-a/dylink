@@ -68,7 +68,7 @@ impl Symbol<'_> {
 /// user for the access to the library to be sound.
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Library(os::Handle);
+pub struct Library(os::InnerLibrary);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
 impl crate::sealed::Sealed for Library {}
@@ -90,7 +90,7 @@ impl Library {
 	#[doc(alias = "dlopen", alias = "LoadLibrary")]
 	#[inline]
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
-		unsafe { imp::dylib_open(path.as_ref().as_os_str()) }.map(Library)
+		unsafe { os::InnerLibrary::open(path.as_ref().as_os_str()) }.map(Self)
 	}
 	/// Attempts to returns a library handle to the current process.
 	///
@@ -110,7 +110,7 @@ impl Library {
 	#[must_use]
 	#[inline]
 	pub fn this() -> Self {
-		unsafe { imp::dylib_this() }
+		unsafe { os::InnerLibrary::this() }
 			.map(Library)
 			.expect("failed to acquire library process handle")
 	}
@@ -138,13 +138,13 @@ impl Library {
 	#[doc(alias = "dlsym")]
 	#[inline]
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<Symbol<'a>> {
-		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
+		unsafe { self.0.symbol(name) }
 	}
-	#[cfg(feature="unstable")]
+	#[cfg(feature = "unstable")]
 	#[doc(alias = "dlsym")]
 	#[inline]
-	pub fn symbol_cstr(&self, name: &std::ffi::CStr) -> *const std::ffi::c_void {
-		unsafe {imp::dylib_c_symbol(self.0.as_ptr(), name)}
+	pub fn c_symbol(&self, name: &std::ffi::CStr) -> *const std::ffi::c_void {
+		unsafe { self.0.c_symbol(name) }
 	}
 
 	/// Creates a new `Library` instance that shares the same underlying library handle as the
@@ -165,8 +165,7 @@ impl Library {
 	/// ```
 	#[inline]
 	pub fn try_clone(&self) -> io::Result<Library> {
-		let handle = unsafe { imp::dylib_clone(self.0)? };
-		Ok(Library(handle))
+		unsafe { self.0.try_clone().map(Library) }
 	}
 
 	/// Creates a new [`Weak`] pointer to this Library.
@@ -191,20 +190,9 @@ impl Library {
 	}
 }
 
-impl Drop for Library {
-	/// Drops the Library.
-	///
-	/// This will decrement the reference count.
-	fn drop(&mut self) {
-		unsafe {
-			let _ = imp::dylib_close(self.0);
-		}
-	}
-}
-
 impl Image for Library {
 	fn as_ptr(&self) -> *const os::Header {
-		unsafe { imp::get_addr(self.0) }
+		unsafe { self.0.get_addr() }
 	}
 	/// Gets the path to the dynamic library file.
 	///
@@ -238,7 +226,7 @@ impl Image for Library {
 	)]
 	#[inline]
 	fn path(&self) -> io::Result<path::PathBuf> {
-		unsafe { imp::dylib_path(self.0) }
+		unsafe { self.0.path() }
 	}
 }
 
@@ -276,7 +264,7 @@ pub trait Image: crate::sealed::Sealed {
 		self.as_ptr() == other.as_ptr()
 	}
 	fn magic(&self) -> *const [u8] {
-		let len: usize = if cfg!(windows) {2} else {4};
+		let len: usize = if cfg!(windows) { 2 } else { 4 };
 		let data: *const u8 = self.as_ptr().cast();
 		ptr::slice_from_raw_parts(data, len)
 	}

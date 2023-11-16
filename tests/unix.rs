@@ -3,7 +3,6 @@
 pub mod linux;
 pub mod macos;
 
-
 #[cfg(not(target_os = "aix"))]
 #[test]
 fn test_unix_sym_info() {

@@ -1,8 +1,4 @@
 use crate::os;
-#[cfg(unix)]
-use crate::os::unix as imp;
-#[cfg(windows)]
-use crate::os::windows as imp;
 use std::{io, path};
 
 use crate::Library;
@@ -19,7 +15,7 @@ impl crate::sealed::Sealed for Weak {}
 
 impl Weak {
 	pub fn upgrade(&self) -> Option<Library> {
-		unsafe { imp::dylib_upgrade(self.base_addr.cast_mut()) }.map(Library)
+		unsafe { os::InnerLibrary::from_weak(self.base_addr.cast_mut()) }.map(Library)
 	}
 }
 

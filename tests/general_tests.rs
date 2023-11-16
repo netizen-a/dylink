@@ -63,7 +63,6 @@ fn test_path_soundness() {
 	t.join().unwrap();
 }
 
-
 #[test]
 fn test_magic() {
 	use dylink::Image;
@@ -74,7 +73,7 @@ fn test_magic() {
 			continue;
 		}
 
-		let magic = unsafe {&*magic};
+		let magic = unsafe { &*magic };
 		if cfg!(windows) {
 			assert!(magic == [b'M', b'Z'] || magic == [b'Z', b'M'])
 		} else if cfg!(target_os = "macos") {
@@ -85,6 +84,5 @@ fn test_magic() {
 			const EI_MAG: [u8; 4] = [0x7f, b'E', b'L', b'F'];
 			assert_eq!(magic, EI_MAG);
 		}
-
 	}
 }

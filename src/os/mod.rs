@@ -12,8 +12,9 @@ use windows as imp;
 
 use std::ffi;
 
-// an owned handle may not be null
-pub(crate) type Handle = std::ptr::NonNull<ffi::c_void>;
+#[derive(Debug)]
+#[repr(transparent)]
+pub(crate) struct InnerLibrary(std::ptr::NonNull<ffi::c_void>);
 
 // This function only works for executable images.
 #[inline]
