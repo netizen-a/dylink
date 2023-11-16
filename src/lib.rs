@@ -27,6 +27,8 @@ use std::{io, marker, path};
 
 pub use dylink_macro::dylink;
 
+use std::ptr;
+
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
@@ -180,6 +182,7 @@ impl Library {
 	///     Ok(())
 	/// }
 	/// ```
+	#[must_use]
 	pub fn downgrade(this: &Self) -> weak::Weak {
 		weak::Weak {
 			base_addr: Image::as_ptr(this),
@@ -268,7 +271,13 @@ pub trait Image: crate::sealed::Sealed {
 	/// This function ignores metadata of `dyn Trait` pointers.
 	///
 	/// [`ptr::eq`]: core::ptr::eq "ptr::eq"
+	#[inline]
 	fn ptr_eq(&self, other: &impl Image) -> bool {
 		self.as_ptr() == other.as_ptr()
+	}
+	fn magic(&self) -> *const [u8] {
+		let len: usize = if cfg!(windows) {2} else {4};
+		let data: *const u8 = self.as_ptr().cast();
+		ptr::slice_from_raw_parts(data, len)
 	}
 }

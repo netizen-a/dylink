@@ -62,3 +62,29 @@ fn test_path_soundness() {
 	}
 	t.join().unwrap();
 }
+
+
+#[test]
+fn test_magic() {
+	use dylink::Image;
+	let images = iter::Images::now().unwrap();
+	for img in images {
+		let magic = img.magic();
+		if magic.is_null() {
+			continue;
+		}
+
+		let magic = unsafe {&*magic};
+		if cfg!(windows) {
+			assert!(magic == [b'M', b'Z'] || magic == [b'Z', b'M'])
+		} else if cfg!(target_os = "macos") {
+			const MH_MAGIC: u32 = 0xfeedface;
+			const MH_MAGIC_64: u32 = 0xfeedfacf;
+			assert!(magic == MH_MAGIC.to_le_bytes() || magic == MH_MAGIC_64.to_le_bytes())
+		} else if cfg!(unix) {
+			const EI_MAG: [u8; 4] = [0x7f, b'E', b'L', b'F'];
+			assert_eq!(magic, EI_MAG);
+		}
+
+	}
+}
