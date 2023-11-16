@@ -15,7 +15,7 @@ impl crate::sealed::Sealed for Weak {}
 
 impl Weak {
 	pub fn upgrade(&self) -> Option<Library> {
-		unsafe { os::InnerLibrary::from_weak(self.base_addr.cast_mut()) }.map(Library)
+		unsafe { os::InnerLibrary::from_ptr(self.base_addr.cast_mut()) }.map(Library)
 	}
 }
 

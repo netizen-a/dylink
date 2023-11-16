@@ -90,7 +90,7 @@ impl super::InnerLibrary {
 			.ok_or_else(io::Error::last_os_error)
 			.map(Self)
 	}
-	pub(crate) unsafe fn from_weak(addr: *mut super::Header) -> Option<Self> {
+	pub(crate) unsafe fn from_ptr(addr: *mut super::Header) -> Option<Self> {
 		if let Some(addr) = ptr::NonNull::new(addr.cast::<ffi::c_void>()) {
 			let new_lib = super::InnerLibrary(addr);
 			new_lib.try_clone().ok()
@@ -100,7 +100,7 @@ impl super::InnerLibrary {
 	}
 
 	#[inline]
-	pub(crate) unsafe fn get_addr(&self) -> *const super::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const super::Header {
 		self.0.as_ptr().cast()
 	}
 }

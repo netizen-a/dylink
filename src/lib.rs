@@ -192,7 +192,7 @@ impl Library {
 
 impl Image for Library {
 	fn as_ptr(&self) -> *const os::Header {
-		unsafe { self.0.get_addr() }
+		unsafe { self.0.to_ptr() }
 	}
 	/// Gets the path to the dynamic library file.
 	///
@@ -247,6 +247,10 @@ macro_rules! lib {
 
 /// A trait for objects that represent executable images.
 pub trait Image: crate::sealed::Sealed {
+
+	// TODO: next version bump rename `as_ptr` to `to_ptr`,
+	//       because getting the pointer on unix is non-trivial.
+
 	/// Returns the base address of the image.
 	///
 	/// The pointer is only valid if there are some strong references to the image.

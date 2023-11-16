@@ -133,7 +133,7 @@ impl super::InnerLibrary {
 
 	// returns null if handle is invalid
 	#[cfg(target_env = "gnu")]
-	pub(crate) unsafe fn get_addr(&self) -> *const super::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const super::Header {
 		use std::os::unix::ffi::OsStringExt;
 		let mut map_ptr = ptr::null_mut::<c::link_map>();
 		if libc::dlinfo(
@@ -150,7 +150,7 @@ impl super::InnerLibrary {
 
 	// returns null if handle is invalid
 	#[cfg(target_os = "macos")]
-	pub(crate) unsafe fn get_addr(&self) -> *const super::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const super::Header {
 		use std::os::unix::ffi::OsStringExt;
 		let handle = self.0;
 		let mut result = ptr::null();
@@ -173,7 +173,7 @@ impl super::InnerLibrary {
 		});
 		result
 	}
-	pub(crate) unsafe fn from_weak(addr: *const super::Header) -> Option<Self> {
+	pub(crate) unsafe fn from_ptr(addr: *const super::Header) -> Option<Self> {
 		let mut info = mem::MaybeUninit::zeroed();
 		if libc::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
 			let info = info.assume_init();
@@ -238,8 +238,6 @@ impl Drop for super::InnerLibrary {
 	}
 }
 
-
-
 #[cfg(target_os = "macos")]
 fn get_image_count() -> &'static AtomicU32 {
 	static IMAGE_COUNT: AtomicU32 = AtomicU32::new(0);
@@ -257,8 +255,6 @@ fn get_image_count() -> &'static AtomicU32 {
 
 	&IMAGE_COUNT
 }
-
-
 
 pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut super::Header> {
 	let mut info = mem::MaybeUninit::<libc::Dl_info>::zeroed();
