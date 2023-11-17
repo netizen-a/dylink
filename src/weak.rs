@@ -21,7 +21,7 @@ impl Weak {
 
 impl crate::Image for Weak {
 	#[inline]
-	fn as_ptr(&self) -> *const os::Header {
+	fn to_ptr(&self) -> *const os::Header {
 		if os::is_dangling(self.base_addr) {
 			std::ptr::null()
 		} else {

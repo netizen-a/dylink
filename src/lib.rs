@@ -184,14 +184,14 @@ impl Library {
 	#[must_use]
 	pub fn downgrade(this: &Self) -> weak::Weak {
 		weak::Weak {
-			base_addr: Image::as_ptr(this),
+			base_addr: Image::to_ptr(this),
 			path_name: Image::path(this).ok(),
 		}
 	}
 }
 
 impl Image for Library {
-	fn as_ptr(&self) -> *const os::Header {
+	fn to_ptr(&self) -> *const os::Header {
 		unsafe { self.0.to_ptr() }
 	}
 	/// Gets the path to the dynamic library file.
@@ -248,8 +248,9 @@ macro_rules! lib {
 /// A trait for objects that represent executable images.
 pub trait Image: crate::sealed::Sealed {
 
-	// TODO: next version bump rename `as_ptr` to `to_ptr`,
+	// TODO: next version bump remove `as_ptr`,
 	//       because getting the pointer on unix is non-trivial.
+
 
 	/// Returns the base address of the image.
 	///
@@ -257,7 +258,19 @@ pub trait Image: crate::sealed::Sealed {
 	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
 	///
 	/// [`null`]: core::ptr::null "ptr::null"
-	fn as_ptr(&self) -> *const os::Header;
+	#[deprecated = "use to_ptr instead"]
+	#[inline]
+	fn as_ptr(&self) -> *const os::Header {
+		self.to_ptr()
+	}
+	/// Returns the base address of the image.
+	///
+	/// The pointer is only valid if there are some strong references to the image.
+	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
+	///
+	/// [`null`]: core::ptr::null "ptr::null"
+	fn to_ptr(&self) -> *const os::Header;
+
 	fn path(&self) -> io::Result<path::PathBuf>;
 	/// Returns `true` if the two `Image`s point to the same base address in a vein similar to [`ptr::eq`].
 	/// This function ignores metadata of `dyn Trait` pointers.
@@ -265,11 +278,11 @@ pub trait Image: crate::sealed::Sealed {
 	/// [`ptr::eq`]: core::ptr::eq "ptr::eq"
 	#[inline]
 	fn ptr_eq(&self, other: &impl Image) -> bool {
-		self.as_ptr() == other.as_ptr()
+		self.to_ptr() == other.to_ptr()
 	}
 	fn magic(&self) -> *const [u8] {
 		let len: usize = if cfg!(windows) { 2 } else { 4 };
-		let data: *const u8 = self.as_ptr().cast();
+		let data: *const u8 = self.to_ptr().cast();
 		ptr::slice_from_raw_parts(data, len)
 	}
 }

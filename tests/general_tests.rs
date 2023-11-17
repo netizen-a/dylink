@@ -23,10 +23,10 @@ fn test_try_clone() {
 fn test_iter_images() {
 	let images = iter::Images::now().unwrap();
 	for weak in images {
-		print!("weak addr: {:p}, ", weak.as_ptr());
+		print!("weak addr: {:p}, ", weak.to_ptr());
 		if let Some(dylib) = weak.upgrade() {
 			println!("upgraded = {}", dylib.path().unwrap().display());
-			assert_eq!(weak.as_ptr(), dylib.as_ptr());
+			assert_eq!(weak.to_ptr(), dylib.to_ptr());
 			assert_eq!(weak.path().ok(), dylib.path().ok());
 		} else {
 			println!("upgrade failed = {}", weak.path().unwrap().display());
