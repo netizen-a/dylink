@@ -27,6 +27,8 @@ use std::{io, marker, path};
 
 pub use dylink_macro::dylink;
 
+use std::ptr;
+
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
@@ -66,7 +68,7 @@ impl Symbol<'_> {
 /// user for the access to the library to be sound.
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Library(os::Handle);
+pub struct Library(os::InnerLibrary);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
 impl crate::sealed::Sealed for Library {}
@@ -88,7 +90,7 @@ impl Library {
 	#[doc(alias = "dlopen", alias = "LoadLibrary")]
 	#[inline]
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
-		unsafe { imp::dylib_open(path.as_ref().as_os_str()) }.map(Library)
+		unsafe { os::InnerLibrary::open(path.as_ref().as_os_str()) }.map(Self)
 	}
 	/// Attempts to returns a library handle to the current process.
 	///
@@ -108,7 +110,7 @@ impl Library {
 	#[must_use]
 	#[inline]
 	pub fn this() -> Self {
-		unsafe { imp::dylib_this() }
+		unsafe { os::InnerLibrary::this() }
 			.map(Library)
 			.expect("failed to acquire library process handle")
 	}
@@ -136,7 +138,13 @@ impl Library {
 	#[doc(alias = "dlsym")]
 	#[inline]
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<Symbol<'a>> {
-		unsafe { imp::dylib_symbol(self.0.as_ptr(), name) }
+		unsafe { self.0.symbol(name) }
+	}
+	#[cfg(feature = "unstable")]
+	#[doc(alias = "dlsym")]
+	#[inline]
+	pub fn c_symbol(&self, name: &std::ffi::CStr) -> *const std::ffi::c_void {
+		unsafe { self.0.c_symbol(name) }
 	}
 
 	/// Creates a new `Library` instance that shares the same underlying library handle as the
@@ -157,8 +165,7 @@ impl Library {
 	/// ```
 	#[inline]
 	pub fn try_clone(&self) -> io::Result<Library> {
-		let handle = unsafe { imp::dylib_clone(self.0)? };
-		Ok(Library(handle))
+		unsafe { self.0.try_clone().map(Library) }
 	}
 
 	/// Creates a new [`Weak`] pointer to this Library.
@@ -174,28 +181,18 @@ impl Library {
 	///     Ok(())
 	/// }
 	/// ```
+	#[must_use]
 	pub fn downgrade(this: &Self) -> weak::Weak {
 		weak::Weak {
-			base_addr: Image::as_ptr(this),
+			base_addr: Image::to_ptr(this),
 			path_name: Image::path(this).ok(),
 		}
 	}
 }
 
-impl Drop for Library {
-	/// Drops the Library.
-	///
-	/// This will decrement the reference count.
-	fn drop(&mut self) {
-		unsafe {
-			let _ = imp::dylib_close(self.0);
-		}
-	}
-}
-
 impl Image for Library {
-	fn as_ptr(&self) -> *const os::Header {
-		unsafe { imp::get_addr(self.0) }
+	fn to_ptr(&self) -> *const os::Header {
+		unsafe { self.0.to_ptr() }
 	}
 	/// Gets the path to the dynamic library file.
 	///
@@ -229,7 +226,7 @@ impl Image for Library {
 	)]
 	#[inline]
 	fn path(&self) -> io::Result<path::PathBuf> {
-		unsafe { imp::dylib_path(self.0) }
+		unsafe { self.0.path() }
 	}
 }
 
@@ -250,19 +247,42 @@ macro_rules! lib {
 
 /// A trait for objects that represent executable images.
 pub trait Image: crate::sealed::Sealed {
+
+	// TODO: next version bump remove `as_ptr`,
+	//       because getting the pointer on unix is non-trivial.
+
+
 	/// Returns the base address of the image.
 	///
 	/// The pointer is only valid if there are some strong references to the image.
 	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
 	///
 	/// [`null`]: core::ptr::null "ptr::null"
-	fn as_ptr(&self) -> *const os::Header;
+	#[deprecated = "use to_ptr instead"]
+	#[inline]
+	fn as_ptr(&self) -> *const os::Header {
+		self.to_ptr()
+	}
+	/// Returns the base address of the image.
+	///
+	/// The pointer is only valid if there are some strong references to the image.
+	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
+	///
+	/// [`null`]: core::ptr::null "ptr::null"
+	fn to_ptr(&self) -> *const os::Header;
+
 	fn path(&self) -> io::Result<path::PathBuf>;
 	/// Returns `true` if the two `Image`s point to the same base address in a vein similar to [`ptr::eq`].
 	/// This function ignores metadata of `dyn Trait` pointers.
 	///
 	/// [`ptr::eq`]: core::ptr::eq "ptr::eq"
+	#[inline]
 	fn ptr_eq(&self, other: &impl Image) -> bool {
-		self.as_ptr() == other.as_ptr()
+		self.to_ptr() == other.to_ptr()
+	}
+	fn magic(&self) -> *const [u8] {
+		let len: usize = if cfg!(windows) { 2 } else { 4 };
+		let data: *const u8 = self.to_ptr().cast();
+		ptr::slice_from_raw_parts(data, len)
 	}
 }

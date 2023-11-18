@@ -23,10 +23,10 @@ fn test_try_clone() {
 fn test_iter_images() {
 	let images = iter::Images::now().unwrap();
 	for weak in images {
-		print!("weak addr: {:p}, ", weak.as_ptr());
+		print!("weak addr: {:p}, ", weak.to_ptr());
 		if let Some(dylib) = weak.upgrade() {
 			println!("upgraded = {}", dylib.path().unwrap().display());
-			assert_eq!(weak.as_ptr(), dylib.as_ptr());
+			assert_eq!(weak.to_ptr(), dylib.to_ptr());
 			assert_eq!(weak.path().ok(), dylib.path().ok());
 		} else {
 			println!("upgrade failed = {}", weak.path().unwrap().display());
@@ -61,4 +61,28 @@ fn test_path_soundness() {
 		let _ = lib.path().unwrap();
 	}
 	t.join().unwrap();
+}
+
+#[test]
+fn test_magic() {
+	use dylink::Image;
+	let images = iter::Images::now().unwrap();
+	for img in images {
+		let magic = img.magic();
+		if magic.is_null() {
+			continue;
+		}
+
+		let magic = unsafe { &*magic };
+		if cfg!(windows) {
+			assert!(magic == [b'M', b'Z'] || magic == [b'Z', b'M'])
+		} else if cfg!(target_os = "macos") {
+			const MH_MAGIC: u32 = 0xfeedface;
+			const MH_MAGIC_64: u32 = 0xfeedfacf;
+			assert!(magic == MH_MAGIC.to_le_bytes() || magic == MH_MAGIC_64.to_le_bytes())
+		} else if cfg!(unix) {
+			const EI_MAG: [u8; 4] = [0x7f, b'E', b'L', b'F'];
+			assert_eq!(magic, EI_MAG);
+		}
+	}
 }
