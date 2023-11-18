@@ -108,6 +108,7 @@ impl<'a> LibLock<'a> {
 		self.hlib.set(value)
 	}
 
+	/// Consumes the `LibLock`, returning the `Library`.
 	#[cfg(feature = "unstable")]
 	#[inline]
 	pub fn into_inner(self) -> Option<Library> {

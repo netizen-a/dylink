@@ -1,7 +1,11 @@
 use crate::os;
+use crate::Library;
 use std::{io, path};
 
-use crate::Library;
+#[cfg(unix)]
+use os::unix as imp;
+#[cfg(windows)]
+use os::windows as imp;
 
 /// Represents an executable image.
 ///
@@ -15,7 +19,7 @@ impl crate::sealed::Sealed for Weak {}
 
 impl Weak {
 	pub fn upgrade(&self) -> Option<Library> {
-		unsafe { os::InnerLibrary::from_ptr(self.base_addr.cast_mut()) }.map(Library)
+		unsafe { imp::InnerLibrary::from_ptr(self.base_addr.cast_mut()) }.map(Library)
 	}
 }
 
