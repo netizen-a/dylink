@@ -10,12 +10,6 @@ use unix as imp;
 #[cfg(windows)]
 use windows as imp;
 
-use std::ffi;
-
-#[derive(Debug)]
-#[repr(transparent)]
-pub(crate) struct InnerLibrary(std::ptr::NonNull<ffi::c_void>);
-
 // This function only works for executable images.
 #[inline]
 pub(crate) fn is_dangling(addr: *const Header) -> bool {

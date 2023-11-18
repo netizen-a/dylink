@@ -68,7 +68,7 @@ impl Symbol<'_> {
 /// user for the access to the library to be sound.
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Library(os::InnerLibrary);
+pub struct Library(imp::InnerLibrary);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
 impl crate::sealed::Sealed for Library {}
@@ -90,7 +90,7 @@ impl Library {
 	#[doc(alias = "dlopen", alias = "LoadLibrary")]
 	#[inline]
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
-		unsafe { os::InnerLibrary::open(path.as_ref().as_os_str()) }.map(Self)
+		unsafe { imp::InnerLibrary::open(path.as_ref().as_os_str()) }.map(Self)
 	}
 	/// Attempts to returns a library handle to the current process.
 	///
@@ -110,7 +110,7 @@ impl Library {
 	#[must_use]
 	#[inline]
 	pub fn this() -> Self {
-		unsafe { os::InnerLibrary::this() }
+		unsafe { imp::InnerLibrary::this() }
 			.map(Library)
 			.expect("failed to acquire library process handle")
 	}
@@ -247,10 +247,8 @@ macro_rules! lib {
 
 /// A trait for objects that represent executable images.
 pub trait Image: crate::sealed::Sealed {
-
 	// TODO: next version bump remove `as_ptr`,
 	//       because getting the pointer on unix is non-trivial.
-
 
 	/// Returns the base address of the image.
 	///

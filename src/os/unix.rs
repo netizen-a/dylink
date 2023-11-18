@@ -44,7 +44,11 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 	}
 }
 
-impl super::InnerLibrary {
+#[derive(Debug)]
+#[repr(transparent)]
+pub(crate) struct InnerLibrary(std::ptr::NonNull<ffi::c_void>);
+
+impl InnerLibrary {
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {
 		let _lock = dylib_guard();
 		let c_str = ffi::CString::new(path.as_bytes())?;
@@ -232,7 +236,7 @@ impl super::InnerLibrary {
 		result
 	}
 }
-impl Drop for super::InnerLibrary {
+impl Drop for InnerLibrary {
 	fn drop(&mut self) {
 		unsafe { libc::dlclose(self.0.as_ptr()) };
 	}

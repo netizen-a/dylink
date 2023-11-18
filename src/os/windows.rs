@@ -14,7 +14,11 @@ fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
 	path.encode_wide().chain(std::iter::once(0u16)).collect()
 }
 
-impl super::InnerLibrary {
+#[derive(Debug)]
+#[repr(transparent)]
+pub(crate) struct InnerLibrary(std::ptr::NonNull<ffi::c_void>);
+
+impl InnerLibrary {
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {
 		let wide_str: Vec<u16> = to_wide(path);
 		let handle = c::LoadLibraryExW(wide_str.as_ptr(), ptr::null_mut(), 0);
@@ -92,7 +96,7 @@ impl super::InnerLibrary {
 	}
 	pub(crate) unsafe fn from_ptr(addr: *mut super::Header) -> Option<Self> {
 		if let Some(addr) = ptr::NonNull::new(addr.cast::<ffi::c_void>()) {
-			let new_lib = super::InnerLibrary(addr);
+			let new_lib = InnerLibrary(addr);
 			new_lib.try_clone().ok()
 		} else {
 			None
@@ -105,7 +109,7 @@ impl super::InnerLibrary {
 	}
 }
 
-impl Drop for super::InnerLibrary {
+impl Drop for InnerLibrary {
 	fn drop(&mut self) {
 		unsafe {
 			c::FreeLibrary(self.0.as_ptr());
@@ -175,8 +179,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			let module_handles = module_handles
 				.into_iter()
 				.map(|base_addr| {
-					let hmodule =
-						super::InnerLibrary(ptr::NonNull::new_unchecked(base_addr.cast()));
+					let hmodule = InnerLibrary(ptr::NonNull::new_unchecked(base_addr.cast()));
 					weak::Weak {
 						base_addr,
 						path_name: hmodule.path().ok(),
