@@ -18,6 +18,7 @@ pub struct mach_header {
 	pub ncmds: ffi::c_ulong,       /* number of load commands */
 	pub sizeofcmds: ffi::c_ulong,  /* the size of all the load commands */
 	pub flags: ffi::c_ulong,       /* flags */
+	_marker: std::marker::PhantomPinned,
 }
 
 #[cfg(target_os = "macos")]
@@ -33,7 +34,6 @@ extern "C" {
 }
 
 #[cfg(target_env = "gnu")]
-#[derive(Debug)]
 #[repr(C)]
 pub struct ElfW_Dyn {
 	d_tag: usize,
@@ -41,7 +41,6 @@ pub struct ElfW_Dyn {
 }
 
 #[cfg(target_env = "gnu")]
-#[derive(Debug)]
 #[repr(C)]
 pub struct link_map {
 	pub l_addr: usize,
