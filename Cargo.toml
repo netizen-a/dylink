@@ -10,6 +10,11 @@ description = "Run-time dynamic linking loader utilities"
 repository = "https://github.com/Razordor/dylink.git"
 publish = false
 
+# TODO: Next version bump needs to make sure that this isn't required anymore.
+[profile]
+dev.panic = "unwind"
+release.panic = "unwind"
+
 [workspace]
 members = ["dylink_macro"]
 
