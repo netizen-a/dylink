@@ -8,8 +8,11 @@ use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, mem, path::PathBuf, ptr};
 use std::marker::PhantomData;
 
-#[cfg(not(any(target_os = "linux", target_env = "gnu")))]
-use std::sync;
+#[cfg(target_os = "macos")]
+use std::sync::{
+	Once,
+	atomic::{Ordering, AtomicU32}
+};
 
 mod c;
 
@@ -198,7 +201,6 @@ impl InnerLibrary {
 	}
 	#[cfg(target_os = "macos")]
 	unsafe fn get_macos_image_path(&self) -> io::Result<PathBuf> {
-		use std::os::unix::ffi::OsStringExt;
 		let handle = self.0;
 		let mut result = Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"));
 		let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
@@ -337,7 +339,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 
 #[cfg(target_os = "macos")]
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
-	use std::os::unix::ffi::OsStringExt;
+	use std::sync::atomic::Ordering;
 
 	let mut data = Vec::new();
 	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
@@ -358,19 +360,25 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 
 
 pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
+	#[cfg(target_os = "macos")]
 	const MH_MAGIC: &[u8] = &0xfeedface_u32.to_le_bytes();
+	#[cfg(target_os = "macos")]
 	const MH_MAGIC_64: &[u8] = &0xfeedfacf_u32.to_le_bytes();
+	#[cfg(not(target_os = "macos"))]
 	const ELF_MAGIC: &[u8] = &[0x7f, b'E', b'L', b'F'];
 	let magic: &[u8] = hdr.as_ref().unwrap_unchecked().magic();
 	match magic {
+		#[cfg(target_os = "macos")]
 		MH_MAGIC => {
 			let hdr = hdr as *const c::mach_header;
 			Ok(mem::size_of::<c::mach_header>() + (*hdr).sizeofcmds as usize)
 		}
+		#[cfg(target_os = "macos")]
 		MH_MAGIC_64 => {
 			let hdr = hdr as *const c::mach_header_64;
 			Ok(mem::size_of::<c::mach_header_64>() + (*hdr).sizeofcmds as usize)
 		},
+		#[cfg(not(target_os = "macos"))]
 		ELF_MAGIC => {
 			let data: *const u8 = hdr as *const u8;
 			match *data.offset(4) {

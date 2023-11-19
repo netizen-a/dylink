@@ -3,9 +3,12 @@
 
 use std::ffi;
 
+#[cfg(target_os = "macos")]
 type cpu_type_t = ffi::c_int;
+#[cfg(target_os = "macos")]
 type cpu_subtype_t = ffi::c_int;
 
+#[cfg(target_os = "macos")]
 // 32-bit header
 #[repr(C)]
 pub struct mach_header {
@@ -19,6 +22,7 @@ pub struct mach_header {
 	_marker: std::marker::PhantomPinned,
 }
 
+#[cfg(target_os = "macos")]
 // 64-bit header
 #[repr(C)]
 pub struct mach_header_64 {
