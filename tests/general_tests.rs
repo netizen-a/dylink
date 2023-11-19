@@ -68,12 +68,12 @@ fn test_magic() {
 	use dylink::Image;
 	let images = img::Images::now().unwrap();
 	for img in images {
-		let magic = img.magic();
-		if magic.is_null() {
+		let magic = unsafe {img.to_ptr().as_ref()};
+		if let None = magic {
 			continue;
 		}
 
-		let magic = unsafe { &*magic };
+		let magic = magic.unwrap().magic();
 		if cfg!(windows) {
 			assert!(magic == [b'M', b'Z'] || magic == [b'Z', b'M'])
 		} else if cfg!(target_os = "macos") {
