@@ -2,24 +2,27 @@
 #![allow(clippy::let_unit_value)]
 
 use crate::sealed::Sealed;
-use crate::{weak, Symbol, img};
+use crate::{img, weak, Symbol};
+use std::marker::PhantomData;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, mem, path::PathBuf, ptr};
-use std::marker::PhantomData;
 
 #[cfg(target_os = "macos")]
 use std::sync::{
+	atomic::{AtomicU32, Ordering},
 	Once,
-	atomic::{Ordering, AtomicU32}
 };
+
+#[cfg(not(any(target_os = "linux", target_os = "macos", target_env = "gnu")))]
+use std::sync::{LockResult, Mutex, MutexGuard};
 
 mod c;
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_env = "gnu")))]
 #[inline]
-fn dylib_guard<'a>() -> sync::LockResult<sync::MutexGuard<'a, ()>> {
-	static LOCK: sync::Mutex<()> = sync::Mutex::new(());
+fn dylib_guard<'a>() -> LockResult<MutexGuard<'a, ()>> {
+	static LOCK: Mutex<()> = Mutex::new(());
 	LOCK.lock()
 }
 
@@ -355,7 +358,6 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	Ok(data)
 }
 
-
 pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 	#[cfg(target_os = "macos")]
 	const MH_MAGIC: &[u8] = &0xfeedface_u32.to_le_bytes();
@@ -374,7 +376,7 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 		MH_MAGIC_64 => {
 			let hdr = hdr as *const c::mach_header_64;
 			Ok(mem::size_of::<c::mach_header_64>() + (*hdr).sizeofcmds as usize)
-		},
+		}
 		#[cfg(not(target_os = "macos"))]
 		ELF_MAGIC => {
 			let data: *const u8 = hdr as *const u8;
@@ -387,9 +389,15 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 					let hdr = hdr as *const libc::Elf64_Ehdr;
 					Ok((*hdr).e_ehsize as usize)
 				}
-				_ => Err(io::Error::new(io::ErrorKind::InvalidData, "invalid ELF file")),
+				_ => Err(io::Error::new(
+					io::ErrorKind::InvalidData,
+					"invalid ELF file",
+				)),
 			}
 		}
-		_ => Err(io::Error::new(io::ErrorKind::Other, "unknown header detected")),
+		_ => Err(io::Error::new(
+			io::ErrorKind::Other,
+			"unknown header detected",
+		)),
 	}
 }

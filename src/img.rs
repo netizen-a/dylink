@@ -82,6 +82,6 @@ impl Header {
 		unsafe { std::slice::from_raw_parts(hdr.cast::<u8>(), len) }
 	}
 	pub fn size(&self) -> io::Result<usize> {
-		unsafe {imp::hdr_size(self)}
+		unsafe { imp::hdr_size(self) }
 	}
 }

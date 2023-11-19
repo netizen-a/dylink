@@ -188,7 +188,6 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	}
 }
 
-
 pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 	let hprocess = c::GetCurrentProcess();
 	let hmodule = hdr as *mut ffi::c_void;
