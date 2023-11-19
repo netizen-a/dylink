@@ -1,3 +1,4 @@
+use crate::img;
 use crate::os;
 use crate::Library;
 use std::{io, path};
@@ -9,10 +10,10 @@ use os::windows as imp;
 
 /// Represents an executable image.
 ///
-/// This object can be obtained through either [`Images`](crate::iter::Images) or [`Library`].
+/// This object can be obtained through either [`Images`](img::Images) or [`Library`].
 #[derive(Debug, Clone)]
 pub struct Weak {
-	pub(crate) base_addr: *const os::Header,
+	pub(crate) base_addr: *const img::Header,
 	pub(crate) path_name: Option<path::PathBuf>,
 }
 impl crate::sealed::Sealed for Weak {}
@@ -25,8 +26,8 @@ impl Weak {
 
 impl crate::Image for Weak {
 	#[inline]
-	fn to_ptr(&self) -> *const os::Header {
-		if os::is_dangling(self.base_addr) {
+	fn to_ptr(&self) -> *const img::Header {
+		if img::is_dangling(self.base_addr) {
 			std::ptr::null()
 		} else {
 			self.base_addr

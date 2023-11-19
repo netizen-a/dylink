@@ -65,15 +65,15 @@ impl<'a> LibLock<'a> {
 	/// ```
 	pub fn symbol(&self, name: &str) -> io::Result<Symbol> {
 		let lib = self.hlib.get_or_init(|| {
-				if self.libs.is_empty() {
-					Library::this()
-				} else {
-					self.libs
-						.iter()
-						.find_map(|path| Library::open(path).ok())
-						.unwrap()
-				}
-			});
+			if self.libs.is_empty() {
+				Library::this()
+			} else {
+				self.libs
+					.iter()
+					.find_map(|path| Library::open(path).ok())
+					.unwrap()
+			}
+		});
 		lib.symbol(name)
 	}
 	/// Gets the reference to the underlying value.

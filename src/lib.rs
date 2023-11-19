@@ -18,7 +18,7 @@ use os::unix as imp;
 #[cfg(windows)]
 use os::windows as imp;
 
-pub mod iter;
+pub mod img;
 pub mod sync;
 mod weak;
 pub use weak::Weak;
@@ -26,8 +26,6 @@ pub use weak::Weak;
 use std::{io, marker, path};
 
 pub use dylink_macro::dylink;
-
-use std::ptr;
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
@@ -51,8 +49,8 @@ impl Symbol<'_> {
 	/// This function is supported on all platforms unconditionally, and should be
 	/// preferred over [`Image::to_ptr`] when possible.
 	#[inline]
-	pub fn base_address(&self) -> *mut os::Header {
-		unsafe { imp::base_addr(self.0) }
+	pub fn header(&self) -> Option<&img::Header> {
+		unsafe { imp::base_addr(self.0).as_ref() }
 	}
 }
 
@@ -191,7 +189,7 @@ impl Library {
 }
 
 impl Image for Library {
-	fn to_ptr(&self) -> *const os::Header {
+	fn to_ptr(&self) -> *const img::Header {
 		unsafe { self.0.to_ptr() }
 	}
 	/// Gets the path to the dynamic library file.
@@ -253,20 +251,8 @@ pub trait Image: crate::sealed::Sealed {
 	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
 	///
 	/// [`null`]: core::ptr::null "ptr::null"
-	fn to_ptr(&self) -> *const os::Header;
+	fn to_ptr(&self) -> *const img::Header;
 
 	/// Returns the path of the image.
 	fn path(&self) -> io::Result<path::PathBuf>;
-
-	/// Returns the magic number of the image.
-	///
-	/// The pointer is only valid if there are some strong references to the image.
-	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
-	///
-	/// [`null`]: core::ptr::null "ptr::null"
-	fn magic(&self) -> *const [u8] {
-		let len: usize = if cfg!(windows) { 2 } else { 4 };
-		let data: *const u8 = self.to_ptr().cast();
-		ptr::slice_from_raw_parts(data, len)
-	}
 }

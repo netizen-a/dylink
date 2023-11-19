@@ -1,6 +1,5 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![allow(clippy::let_unit_value)]
-#![allow(unused_imports)]
 
 #[cfg(target_env = "gnu")]
 use libc::dl_iterate_phdr;
@@ -9,7 +8,7 @@ use crate::sealed::Sealed;
 use crate::{weak, Symbol};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
-use std::{ffi, io, mem, path::PathBuf, ptr};
+use std::{ffi, img, io, mem, path::PathBuf, ptr};
 use std::{
 	marker::PhantomData,
 	sync::{
@@ -136,7 +135,7 @@ impl InnerLibrary {
 
 	// returns null if handle is invalid
 	#[cfg(target_env = "gnu")]
-	pub(crate) unsafe fn to_ptr(&self) -> *const super::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
 		use std::os::unix::ffi::OsStringExt;
 		let mut map_ptr = ptr::null_mut::<c::link_map>();
 		if libc::dlinfo(
@@ -145,7 +144,7 @@ impl InnerLibrary {
 			&mut map_ptr as *mut _ as *mut _,
 		) == 0
 		{
-			(*map_ptr).l_addr as *const super::Header
+			(*map_ptr).l_addr as *const img::Header
 		} else {
 			ptr::null()
 		}
@@ -153,7 +152,7 @@ impl InnerLibrary {
 
 	// returns null if handle is invalid
 	#[cfg(target_os = "macos")]
-	pub(crate) unsafe fn to_ptr(&self) -> *const super::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
 		use std::os::unix::ffi::OsStringExt;
 		let handle = self.0;
 		let mut result = ptr::null();
@@ -168,7 +167,7 @@ impl InnerLibrary {
 					let _ = libc::dlclose(active_handle);
 				}
 				if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
-					result = c::_dyld_get_image_header(image_index) as *const super::Header;
+					result = c::_dyld_get_image_header(image_index) as *const img::Header;
 					break;
 				}
 			}
@@ -176,7 +175,7 @@ impl InnerLibrary {
 		});
 		result
 	}
-	pub(crate) unsafe fn from_ptr(addr: *const super::Header) -> Option<Self> {
+	pub(crate) unsafe fn from_ptr(addr: *const img::Header) -> Option<Self> {
 		let mut info = mem::MaybeUninit::zeroed();
 		if libc::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
 			let info = info.assume_init();
@@ -259,7 +258,7 @@ fn get_image_count() -> &'static AtomicU32 {
 	&IMAGE_COUNT
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut super::Header {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Header {
 	let mut info = mem::MaybeUninit::<libc::Dl_info>::zeroed();
 	if libc::dladdr(symbol, info.as_mut_ptr()) != 0 {
 		let info = info.assume_init();
@@ -272,7 +271,7 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut super::Hea
 #[derive(Debug)]
 pub struct DlInfo {
 	pub dli_fname: ffi::CString,
-	pub dli_fbase: *mut super::Header,
+	pub dli_fbase: *mut img::Header,
 	pub dli_sname: ffi::CString,
 	pub dli_saddr: *mut ffi::c_void,
 }
@@ -338,7 +337,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			Some(PathBuf::from(path))
 		};
 		let weak_ptr = weak::Weak {
-			base_addr: (*info).dlpi_addr as *mut super::Header,
+			base_addr: (*info).dlpi_addr as *mut img::Header,
 			path_name,
 		};
 		data.push(weak_ptr);
@@ -358,7 +357,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			let path = ffi::CStr::from_ptr(c::_dyld_get_image_name(image_index));
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
 			let weak_ptr = weak::Weak {
-				base_addr: c::_dyld_get_image_header(image_index) as *const super::Header,
+				base_addr: c::_dyld_get_image_header(image_index) as *const img::Header,
 				path_name: Some(PathBuf::from(path)),
 			};
 			data.push(weak_ptr);

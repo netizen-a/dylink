@@ -21,7 +21,7 @@ fn test_try_clone() {
 
 #[test]
 fn test_iter_images() {
-	let images = iter::Images::now().unwrap();
+	let images = img::Images::now().unwrap();
 	for weak in images {
 		print!("weak addr: {:p}, ", weak.to_ptr());
 		if let Some(dylib) = weak.upgrade() {
@@ -37,7 +37,7 @@ fn test_iter_images() {
 // test to see if there are race conditions when getting a path.
 #[test]
 fn test_path_soundness() {
-	use dylink::iter::Images;
+	use dylink::img::Images;
 	let images = Images::now().unwrap();
 	let mut vlib = vec![];
 	for img in images {
@@ -66,7 +66,7 @@ fn test_path_soundness() {
 #[test]
 fn test_magic() {
 	use dylink::Image;
-	let images = iter::Images::now().unwrap();
+	let images = img::Images::now().unwrap();
 	for img in images {
 		let magic = img.magic();
 		if magic.is_null() {

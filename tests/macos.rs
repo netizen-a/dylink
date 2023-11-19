@@ -3,11 +3,11 @@
 use dylink::*;
 
 #[test]
-fn test_sym_addr() {
+fn test_sym_hdr() {
 	let lib = Library::open("libSystem.dylib").unwrap();
 	let sym = lib.symbol("malloc").unwrap();
-	let base = sym.base_address();
-	assert!(!base.is_null())
+	let base = sym.header();
+	assert!(base.is_some())
 }
 
 #[test]

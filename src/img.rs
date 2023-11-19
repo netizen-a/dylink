@@ -57,3 +57,28 @@ impl ExactSizeIterator for Images {
 }
 
 impl FusedIterator for Images {}
+
+// This function only works for executable images.
+#[inline]
+pub(crate) fn is_dangling(addr: *const Header) -> bool {
+	unsafe { imp::base_addr(addr.cast_mut().cast()).is_null() }
+}
+
+// Platform behavior:
+//     MacOS   -> mach_header
+//     Windows -> IMAGE_DOS_HEADER -> IMAGE_FILE_HEADER | IMAGE_OS2_HEADER | IMAGE_VXD_HEADER
+//     Linux   -> ElfN_Ehdr
+#[repr(C)]
+pub struct Header {
+	_data: [u8; 0],
+	_marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+}
+
+impl Header {
+	/// Returns the magic number of the image.
+	pub fn magic(&self) -> &[u8] {
+		let hdr = self as *const Header;
+		let len: usize = if cfg!(windows) { 2 } else { 4 };
+		unsafe { std::slice::from_raw_parts(hdr.cast::<u8>(), len) }
+	}
+}

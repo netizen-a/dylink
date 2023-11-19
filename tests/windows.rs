@@ -42,11 +42,11 @@ fn test_macro_impl() {
 }
 
 #[test]
-fn test_sym_addr() {
+fn test_sym_hdr() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let sym = lib.symbol("SetLastError").unwrap();
-	let base = sym.base_address();
-	assert!(!base.is_null())
+	let base = sym.header();
+	assert!(base.is_some())
 }
 
 #[test]
