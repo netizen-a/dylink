@@ -19,7 +19,6 @@ pub struct mach_header {
 	pub ncmds: u32,
 	pub sizeofcmds: u32,
 	pub flags: u32,
-	_marker: std::marker::PhantomPinned,
 }
 
 #[cfg(target_os = "macos")]
@@ -34,7 +33,6 @@ pub struct mach_header_64 {
 	pub sizeofcmds: u32,
 	pub flags: u32,
 	pub reserved: u32,
-	_marker: std::marker::PhantomPinned,
 }
 
 #[cfg(target_os = "macos")]

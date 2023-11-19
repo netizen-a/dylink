@@ -146,7 +146,6 @@ impl InnerLibrary {
 	// returns null if handle is invalid
 	#[cfg(target_os = "macos")]
 	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
-		use std::os::unix::ffi::OsStringExt;
 		let handle = self.0;
 		let mut result = ptr::null();
 		let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
@@ -339,8 +338,6 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 
 #[cfg(target_os = "macos")]
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
-	use std::sync::atomic::Ordering;
-
 	let mut data = Vec::new();
 	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 		data.clear();
