@@ -1,15 +1,12 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![allow(non_camel_case_types)]
 
-use std::{ffi, ptr};
+use std::ffi;
 
-#[cfg(target_os = "macos")]
 type cpu_type_t = ffi::c_int;
-#[cfg(target_os = "macos")]
 type cpu_subtype_t = ffi::c_int;
 
 // 32-bit header
-#[cfg(target_os = "macos")]
 #[repr(C)]
 pub struct mach_header {
 	pub magic: u32,
@@ -19,6 +16,20 @@ pub struct mach_header {
 	pub ncmds: u32,
 	pub sizeofcmds: u32,
 	pub flags: u32,
+	_marker: std::marker::PhantomPinned,
+}
+
+// 64-bit header
+#[repr(C)]
+pub struct mach_header_64 {
+	pub magic: u32,
+	pub cputype: cpu_type_t,
+	pub cpusubtype: cpu_subtype_t,
+	pub filetype: u32,
+	pub ncmds: u32,
+	pub sizeofcmds: u32,
+	pub flags: u32,
+	pub reserved: u32,
 	_marker: std::marker::PhantomPinned,
 }
 

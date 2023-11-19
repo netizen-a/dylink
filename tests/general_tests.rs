@@ -64,16 +64,15 @@ fn test_path_soundness() {
 }
 
 #[test]
-fn test_magic() {
+fn test_hdr_magic() {
 	use dylink::Image;
 	let images = img::Images::now().unwrap();
 	for img in images {
-		let magic = unsafe { img.to_ptr().as_ref() };
-		if let None = magic {
+		let maybe_hdr = unsafe { img.to_ptr().as_ref() };
+		let Some(hdr) = maybe_hdr else {
 			continue;
-		}
-
-		let magic = magic.unwrap().magic();
+		};
+		let magic = hdr.magic();
 		if cfg!(windows) {
 			assert!(magic == [b'M', b'Z'] || magic == [b'Z', b'M'])
 		} else if cfg!(target_os = "macos") {
@@ -84,5 +83,19 @@ fn test_magic() {
 			const EI_MAG: [u8; 4] = [0x7f, b'E', b'L', b'F'];
 			assert_eq!(magic, EI_MAG);
 		}
+	}
+}
+
+#[test]
+fn test_hdr_size() {
+	use dylink::Image;
+	let images = img::Images::now().unwrap();
+	for img in images {
+		let maybe_hdr = unsafe { img.to_ptr().as_ref() };
+		let Some(hdr) = maybe_hdr else {
+			continue;
+		};
+		let hdr_size = hdr.size().unwrap();
+		assert!(hdr_size > 0);
 	}
 }

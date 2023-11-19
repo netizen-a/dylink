@@ -81,4 +81,7 @@ impl Header {
 		let len: usize = if cfg!(windows) { 2 } else { 4 };
 		unsafe { std::slice::from_raw_parts(hdr.cast::<u8>(), len) }
 	}
+	pub fn size(&self) -> io::Result<usize> {
+		unsafe {imp::hdr_size(self)}
+	}
 }

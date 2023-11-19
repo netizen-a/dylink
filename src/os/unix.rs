@@ -1,21 +1,12 @@
 // Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![allow(clippy::let_unit_value)]
 
-#[cfg(target_env = "gnu")]
-use libc::dl_iterate_phdr;
-
 use crate::sealed::Sealed;
-use crate::{weak, Symbol};
+use crate::{weak, Symbol, img};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
-use std::{ffi, img, io, mem, path::PathBuf, ptr};
-use std::{
-	marker::PhantomData,
-	sync::{
-		atomic::{AtomicU32, Ordering},
-		Once,
-	},
-};
+use std::{ffi, io, mem, path::PathBuf, ptr};
+use std::marker::PhantomData;
 
 #[cfg(not(any(target_os = "linux", target_env = "gnu")))]
 use std::sync;
@@ -136,7 +127,6 @@ impl InnerLibrary {
 	// returns null if handle is invalid
 	#[cfg(target_env = "gnu")]
 	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
-		use std::os::unix::ffi::OsStringExt;
 		let mut map_ptr = ptr::null_mut::<c::link_map>();
 		if libc::dlinfo(
 			self.0.as_ptr(),
@@ -180,14 +170,13 @@ impl InnerLibrary {
 		if libc::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
 			let info = info.assume_init();
 			let handle = libc::dlopen(info.dli_fname, libc::RTLD_NOW | libc::RTLD_LOCAL);
-			NonNull::new(handle).map(Self)
+			ptr::NonNull::new(handle).map(Self)
 		} else {
 			None
 		}
 	}
 	#[cfg(target_env = "gnu")]
 	unsafe fn get_link_map_path(&self) -> Option<PathBuf> {
-		use std::os::unix::ffi::OsStringExt;
 		let handle = self.0;
 		let mut map_ptr = ptr::null_mut::<c::link_map>();
 		if libc::dlinfo(
@@ -264,7 +253,7 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Heade
 		let info = info.assume_init();
 		info.dli_fbase.cast()
 	} else {
-		ptr::null()
+		ptr::null_mut()
 	}
 }
 
@@ -365,4 +354,37 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 		Some(image_index)
 	});
 	Ok(data)
+}
+
+
+pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
+	const MH_MAGIC: &[u8] = &0xfeedface_u32.to_le_bytes();
+	const MH_MAGIC_64: &[u8] = &0xfeedfacf_u32.to_le_bytes();
+	const ELF_MAGIC: &[u8] = &[0x7f, b'E', b'L', b'F'];
+	let magic: &[u8] = hdr.as_ref().unwrap_unchecked().magic();
+	match magic {
+		MH_MAGIC => {
+			let hdr = hdr as *const c::mach_header;
+			Ok(mem::size_of::<c::mach_header>() + (*hdr).sizeofcmds as usize)
+		}
+		MH_MAGIC_64 => {
+			let hdr = hdr as *const c::mach_header_64;
+			Ok(mem::size_of::<c::mach_header_64>() + (*hdr).sizeofcmds as usize)
+		},
+		ELF_MAGIC => {
+			let data: *const u8 = hdr as *const u8;
+			match *data.offset(4) {
+				libc::ELFCLASS32 => {
+					let hdr = hdr as *const libc::Elf32_Ehdr;
+					Ok((*hdr).e_ehsize as usize)
+				}
+				libc::ELFCLASS64 => {
+					let hdr = hdr as *const libc::Elf64_Ehdr;
+					Ok((*hdr).e_ehsize as usize)
+				}
+				_ => Err(io::Error::new(io::ErrorKind::InvalidData, "invalid ELF file")),
+			}
+		}
+		_ => Err(io::Error::new(io::ErrorKind::Other, "unknown header detected")),
+	}
 }

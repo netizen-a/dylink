@@ -12,6 +12,12 @@ pub type PCSTR = *const ffi::c_char;
 pub type PWSTR = *mut u16;
 pub type BOOL = i32;
 pub type DWORD = u32;
+#[repr(C)]
+pub struct MODULEINFO {
+	pub lpBaseOfDll: *mut ffi::c_void,
+	pub SizeOfImage: DWORD,
+	pub EntryPoint: *mut ffi::c_void,
+}
 
 extern "system" {
 	pub fn LoadLibraryExW(lplibfilename: PCWSTR, hfile: HANDLE, dwflags: u32) -> HMODULE;
@@ -27,6 +33,13 @@ extern "system" {
 		cb: DWORD,
 		lpcbneeded: *mut DWORD,
 		dwfilterflag: DWORD,
+	) -> BOOL;
+	#[link_name = "K32GetModuleInformation"]
+	pub fn GetModuleInformation(
+		hprocess: HANDLE,
+		hmodule: HMODULE,
+		lpmodinfo: *mut MODULEINFO,
+		cb: DWORD,
 	) -> BOOL;
 }
 

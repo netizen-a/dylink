@@ -187,3 +187,17 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 		}
 	}
 }
+
+
+pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
+	let hprocess = c::GetCurrentProcess();
+	let hmodule = hdr as *mut ffi::c_void;
+	let mut lpmodinfo = mem::MaybeUninit::zeroed();
+	let cb = mem::size_of::<c::MODULEINFO>();
+	let result = c::GetModuleInformation(hprocess, hmodule, lpmodinfo.as_mut_ptr(), cb as u32);
+	if result != 0 {
+		Ok(lpmodinfo.assume_init().SizeOfImage as usize)
+	} else {
+		Err(io::Error::last_os_error())
+	}
+}
