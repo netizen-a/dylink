@@ -8,12 +8,7 @@ keywords = ["ffi", "dlopen", "load", "shared", "lazy"]
 categories = ["api-bindings"]
 description = "Run-time dynamic linking loader utilities"
 repository = "https://github.com/Razordor/dylink.git"
-publish = true
-
-# TODO: Next version bump needs to make sure that this isn't required anymore.
-[profile]
-dev.panic = "unwind"
-release.panic = "unwind"
+publish = false
 
 [workspace]
 members = ["dylink_macro"]

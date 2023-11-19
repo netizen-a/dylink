@@ -49,6 +49,10 @@ impl<'a> LibLock<'a> {
 	///
 	/// If the requested symbol does not exist in the dynamic library, then this call will return an error.
 	///
+	/// # Panics
+	///
+	/// Panics if library cannot be initialized
+	///
 	/// # Examples
 	///
 	/// ```no_run
@@ -60,10 +64,7 @@ impl<'a> LibLock<'a> {
 	/// let my_symbol: unsafe extern "C" fn() = unsafe {mem::transmute(sym.cast::<()>())};
 	/// ```
 	pub fn symbol(&self, name: &str) -> io::Result<Symbol> {
-		// yes this is cursed, no I can't do anything about it until get_or_try_init hits stable.
-		// Fundamentally this function is designed to error and not panic hence catch_unwind.
-		let lib = std::panic::catch_unwind(|| {
-			self.hlib.get_or_init(|| {
+		let lib = self.hlib.get_or_init(|| {
 				if self.libs.is_empty() {
 					Library::this()
 				} else {
@@ -72,15 +73,8 @@ impl<'a> LibLock<'a> {
 						.find_map(|path| Library::open(path).ok())
 						.unwrap()
 				}
-			})
-		});
-		match lib {
-			Ok(lib) => lib.symbol(name),
-			Err(_) => Err(io::Error::new(
-				io::ErrorKind::Other,
-				"Library initialization failed",
-			)),
-		}
+			});
+		lib.symbol(name)
 	}
 	/// Gets the reference to the underlying value.
 	///
