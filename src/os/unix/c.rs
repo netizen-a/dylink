@@ -8,16 +8,17 @@ type cpu_type_t = ffi::c_int;
 #[cfg(target_os = "macos")]
 type cpu_subtype_t = ffi::c_int;
 
+// 32-bit header
 #[cfg(target_os = "macos")]
 #[repr(C)]
 pub struct mach_header {
-	pub magic: ffi::c_ulong,       /* mach magic number identifier */
-	pub cputype: cpu_type_t,       /* cpu specifier */
-	pub cpusubtype: cpu_subtype_t, /* machine specifier */
-	pub filetype: ffi::c_ulong,    /* type of file */
-	pub ncmds: ffi::c_ulong,       /* number of load commands */
-	pub sizeofcmds: ffi::c_ulong,  /* the size of all the load commands */
-	pub flags: ffi::c_ulong,       /* flags */
+	pub magic: u32,
+	pub cputype: cpu_type_t,
+	pub cpusubtype: cpu_subtype_t,
+	pub filetype: u32,
+	pub ncmds: u32,
+	pub sizeofcmds: u32,
+	pub flags: u32,
 	_marker: std::marker::PhantomPinned,
 }
 

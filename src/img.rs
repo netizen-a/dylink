@@ -65,9 +65,9 @@ pub(crate) fn is_dangling(addr: *const Header) -> bool {
 }
 
 // Platform behavior:
-//     MacOS   -> mach_header
+//     MacOS   -> mach_header | mach_header_64
 //     Windows -> IMAGE_DOS_HEADER -> IMAGE_FILE_HEADER | IMAGE_OS2_HEADER | IMAGE_VXD_HEADER
-//     Linux   -> ElfN_Ehdr
+//     Linux   -> Elf32_Ehdr | Elf64_Ehdr
 #[repr(C)]
 pub struct Header {
 	_data: [u8; 0],

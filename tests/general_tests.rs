@@ -68,7 +68,7 @@ fn test_magic() {
 	use dylink::Image;
 	let images = img::Images::now().unwrap();
 	for img in images {
-		let magic = unsafe {img.to_ptr().as_ref()};
+		let magic = unsafe { img.to_ptr().as_ref() };
 		if let None = magic {
 			continue;
 		}

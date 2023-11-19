@@ -36,10 +36,10 @@ struct ReadmeDoctests;
 pub struct Symbol<'a>(*mut std::ffi::c_void, marker::PhantomData<&'a ()>);
 impl Sealed for Symbol<'_> {}
 
-impl Symbol<'_> {
+impl<'a> Symbol<'a> {
 	/// Casts to a pointer of another type.
 	#[inline]
-	pub const fn cast<T>(&self) -> *mut T {
+	pub const fn cast<T>(self) -> *mut T {
 		self.0 as _
 	}
 	/// Attempts to get the base address of the library.
@@ -49,7 +49,7 @@ impl Symbol<'_> {
 	/// This function is supported on all platforms unconditionally, and should be
 	/// preferred over [`Image::to_ptr`] when possible.
 	#[inline]
-	pub fn header(&self) -> Option<&img::Header> {
+	pub fn header(self) -> Option<&'a img::Header> {
 		unsafe { imp::base_addr(self.0).as_ref() }
 	}
 }
