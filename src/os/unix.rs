@@ -9,7 +9,6 @@ use crate::sealed::Sealed;
 use crate::{weak, Symbol};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
-use std::ptr::NonNull;
 use std::{ffi, io, mem, path::PathBuf, ptr};
 use std::{
 	marker::PhantomData,
@@ -46,7 +45,7 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub(crate) struct InnerLibrary(std::ptr::NonNull<ffi::c_void>);
+pub(crate) struct InnerLibrary(ptr::NonNull<ffi::c_void>);
 
 impl InnerLibrary {
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {
@@ -260,17 +259,13 @@ fn get_image_count() -> &'static AtomicU32 {
 	&IMAGE_COUNT
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut super::Header> {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut super::Header {
 	let mut info = mem::MaybeUninit::<libc::Dl_info>::zeroed();
 	if libc::dladdr(symbol, info.as_mut_ptr()) != 0 {
 		let info = info.assume_init();
-		Ok(info.dli_fbase.cast())
+		info.dli_fbase.cast()
 	} else {
-		// dlerror is not available for dladdr, so we're giving a generic error.
-		Err(io::Error::new(
-			io::ErrorKind::Other,
-			"failed to get base address",
-		))
+		ptr::null()
 	}
 }
 

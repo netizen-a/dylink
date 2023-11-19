@@ -6,7 +6,7 @@ use dylink::*;
 fn test_sym_addr() {
 	let lib = Library::open("libSystem.dylib").unwrap();
 	let sym = lib.symbol("malloc").unwrap();
-	let base = sym.base_address().unwrap();
+	let base = sym.base_address();
 	assert!(!base.is_null())
 }
 

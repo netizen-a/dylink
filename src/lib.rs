@@ -49,9 +49,9 @@ impl Symbol<'_> {
 	/// # Platform support
 	///
 	/// This function is supported on all platforms unconditionally, and should be
-	/// preferred over [`Image::as_ptr`] when possible.
+	/// preferred over [`Image::to_ptr`] when possible.
 	#[inline]
-	pub fn base_address(&self) -> io::Result<*mut os::Header> {
+	pub fn base_address(&self) -> *mut os::Header {
 		unsafe { imp::base_addr(self.0) }
 	}
 }
@@ -92,7 +92,7 @@ impl Library {
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
 		unsafe { imp::InnerLibrary::open(path.as_ref().as_os_str()) }.map(Self)
 	}
-	/// Attempts to returns a library handle to the current process.
+	/// Attempts to return a library handle to the current process.
 	///
 	/// # Panics
 	///
@@ -247,20 +247,6 @@ macro_rules! lib {
 
 /// A trait for objects that represent executable images.
 pub trait Image: crate::sealed::Sealed {
-	// TODO: next version bump remove `as_ptr`,
-	//       because getting the pointer on unix is non-trivial.
-
-	/// Returns the base address of the image.
-	///
-	/// The pointer is only valid if there are some strong references to the image.
-	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
-	///
-	/// [`null`]: core::ptr::null "ptr::null"
-	#[deprecated = "use to_ptr instead"]
-	#[inline]
-	fn as_ptr(&self) -> *const os::Header {
-		self.to_ptr()
-	}
 	/// Returns the base address of the image.
 	///
 	/// The pointer is only valid if there are some strong references to the image.
@@ -269,15 +255,15 @@ pub trait Image: crate::sealed::Sealed {
 	/// [`null`]: core::ptr::null "ptr::null"
 	fn to_ptr(&self) -> *const os::Header;
 
+	/// Returns the path of the image.
 	fn path(&self) -> io::Result<path::PathBuf>;
-	/// Returns `true` if the two `Image`s point to the same base address in a vein similar to [`ptr::eq`].
-	/// This function ignores metadata of `dyn Trait` pointers.
+
+	/// Returns the magic number of the image.
 	///
-	/// [`ptr::eq`]: core::ptr::eq "ptr::eq"
-	#[inline]
-	fn ptr_eq(&self, other: &impl Image) -> bool {
-		self.to_ptr() == other.to_ptr()
-	}
+	/// The pointer is only valid if there are some strong references to the image.
+	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
+	///
+	/// [`null`]: core::ptr::null "ptr::null"
 	fn magic(&self) -> *const [u8] {
 		let len: usize = if cfg!(windows) { 2 } else { 4 };
 		let data: *const u8 = self.to_ptr().cast();

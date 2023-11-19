@@ -11,7 +11,7 @@ fn test_this_path() {
 fn test_try_clone() {
 	let lib = Library::this();
 	let other = lib.try_clone().unwrap();
-	assert!(Image::ptr_eq(&lib, &other));
+	assert_eq!(lib.to_ptr(), other.to_ptr());
 	let t = std::thread::spawn(move || {
 		println!("other: {:?}", other);
 	});

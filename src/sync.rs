@@ -96,7 +96,6 @@ impl<'a> LibLock<'a> {
 	/// Has no effect and returns `None` if the `LibLock` hasn't been initialized.
 	///
 	/// Safety is guaranteed by requiring a mutable reference.
-	#[cfg(feature = "unstable")]
 	#[inline]
 	pub fn take(&mut self) -> Option<Library> {
 		self.hlib.take()

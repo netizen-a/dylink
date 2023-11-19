@@ -129,19 +129,14 @@ impl AsRawHandle for Library {
 	}
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut super::Header> {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut super::Header {
 	let mut handle = ptr::null_mut();
-	let result = c::GetModuleHandleExW(
+	let _ = c::GetModuleHandleExW(
 		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT | c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
 		symbol.cast(),
 		&mut handle,
 	);
-	if result == 0 {
-		Err(io::Error::last_os_error())
-	} else {
-		// The handle doubles as the base address (this may not be true the other way around though).
-		Ok(handle.cast())
-	}
+	handle.cast()
 }
 
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {

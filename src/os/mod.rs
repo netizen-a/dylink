@@ -13,7 +13,7 @@ use windows as imp;
 // This function only works for executable images.
 #[inline]
 pub(crate) fn is_dangling(addr: *const Header) -> bool {
-	unsafe { imp::base_addr(addr.cast_mut().cast()).is_err() }
+	unsafe { imp::base_addr(addr.cast_mut().cast()).is_null() }
 }
 
 // TODO: Next version bump this needs to be moved to a different module.
