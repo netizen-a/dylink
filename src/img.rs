@@ -81,6 +81,11 @@ impl Header {
 		let len: usize = if cfg!(windows) { 2 } else { 4 };
 		unsafe { std::slice::from_raw_parts(hdr.cast::<u8>(), len) }
 	}
+	/// Returns the size of the header file.
+	///
+	/// # Errors
+	///
+	/// Errors when unknown header is detected.
 	pub fn size(&self) -> io::Result<usize> {
 		unsafe { imp::hdr_size(self) }
 	}
