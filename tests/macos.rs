@@ -1,5 +1,3 @@
-#![cfg(target_os = "macos")]
-
 use dylink::*;
 
 #[test]

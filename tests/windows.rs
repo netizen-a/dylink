@@ -1,5 +1,3 @@
-#![cfg(windows)]
-
 use dylink::*;
 
 static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);

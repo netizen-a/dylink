@@ -65,7 +65,6 @@ fn test_path_soundness() {
 
 #[test]
 fn test_hdr_magic() {
-	use dylink::Image;
 	let images = img::Images::now().unwrap();
 	for img in images {
 		let maybe_hdr = unsafe { img.to_ptr().as_ref() };
@@ -87,15 +86,14 @@ fn test_hdr_magic() {
 }
 
 #[test]
-fn test_hdr_size() {
-	use dylink::Image;
+fn test_hdr_len() {
 	let images = img::Images::now().unwrap();
 	for img in images {
 		let maybe_hdr = unsafe { img.to_ptr().as_ref() };
 		let Some(hdr) = maybe_hdr else {
 			continue;
 		};
-		let hdr_size = hdr.size().unwrap();
-		assert!(hdr_size > 0);
+		let bytes = hdr.to_bytes().unwrap();
+		assert!(bytes.len() > 0);
 	}
 }
