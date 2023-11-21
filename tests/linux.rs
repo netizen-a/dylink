@@ -1,3 +1,4 @@
+#![cfg(target_os = "linux")]
 use dylink::*;
 
 static LIB_X11: sync::LibLock = sync::LibLock::new(&["libX11.so.6"]);
