@@ -23,6 +23,7 @@ path="./dylink_macro"
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
+targets = ["x86_64-unknown-linux-gnu"]
 
 [features]
 # features still being tested. marked items must not be relied upon between versions.
