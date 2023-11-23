@@ -1,7 +1,5 @@
 use crate::os;
 use crate::weak;
-use std::error::Error;
-use std::fmt::Display;
 use std::io;
 use std::iter::FusedIterator;
 use std::vec;
@@ -88,59 +86,5 @@ impl Header {
 		let data = self as *const Header as *const u8;
 		let slice = unsafe {std::slice::from_raw_parts(data, len)};
 		Ok(slice)
-	}
-}
-
-#[derive(Debug, Clone)]
-pub struct TryFromHeaderError(String);
-impl Error for TryFromHeaderError {}
-impl Display for TryFromHeaderError {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
-	}
-}
-impl From<io::Error> for TryFromHeaderError {
-	fn from(value: io::Error) -> Self {
-		Self(value.to_string())
-	}
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-impl <'a> TryFrom<&'a Header> for &'a libc::Elf32_Ehdr {
-	type Error = TryFromHeaderError;
-	fn try_from(value: &Header) -> Result<Self, Self::Error> {
-		match value.magic() {
-			[0x7f, b'E', b'L', b'F'] => {
-				let hdr = value.to_bytes()?;
-				if hdr.len() < 5 {
-					Err(TryFromHeaderError("converted header length out of range".to_owned()))
-				} else if hdr[4] == libc::ELFCLASS32 {
-					Ok(unsafe{std::mem::transmute(value)})
-				} else {
-					Err(TryFromHeaderError("converted header has conflicting architecture".to_owned()))
-				}
-			}
-			_ => Err(TryFromHeaderError("converted header has conflicting magic".to_owned()))
-		}
-	}
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-impl <'a> TryFrom<&'a Header> for &'a libc::Elf64_Ehdr {
-	type Error = TryFromHeaderError;
-	fn try_from(value: &Header) -> Result<Self, Self::Error> {
-		match value.magic() {
-			[0x7f, b'E', b'L', b'F'] => {
-				let hdr = value.to_bytes()?;
-				if hdr.len() < 5 {
-					Err(TryFromHeaderError("converted header length out of range".to_owned()))
-				} else if hdr[4] == libc::ELFCLASS64 {
-					Ok(unsafe{std::mem::transmute(value)})
-				} else {
-					Err(TryFromHeaderError("converted header has conflicting architecture".to_owned()))
-				}
-			}
-			_ => Err(TryFromHeaderError("converted header has conflicting magic".to_owned()))
-		}
 	}
 }

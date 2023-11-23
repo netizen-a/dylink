@@ -53,25 +53,3 @@ fn test_path() {
 	let path = lib.path();
 	assert!(path.is_ok())
 }
-
-
-#[test]
-fn test_hdr_convert() {
-	let images = img::Images::now().unwrap();
-	for img in images {
-		let maybe_hdr = unsafe { img.to_ptr().as_ref() };
-		let Some(hdr) = maybe_hdr else {
-			continue;
-		};
-		let bytes = hdr.to_bytes().unwrap();
-		if bytes[4] == libc::ELFCLASS32 {
-			let hdr: &libc::Elf32_Ehdr = hdr.try_into().unwrap();
-			assert_eq!(hdr.e_version, libc::EV_CURRENT);
-		} else if bytes[4] == libc::ELFCLASS64 {
-			let hdr: &libc::Elf64_Ehdr = hdr.try_into().unwrap();
-			assert_eq!(hdr.e_version, libc::EV_CURRENT);
-		} else {
-			panic!("unknown header class")
-		}
-	}
-}
