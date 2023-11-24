@@ -13,9 +13,6 @@ publish = false
 [workspace]
 members = ["dylink_macro"]
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
 [dependencies.dylink_macro]
 version = "0.9"
 path="./dylink_macro"
@@ -23,7 +20,6 @@ path="./dylink_macro"
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
-targets = ["x86_64-unknown-linux-gnu"]
 
 [features]
 # features still being tested. marked items must not be relied upon between versions.

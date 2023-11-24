@@ -31,7 +31,7 @@ fn dylib_guard<'a>() -> LockResult<MutexGuard<'a, ()>> {
 fn dylib_guard() {}
 
 unsafe fn c_dlerror() -> Option<ffi::CString> {
-	let raw = libc::dlerror();
+	let raw = c::dlerror();
 	if raw.is_null() {
 		None
 	} else {
@@ -47,8 +47,7 @@ impl InnerLibrary {
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {
 		let _lock = dylib_guard();
 		let c_str = ffi::CString::new(path.as_bytes())?;
-		let handle: *mut ffi::c_void =
-			libc::dlopen(c_str.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL);
+		let handle: *mut ffi::c_void = c::dlopen(c_str.as_ptr(), c::RTLD_NOW | c::RTLD_LOCAL);
 		if let Some(ret) = ptr::NonNull::new(handle) {
 			Ok(Self(ret))
 		} else {
@@ -58,7 +57,7 @@ impl InnerLibrary {
 	}
 	pub unsafe fn this() -> io::Result<Self> {
 		let _lock = dylib_guard();
-		let handle: *mut ffi::c_void = libc::dlopen(ptr::null(), libc::RTLD_NOW | libc::RTLD_LOCAL);
+		let handle: *mut ffi::c_void = c::dlopen(ptr::null(), c::RTLD_NOW | c::RTLD_LOCAL);
 		if let Some(ret) = ptr::NonNull::new(handle) {
 			Ok(Self(ret))
 		} else {
@@ -69,7 +68,7 @@ impl InnerLibrary {
 
 	#[inline]
 	pub unsafe fn c_symbol(&self, name: &ffi::CStr) -> *const ffi::c_void {
-		libc::dlsym(self.0.as_ptr(), name.as_ptr())
+		c::dlsym(self.0.as_ptr(), name.as_ptr())
 	}
 
 	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<Symbol<'a>> {
@@ -134,9 +133,9 @@ impl InnerLibrary {
 	#[cfg(target_env = "gnu")]
 	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
 		let mut map_ptr = ptr::null_mut::<c::link_map>();
-		if libc::dlinfo(
+		if c::dlinfo(
 			self.0.as_ptr(),
-			libc::RTLD_DI_LINKMAP,
+			c::RTLD_DI_LINKMAP,
 			&mut map_ptr as *mut _ as *mut _,
 		) == 0
 		{
@@ -154,12 +153,10 @@ impl InnerLibrary {
 		let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 			for image_index in (0..image_index).rev() {
 				let image_name = c::_dyld_get_image_name(image_index);
-				let active_handle = libc::dlopen(
-					image_name,
-					libc::RTLD_NOW | libc::RTLD_LOCAL | libc::RTLD_NOLOAD,
-				);
+				let active_handle =
+					c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
 				if !active_handle.is_null() {
-					let _ = libc::dlclose(active_handle);
+					let _ = c::dlclose(active_handle);
 				}
 				if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
 					result = c::_dyld_get_image_header(image_index) as *const img::Header;
@@ -172,9 +169,9 @@ impl InnerLibrary {
 	}
 	pub(crate) unsafe fn from_ptr(addr: *const img::Header) -> Option<Self> {
 		let mut info = mem::MaybeUninit::zeroed();
-		if libc::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
+		if c::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
 			let info = info.assume_init();
-			let handle = libc::dlopen(info.dli_fname, libc::RTLD_NOW | libc::RTLD_LOCAL);
+			let handle = c::dlopen(info.dli_fname, c::RTLD_NOW | c::RTLD_LOCAL);
 			ptr::NonNull::new(handle).map(Self)
 		} else {
 			None
@@ -184,9 +181,9 @@ impl InnerLibrary {
 	unsafe fn get_link_map_path(&self) -> Option<PathBuf> {
 		let handle = self.0;
 		let mut map_ptr = ptr::null_mut::<c::link_map>();
-		if libc::dlinfo(
+		if c::dlinfo(
 			handle.as_ptr(),
-			libc::RTLD_DI_LINKMAP,
+			c::RTLD_DI_LINKMAP,
 			&mut map_ptr as *mut _ as *mut _,
 		) == 0
 		{
@@ -208,12 +205,10 @@ impl InnerLibrary {
 		let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 			for image_index in (0..image_index).rev() {
 				let image_name = c::_dyld_get_image_name(image_index);
-				let active_handle = libc::dlopen(
-					image_name,
-					libc::RTLD_NOW | libc::RTLD_LOCAL | libc::RTLD_NOLOAD,
-				);
+				let active_handle =
+					c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
 				if !active_handle.is_null() {
-					let _ = libc::dlclose(active_handle);
+					let _ = c::dlclose(active_handle);
 				}
 				if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
 					let path = ffi::CStr::from_ptr(image_name);
@@ -229,7 +224,7 @@ impl InnerLibrary {
 }
 impl Drop for InnerLibrary {
 	fn drop(&mut self) {
-		unsafe { libc::dlclose(self.0.as_ptr()) };
+		unsafe { c::dlclose(self.0.as_ptr()) };
 	}
 }
 
@@ -252,8 +247,8 @@ fn get_image_count() -> &'static AtomicU32 {
 }
 
 pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Header {
-	let mut info = mem::MaybeUninit::<libc::Dl_info>::zeroed();
-	if libc::dladdr(symbol, info.as_mut_ptr()) != 0 {
+	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
+	if c::dladdr(symbol, info.as_mut_ptr()) != 0 {
 		let info = info.assume_init();
 		info.dli_fbase.cast()
 	} else {
@@ -276,9 +271,9 @@ pub trait SymExt: Sealed {
 impl SymExt for Symbol<'_> {
 	#[doc(alias = "dladdr")]
 	fn info(&self) -> io::Result<DlInfo> {
-		let mut info = mem::MaybeUninit::<libc::Dl_info>::zeroed();
+		let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 		unsafe {
-			if libc::dladdr(self.0 as *const _, info.as_mut_ptr()) != 0 {
+			if c::dladdr(self.0 as *const _, info.as_mut_ptr()) != 0 {
 				let info = info.assume_init();
 				Ok(DlInfo {
 					dli_fname: ffi::CStr::from_ptr(info.dli_fname).to_owned(),
@@ -300,20 +295,20 @@ impl SymExt for Symbol<'_> {
 #[cfg(target_env = "gnu")]
 unsafe fn iter_phdr<F>(mut f: F) -> ffi::c_int
 where
-	F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int,
+	F: FnMut(*mut c::dl_phdr_info, usize) -> ffi::c_int,
 {
 	unsafe extern "C" fn callback<F>(
-		info: *mut libc::dl_phdr_info,
-		size: libc::size_t,
+		info: *mut c::dl_phdr_info,
+		size: usize,
 		data: *mut ffi::c_void,
 	) -> ffi::c_int
 	where
-		F: FnMut(*mut libc::dl_phdr_info, libc::size_t) -> ffi::c_int,
+		F: FnMut(*mut c::dl_phdr_info, usize) -> ffi::c_int,
 	{
 		let f = data as *mut F;
 		(*f)(info, size)
 	}
-	libc::dl_iterate_phdr(Some(callback::<F>), &mut f as *mut _ as *mut _)
+	c::dl_iterate_phdr(callback::<F>, &mut f as *mut _ as *mut _)
 }
 
 #[cfg(target_env = "gnu")]
@@ -381,12 +376,12 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 		ELF_MAGIC => {
 			let data: *const u8 = hdr as *const u8;
 			match *data.offset(4) {
-				libc::ELFCLASS32 => {
-					let hdr = hdr as *const libc::Elf32_Ehdr;
+				c::ELFCLASS32 => {
+					let hdr = hdr as *const c::Elf32_Ehdr;
 					Ok((*hdr).e_ehsize as usize)
 				}
-				libc::ELFCLASS64 => {
-					let hdr = hdr as *const libc::Elf64_Ehdr;
+				c::ELFCLASS64 => {
+					let hdr = hdr as *const c::Elf64_Ehdr;
 					Ok((*hdr).e_ehsize as usize)
 				}
 				_ => Err(io::Error::new(

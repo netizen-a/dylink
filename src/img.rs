@@ -84,7 +84,7 @@ impl Header {
 	pub fn to_bytes(&self) -> io::Result<&[u8]> {
 		let len = unsafe { imp::hdr_size(self)? };
 		let data = self as *const Header as *const u8;
-		let slice = unsafe {std::slice::from_raw_parts(data, len)};
+		let slice = unsafe { std::slice::from_raw_parts(data, len) };
 		Ok(slice)
 	}
 }
