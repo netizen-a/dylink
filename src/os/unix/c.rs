@@ -3,12 +3,10 @@
 
 use std::ffi;
 
-#[cfg(target_os = "macos")]
 type cpu_type_t = ffi::c_int;
-#[cfg(target_os = "macos")]
 type cpu_subtype_t = ffi::c_int;
 
-#[cfg(target_os = "macos")]
+
 // 32-bit header
 #[repr(C)]
 pub struct mach_header {
@@ -21,7 +19,6 @@ pub struct mach_header {
 	pub flags: u32,
 }
 
-#[cfg(target_os = "macos")]
 // 64-bit header
 #[repr(C)]
 pub struct mach_header_64 {
@@ -54,34 +51,32 @@ pub const RTLD_NOLOAD: ffi::c_int = 0x4;
 pub const RTLD_DI_LINKMAP: ffi::c_int = 2;
 #[cfg(target_env = "gnu")]
 pub type ElfW_Addr = usize;
+#[cfg(target_env = "gnu")]
+pub type Elf64_Xword = u64;
 
 pub type ElfW_Half = u16;
-
-pub type Elf32_Word = u32;
-pub type Elf64_Word = u32;
+pub type ElfW_Word = u32;
 
 pub type Elf32_Off = u32;
 pub type Elf64_Off = u64;
 
 pub type Elf32_Addr = u32;
-pub type Elf64_Addr = u64;
 
-pub type Elf64_Xword = u64;
+pub type Elf64_Addr = u64;
 
 pub const ELFCLASS32: u8 = 1;
 pub const ELFCLASS64: u8 = 2;
 
-#[cfg(target_pointer_width = "64")]
 #[repr(C)]
 pub struct Elf32_Ehdr {
 	pub e_ident: [ffi::c_uchar; 16],
 	pub e_type: ElfW_Half,
 	pub e_machine: ElfW_Half,
-	pub e_version: Elf32_Word,
+	pub e_version: ElfW_Word,
 	pub e_entry: Elf32_Addr,
 	pub e_phoff: Elf32_Off,
 	pub e_shoff: Elf32_Off,
-	pub e_flags: Elf32_Word,
+	pub e_flags: ElfW_Word,
 	pub e_ehsize: ElfW_Half,
 	pub e_phentsize: ElfW_Half,
 	pub e_phnum: ElfW_Half,
@@ -90,17 +85,16 @@ pub struct Elf32_Ehdr {
 	pub e_shstrndx: ElfW_Half,
 }
 
-#[cfg(target_pointer_width = "64")]
 #[repr(C)]
 pub struct Elf64_Ehdr {
 	pub e_ident: [ffi::c_uchar; 16],
 	pub e_type: ElfW_Half,
 	pub e_machine: ElfW_Half,
-	pub e_version: Elf64_Word,
+	pub e_version: ElfW_Word,
 	pub e_entry: Elf64_Addr,
 	pub e_phoff: Elf64_Off,
 	pub e_shoff: Elf64_Off,
-	pub e_flags: Elf64_Word,
+	pub e_flags: ElfW_Word,
 	pub e_ehsize: ElfW_Half,
 	pub e_phentsize: ElfW_Half,
 	pub e_phnum: ElfW_Half,
@@ -109,24 +103,24 @@ pub struct Elf64_Ehdr {
 	pub e_shstrndx: ElfW_Half,
 }
 
-#[cfg(target_pointer_width = "32")]
+#[cfg(all(target_env = "gnu", target_pointer_width = "32"))]
 #[repr(C)]
 pub struct Elf32_Phdr {
-	pub p_type: Elf32_Word,
+	pub p_type: ElfW_Word,
 	pub p_offset: Elf32_Off,
 	pub p_vaddr: Elf32_Addr,
 	pub p_paddr: Elf32_Addr,
-	pub p_filesz: Elf32_Word,
-	pub p_memsz: Elf32_Word,
-	pub p_flags: Elf32_Word,
-	pub p_align: Elf32_Word,
+	pub p_filesz: ElfW_Word,
+	pub p_memsz: ElfW_Word,
+	pub p_flags: ElfW_Word,
+	pub p_align: ElfW_Word,
 }
 
-#[cfg(target_pointer_width = "64")]
+#[cfg(all(target_env = "gnu", target_pointer_width = "64"))]
 #[repr(C)]
 pub struct Elf64_Phdr {
-	pub p_type: Elf64_Word,
-	pub p_flags: Elf64_Word,
+	pub p_type: ElfW_Word,
+	pub p_flags: ElfW_Word,
 	pub p_offset: Elf64_Off,
 	pub p_vaddr: Elf64_Addr,
 	pub p_paddr: Elf64_Addr,
@@ -162,6 +156,7 @@ extern "C" {
 	) -> ffi::c_int;
 }
 
+#[cfg(target_os = "linux")]
 pub type DlIteratePhdrCallback = unsafe extern "C" fn(
 	info: *mut dl_phdr_info,
 	size: usize,

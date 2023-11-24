@@ -354,25 +354,20 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 }
 
 pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
-	#[cfg(target_os = "macos")]
 	const MH_MAGIC: &[u8] = &0xfeedface_u32.to_le_bytes();
-	#[cfg(target_os = "macos")]
 	const MH_MAGIC_64: &[u8] = &0xfeedfacf_u32.to_le_bytes();
-	#[cfg(not(target_os = "macos"))]
 	const ELF_MAGIC: &[u8] = &[0x7f, b'E', b'L', b'F'];
+
 	let magic: &[u8] = hdr.as_ref().unwrap_unchecked().magic();
 	match magic {
-		#[cfg(target_os = "macos")]
 		MH_MAGIC => {
 			let hdr = hdr as *const c::mach_header;
 			Ok(mem::size_of::<c::mach_header>() + (*hdr).sizeofcmds as usize)
 		}
-		#[cfg(target_os = "macos")]
 		MH_MAGIC_64 => {
 			let hdr = hdr as *const c::mach_header_64;
 			Ok(mem::size_of::<c::mach_header_64>() + (*hdr).sizeofcmds as usize)
 		}
-		#[cfg(not(target_os = "macos"))]
 		ELF_MAGIC => {
 			let data: *const u8 = hdr as *const u8;
 			match *data.offset(4) {
