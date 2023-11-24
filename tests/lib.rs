@@ -91,7 +91,7 @@ fn test_hdr_magic() {
 }
 
 #[test]
-fn test_hdr_len() {
+fn test_hdr_bytes() {
 	let images = img::Images::now().unwrap();
 	for img in images {
 		let maybe_hdr = unsafe { img.to_ptr().as_ref() };
@@ -100,5 +100,6 @@ fn test_hdr_len() {
 		};
 		let bytes = hdr.to_bytes().unwrap();
 		assert!(bytes.len() > 0);
+		let _ = bytes[bytes.len() - 1];
 	}
 }
