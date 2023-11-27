@@ -401,11 +401,21 @@ pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
 			let path = ffi::CStr::from_ptr(info.dli_fname);
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
 			Ok(path.into())
+		} else if cfg!(target_os = "macos") {
+			let this = InnerLibrary::this()?;
+			if this.to_ptr() == hdr {
+				std::env::current_exe()
+			} else {
+				Err(io::Error::new(
+					io::ErrorKind::InvalidData,
+					"invalid header",
+				))
+			}
 		} else {
 			// dlerror isn't available for dlinfo, so I can only provide a general error message here
 			Err(io::Error::new(
 				io::ErrorKind::Other,
-				"Failed to retrieve symbol information",
+				"Failed to retrieve path",
 			))
 		}
 	}
