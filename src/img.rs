@@ -2,6 +2,7 @@ use crate::os;
 use crate::weak;
 use std::io;
 use std::iter::FusedIterator;
+use std::path;
 use std::vec;
 
 #[cfg(unix)]
@@ -87,4 +88,8 @@ impl Header {
 		let slice = unsafe { std::slice::from_raw_parts(data, len) };
 		Ok(slice)
 	}
+	pub fn path(&self) -> io::Result<path::PathBuf> {
+		unsafe {imp::hdr_path(self as *const Header)}
+	}
+
 }

@@ -103,3 +103,22 @@ fn test_hdr_bytes() {
 		let _ = bytes[bytes.len() - 1];
 	}
 }
+
+
+#[test]
+fn test_hdr_path() {
+	let images = img::Images::now().unwrap();
+	for img in images {
+		let maybe_hdr = unsafe { img.to_ptr().as_ref() };
+		let Some(hdr) = maybe_hdr else {
+			continue;
+		};
+
+		assert_eq!(img.path().unwrap(), hdr.path().unwrap());
+	}
+	let this = Library::this();
+	let this_ptr = this.to_ptr();
+	unsafe {
+		assert_eq!(this.path().unwrap(), (&*this_ptr).path().unwrap())
+	}
+}

@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
 use std::os::windows::prelude::*;
+use std::path::PathBuf;
 use std::{ffi, io, mem, path, ptr};
 
 use crate::img;
@@ -199,4 +200,12 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 	} else {
 		Err(io::Error::last_os_error())
 	}
+}
+
+pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
+	let Some(nonnull_hdr) = ptr::NonNull::new(hdr as *mut _) else {
+		return Err(io::Error::new(io::ErrorKind::Other, "invalid header"))
+	};
+	let lib = mem::ManuallyDrop::new(InnerLibrary(nonnull_hdr));
+	lib.path()
 }
