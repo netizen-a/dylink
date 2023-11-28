@@ -91,10 +91,5 @@ impl Header {
 	pub fn path(&self) -> io::Result<path::PathBuf> {
 		unsafe {imp::hdr_path(self as *const Header)}
 	}
-}
 
-impl std::fmt::Debug for Header {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.to_bytes().fmt(f)
-	}
 }

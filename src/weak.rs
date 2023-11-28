@@ -1,7 +1,7 @@
 use crate::img;
 use crate::os;
 use crate::Library;
-use std::path;
+use std::{io, path};
 
 #[cfg(unix)]
 use os::unix as imp;
@@ -22,8 +22,11 @@ impl Weak {
 	pub fn upgrade(&self) -> Option<Library> {
 		unsafe { imp::InnerLibrary::from_ptr(self.base_addr.cast_mut()) }.map(Library)
 	}
+}
+
+impl crate::Image for Weak {
 	#[inline]
-	pub fn to_ptr(&self) -> *const img::Header {
+	fn to_ptr(&self) -> *const img::Header {
 		if img::is_dangling(self.base_addr) {
 			std::ptr::null()
 		} else {
@@ -31,7 +34,10 @@ impl Weak {
 		}
 	}
 	#[inline]
-	pub fn path(&self) -> Option<&path::PathBuf> {
-		self.path_name.as_ref()
+	fn path(&self) -> io::Result<path::PathBuf> {
+		match self.path_name {
+			Some(ref val) => Ok(val.clone()),
+			None => Err(io::Error::new(io::ErrorKind::NotFound, "No path available")),
+		}
 	}
 }

@@ -16,7 +16,7 @@ fn test_this_path() {
 fn test_try_clone() {
 	let lib = Library::this();
 	let other = lib.try_clone().unwrap();
-	assert_eq!(lib.to_header() as *const _, other.to_header() as *const _);
+	assert_eq!(lib.to_ptr(), other.to_ptr());
 	let t = std::thread::spawn(move || {
 		println!("other: {:?}", other);
 	});
@@ -31,8 +31,8 @@ fn test_iter_images() {
 		print!("weak addr: {:p}, ", weak.to_ptr());
 		if let Some(dylib) = weak.upgrade() {
 			println!("upgraded = {}", dylib.path().unwrap().display());
-			assert_eq!(weak.to_ptr(), dylib.to_header());
-			assert_eq!(weak.path(), dylib.path().ok().as_ref());
+			assert_eq!(weak.to_ptr(), dylib.to_ptr());
+			assert_eq!(weak.path().ok(), dylib.path().ok());
 		} else {
 			println!("upgrade failed = {}", weak.path().unwrap().display());
 		}
@@ -114,10 +114,11 @@ fn test_hdr_path() {
 			continue;
 		};
 
-		assert_eq!(img.path().unwrap(), &hdr.path().unwrap());
+		assert_eq!(img.path().unwrap(), hdr.path().unwrap());
 	}
 	let this = Library::this();
-	let this_ptr = this.to_header();
-
-	assert_eq!(this.path().unwrap(), (&*this_ptr).path().unwrap())
+	let this_ptr = this.to_ptr();
+	unsafe {
+		assert_eq!(this.path().unwrap(), (&*this_ptr).path().unwrap())
+	}
 }
