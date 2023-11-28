@@ -182,15 +182,13 @@ impl Library {
 	#[must_use]
 	pub fn downgrade(this: &Self) -> weak::Weak {
 		weak::Weak {
-			base_addr: Image::to_ptr(this),
-			path_name: Image::path(this).ok(),
+			base_addr: Self::to_header(this),
+			path_name: Self::path(this).ok(),
 		}
 	}
-}
 
-impl Image for Library {
-	fn to_ptr(&self) -> *const img::Header {
-		unsafe { self.0.to_ptr() }
+	pub fn to_header<'a>(&'a self) -> &'a img::Header {
+		unsafe { self.0.to_ptr().as_ref().unwrap() }
 	}
 	/// Gets the path to the dynamic library file.
 	///
@@ -223,7 +221,7 @@ impl Image for Library {
 		alias = "GetModuleFileNameW"
 	)]
 	#[inline]
-	fn path(&self) -> io::Result<path::PathBuf> {
+	pub fn path(&self) -> io::Result<path::PathBuf> {
 		unsafe { self.0.path() }
 	}
 }
@@ -243,16 +241,3 @@ macro_rules! lib {
 	};
 }
 
-/// A trait for objects that represent executable images.
-pub trait Image: crate::sealed::Sealed {
-	/// Returns the base address of the image.
-	///
-	/// The pointer is only valid if there are some strong references to the image.
-	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
-	///
-	/// [`null`]: core::ptr::null "ptr::null"
-	fn to_ptr(&self) -> *const img::Header;
-
-	/// Returns the path of the image.
-	fn path(&self) -> io::Result<path::PathBuf>;
-}

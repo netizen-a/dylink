@@ -93,3 +93,15 @@ impl Header {
 	}
 
 }
+
+impl std::fmt::Debug for Header {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.to_bytes().fmt(f)
+	}
+}
+
+impl PartialEq<&Header> for &Header {
+	fn eq(&self, other: &&Header) -> bool {
+		self.to_bytes().unwrap() == other.to_bytes().unwrap()
+	}
+}
