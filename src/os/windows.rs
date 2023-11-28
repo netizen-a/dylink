@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
 use std::os::windows::prelude::*;
-use std::path::PathBuf;
 use std::{ffi, io, mem, path, ptr};
 
 use crate::img;
@@ -52,39 +51,7 @@ impl InnerLibrary {
 		}
 	}
 
-	pub(crate) unsafe fn path(&self) -> io::Result<path::PathBuf> {
-		const MAX_PATH: usize = 260;
-		const ERROR_INSUFFICIENT_BUFFER: i32 = 0x7A;
 
-		let mut file_name = vec![0u16; MAX_PATH];
-		loop {
-			let _ = c::GetModuleFileNameW(
-				self.0.as_ptr(),
-				file_name.as_mut_ptr(),
-				file_name.len() as c::DWORD,
-			);
-			let last_error = io::Error::last_os_error();
-			match last_error.raw_os_error().unwrap_unchecked() {
-				0 => {
-					// The function succeeded.
-					// Truncate the vector to remove unused zero bytes.
-					if let Some(new_len) = file_name.iter().rposition(|&a| a != 0) {
-						file_name.truncate(new_len + 1)
-					}
-					let os_str = ffi::OsString::from_wide(&file_name);
-					break Ok(os_str.into());
-				}
-				ERROR_INSUFFICIENT_BUFFER => {
-					// The buffer is too small; double its size.
-					file_name.resize(file_name.len() * 2, 0)
-				}
-				_ => {
-					// An unexpected error occurred; return an error.
-					return Err(last_error);
-				}
-			}
-		}
-	}
 	pub(crate) unsafe fn try_clone(&self) -> io::Result<Self> {
 		let mut new_handle = ptr::null_mut();
 		let _ = c::GetModuleHandleExW(
@@ -176,10 +143,9 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			let module_handles = module_handles
 				.into_iter()
 				.map(|base_addr| {
-					let hmodule = InnerLibrary(ptr::NonNull::new_unchecked(base_addr.cast()));
 					weak::Weak {
 						base_addr,
-						path_name: hmodule.path().ok(),
+						path_name: hdr_path(base_addr).ok(),
 					}
 				})
 				.collect::<Vec<weak::Weak>>();
@@ -202,10 +168,40 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 	}
 }
 
-pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
-	let Some(nonnull_hdr) = ptr::NonNull::new(hdr as *mut _) else {
-		return Err(io::Error::new(io::ErrorKind::Other, "invalid header"))
-	};
-	let lib = mem::ManuallyDrop::new(InnerLibrary(nonnull_hdr));
-	lib.path()
+
+
+
+pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<path::PathBuf> {
+	const MAX_PATH: usize = 260;
+	const ERROR_INSUFFICIENT_BUFFER: i32 = 0x7A;
+
+	let mut file_name = vec![0u16; MAX_PATH];
+	let hmodule: *mut ffi::c_void = hdr.cast_mut().cast();
+	loop {
+		let _ = c::GetModuleFileNameW(
+			hmodule,
+			file_name.as_mut_ptr(),
+			file_name.len() as c::DWORD,
+		);
+		let last_error = io::Error::last_os_error();
+		match last_error.raw_os_error().unwrap_unchecked() {
+			0 => {
+				// The function succeeded.
+				// Truncate the vector to remove unused zero bytes.
+				if let Some(new_len) = file_name.iter().rposition(|&a| a != 0) {
+					file_name.truncate(new_len + 1)
+				}
+				let os_str = ffi::OsString::from_wide(&file_name);
+				break Ok(os_str.into());
+			}
+			ERROR_INSUFFICIENT_BUFFER => {
+				// The buffer is too small; double its size.
+				file_name.resize(file_name.len() * 2, 0)
+			}
+			_ => {
+				// An unexpected error occurred; return an error.
+				return Err(last_error);
+			}
+		}
+	}
 }

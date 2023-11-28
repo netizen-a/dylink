@@ -84,47 +84,13 @@ impl InnerLibrary {
 			Ok(Symbol(handle, PhantomData))
 		}
 	}
-	pub unsafe fn path(&self) -> io::Result<PathBuf> {
-		match Self::this() {
-			Ok(this_handle)
-				if (cfg!(target_os = "macos")
-					&& (this_handle.0.as_ptr() as isize & (-4))
-						== (self.0.as_ptr() as isize & (-4)))
-					|| this_handle.0 == self.0 =>
-			{
-				std::env::current_exe()
-			}
-			_ => {
-				#[cfg(target_env = "gnu")]
-				{
-					if let Some(path) = self.get_link_map_path() {
-						Ok(path)
-					} else {
-						Err(io::Error::new(
-							io::ErrorKind::NotFound,
-							"Library path not found",
-						))
-					}
-				}
-				#[cfg(target_os = "macos")]
-				{
-					self.get_macos_image_path()
-				}
-				#[cfg(not(any(target_env = "gnu", target_os = "macos")))]
-				{
-					// Handle other platforms or configurations
-					Err(io::Error::new(io::ErrorKind::Other, "Unsupported platform"))
-				}
-			}
-		}
-	}
 	pub(crate) unsafe fn try_clone(&self) -> io::Result<Self> {
 		let this = Self::this()?;
 		if this.0 == self.0 {
 			Ok(this)
 		} else {
 			std::mem::drop(this);
-			let path = self.path()?;
+			let path = hdr_path(self.to_ptr())?;
 			Self::open(path.as_os_str())
 		}
 	}
@@ -176,50 +142,6 @@ impl InnerLibrary {
 		} else {
 			None
 		}
-	}
-	#[cfg(target_env = "gnu")]
-	unsafe fn get_link_map_path(&self) -> Option<PathBuf> {
-		let handle = self.0;
-		let mut map_ptr = ptr::null_mut::<c::link_map>();
-		if c::dlinfo(
-			handle.as_ptr(),
-			c::RTLD_DI_LINKMAP,
-			&mut map_ptr as *mut _ as *mut _,
-		) == 0
-		{
-			let path = ffi::CStr::from_ptr((*map_ptr).l_name);
-			let path = ffi::OsStr::from_bytes(path.to_bytes());
-			if !path.is_empty() {
-				Some(path.into())
-			} else {
-				None
-			}
-		} else {
-			None
-		}
-	}
-	#[cfg(target_os = "macos")]
-	unsafe fn get_macos_image_path(&self) -> io::Result<PathBuf> {
-		let handle = self.0;
-		let mut result = Err(io::Error::new(io::ErrorKind::NotFound, "Path not found"));
-		let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
-			for image_index in (0..image_index).rev() {
-				let image_name = c::_dyld_get_image_name(image_index);
-				let active_handle =
-					c::dlopen(image_name, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
-				if !active_handle.is_null() {
-					let _ = c::dlclose(active_handle);
-				}
-				if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
-					let path = ffi::CStr::from_ptr(image_name);
-					let path = ffi::OsStr::from_bytes(path.to_bytes());
-					result = Ok(path.into());
-					break;
-				}
-			}
-			Some(image_index)
-		});
-		result
 	}
 }
 impl Drop for InnerLibrary {
@@ -401,18 +323,7 @@ pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
 			let path = ffi::CStr::from_ptr(info.dli_fname);
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
 			Ok(path.into())
-		} else if cfg!(target_os = "macos") {
-			let this = InnerLibrary::this()?;
-			if this.to_ptr() == hdr {
-				std::env::current_exe()
-			} else {
-				Err(io::Error::new(
-					io::ErrorKind::InvalidData,
-					"invalid header",
-				))
-			}
 		} else {
-			// dlerror isn't available for dlinfo, so I can only provide a general error message here
 			Err(io::Error::new(
 				io::ErrorKind::Other,
 				"Failed to retrieve path",

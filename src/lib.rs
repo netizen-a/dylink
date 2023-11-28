@@ -46,8 +46,7 @@ impl<'a> Symbol<'a> {
 	///
 	/// # Platform support
 	///
-	/// This function is supported on all platforms unconditionally, and should be
-	/// preferred over [`Image::to_ptr`] when possible.
+	/// This function is supported on all platforms unconditionally.
 	#[inline]
 	pub fn header(self) -> Option<&'a img::Header> {
 		unsafe { imp::base_addr(self.0).as_ref() }
@@ -99,7 +98,7 @@ impl Library {
 	/// # Examples
 	///
 	/// ```
-	/// use dylink::{Library, Image};
+	/// use dylink::Library;
 	///
 	/// let this = Library::this();
 	/// let path = this.path().unwrap();
@@ -182,21 +181,19 @@ impl Library {
 	#[must_use]
 	pub fn downgrade(this: &Self) -> weak::Weak {
 		weak::Weak {
-			base_addr: Image::to_ptr(this),
-			path_name: Image::path(this).ok(),
+			base_addr: unsafe {this.0.to_ptr()},
+			path_name: this.path().ok(),
 		}
 	}
-}
 
-impl Image for Library {
-	fn to_ptr(&self) -> *const img::Header {
-		unsafe { self.0.to_ptr() }
+	pub fn to_header<'a>(&'a self) -> &'a img::Header {
+		unsafe { self.0.to_ptr().as_ref().unwrap() }
 	}
 	/// Gets the path to the dynamic library file.
 	///
 	/// # Platform-specific behavior
-	/// This function currently corresponds to the `dlinfo` function on Linux, `_dyld_get_image_name` on MacOS,
-	/// and `GetModuleFileNameW` function on Windows. Note that, this [may change in the future][changes]
+	/// This function currently corresponds to the `dladdr` function on Unix, and `GetModuleFileNameW`
+	/// function on Windows. Note that, this [may change in the future][changes]
 	///
 	/// [changes]: io#platform-specific-behavior
 	///
@@ -209,7 +206,7 @@ impl Image for Library {
 	/// # Examples
 	///
 	/// ```no_run
-	/// use dylink::{Library, Image};
+	/// use dylink::Library;
 	///
 	/// fn main() -> std::io::Result<()> {
 	///     let mut lib = Library::open("foo.dll")?;
@@ -223,8 +220,8 @@ impl Image for Library {
 		alias = "GetModuleFileNameW"
 	)]
 	#[inline]
-	fn path(&self) -> io::Result<path::PathBuf> {
-		unsafe { self.0.path() }
+	pub fn path(&self) -> io::Result<path::PathBuf> {
+		self.to_header().path()
 	}
 }
 
@@ -241,18 +238,4 @@ macro_rules! lib {
 		[$($name),+].into_iter()
 			.find_map(|elem| $crate::Library::open(elem).ok())
 	};
-}
-
-/// A trait for objects that represent executable images.
-pub trait Image: crate::sealed::Sealed {
-	/// Returns the base address of the image.
-	///
-	/// The pointer is only valid if there are some strong references to the image.
-	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
-	///
-	/// [`null`]: core::ptr::null "ptr::null"
-	fn to_ptr(&self) -> *const img::Header;
-
-	/// Returns the path of the image.
-	fn path(&self) -> io::Result<path::PathBuf>;
 }
