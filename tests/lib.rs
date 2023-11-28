@@ -31,7 +31,7 @@ fn test_iter_images() {
 		print!("weak addr: {:p}, ", weak.to_ptr());
 		if let Some(dylib) = weak.upgrade() {
 			println!("upgraded = {}", dylib.path().unwrap().display());
-			assert_eq!(weak.to_ptr(), dylib.to_header());
+			assert_eq!(unsafe {weak.to_ptr().as_ref()}, dylib.to_header());
 			assert_eq!(weak.path().ok(), dylib.path().ok());
 		} else {
 			println!("upgrade failed = {}", weak.path().unwrap().display());
@@ -116,7 +116,10 @@ fn test_hdr_path() {
 
 		assert_eq!(img.path().unwrap(), hdr.path().unwrap());
 	}
-	let this = Library::this();
-	let this_ptr = this.to_header();
-	assert_eq!(this.path().unwrap(), (&*this_ptr).path().unwrap())
+
+	if cfg!(not(target_os = "macos")) {
+		let this = Library::this();
+		let this_ptr = this.to_header().unwrap();
+		assert_eq!(this.path().unwrap(), this_ptr.path().unwrap())
+	}
 }

@@ -99,7 +99,7 @@ impl Library {
 	/// # Examples
 	///
 	/// ```
-	/// use dylink::{Library, Image};
+	/// use dylink::Library;
 	///
 	/// let this = Library::this();
 	/// let path = this.path().unwrap();
@@ -180,15 +180,17 @@ impl Library {
 	/// }
 	/// ```
 	#[must_use]
-	pub fn downgrade(this: &Self) -> weak::Weak {
-		weak::Weak {
-			base_addr: Self::to_header(this),
-			path_name: Self::path(this).ok(),
-		}
+	pub fn downgrade(this: &Self) -> Option<weak::Weak> {
+		let base_addr = this.to_header()?;
+		Some(weak::Weak {
+			base_addr,
+			path_name: this.path().ok(),
+		})
 	}
 
-	pub fn to_header<'a>(&'a self) -> &'a img::Header {
-		unsafe { self.0.to_ptr().as_ref().unwrap() }
+	// May not be applicable to running process (Self::this), hence Option type.
+	pub fn to_header<'a>(&'a self) -> Option<&'a img::Header> {
+		unsafe { self.0.to_ptr().as_ref() }
 	}
 	/// Gets the path to the dynamic library file.
 	///
@@ -207,7 +209,7 @@ impl Library {
 	/// # Examples
 	///
 	/// ```no_run
-	/// use dylink::{Library, Image};
+	/// use dylink::Library;
 	///
 	/// fn main() -> std::io::Result<()> {
 	///     let mut lib = Library::open("foo.dll")?;

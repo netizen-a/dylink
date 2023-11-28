@@ -395,8 +395,8 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 
 pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
 	let mut result = Err(io::Error::new(
-		io::ErrorKind::Other,
-		"Failed to retrieve path",
+		io::ErrorKind::NotFound,
+		"Header path not found",
 	));
 	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 	unsafe {
