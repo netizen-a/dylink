@@ -316,18 +316,23 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 
 
 pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
+	let mut result = Err(io::Error::new(
+		io::ErrorKind::Other,
+		"Failed to retrieve path",
+	));
 	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 	unsafe {
 		if c::dladdr(hdr as *const _, info.as_mut_ptr()) != 0 {
 			let info = info.assume_init();
 			let path = ffi::CStr::from_ptr(info.dli_fname);
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
-			Ok(path.into())
+			result = Ok(path.into());
 		} else {
-			Err(io::Error::new(
-				io::ErrorKind::Other,
-				"Failed to retrieve path",
-			))
+			let this = InnerLibrary::this()?;
+			if this.to_ptr() == hdr {
+				result = std::env::current_exe();
+			}
 		}
 	}
+	result
 }

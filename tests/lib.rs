@@ -5,8 +5,6 @@ mod windows;
 
 use dylink::*;
 
-// This test generally fails on macos, but that's ok
-#[cfg(not(target_os = "macos"))]
 #[test]
 fn test_this_path() {
 	let lib = Library::this();
