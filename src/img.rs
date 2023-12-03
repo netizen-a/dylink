@@ -88,10 +88,10 @@ impl Header {
 		let slice = unsafe { std::slice::from_raw_parts(data, len) };
 		Ok(slice)
 	}
+	// This should work on all platforms..
 	pub fn path(&self) -> io::Result<path::PathBuf> {
 		unsafe {imp::hdr_path(self as *const Header)}
 	}
-
 }
 
 impl std::fmt::Debug for Header {

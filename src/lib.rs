@@ -46,8 +46,7 @@ impl<'a> Symbol<'a> {
 	///
 	/// # Platform support
 	///
-	/// This function is supported on all platforms unconditionally, and should be
-	/// preferred over [`Image::to_ptr`] when possible.
+	/// This function is supported on all platforms unconditionally.
 	#[inline]
 	pub fn header(self) -> Option<&'a img::Header> {
 		unsafe { imp::base_addr(self.0).as_ref() }
@@ -184,7 +183,7 @@ impl Library {
 		let base_addr = this.to_header()?;
 		Some(weak::Weak {
 			base_addr,
-			path_name: this.path().ok(),
+			path_name: unsafe {this.0.path()}.ok(),
 		})
 	}
 
@@ -192,40 +191,7 @@ impl Library {
 	pub fn to_header<'a>(&'a self) -> Option<&'a img::Header> {
 		unsafe { self.0.to_ptr().as_ref() }
 	}
-	/// Gets the path to the dynamic library file.
-	///
-	/// # Platform-specific behavior
-	/// This function currently corresponds to the `dlinfo` function on Linux, `_dyld_get_image_name` on MacOS,
-	/// and `GetModuleFileNameW` function on Windows. Note that, this [may change in the future][changes]
-	///
-	/// [changes]: io#platform-specific-behavior
-	///
-	/// *Note: This function is not guarenteed to return the same path as the one passed in to open the library.*
-	///
-	/// # Errors
-	///
-	/// This function will return an error if there is no path associated with the library handle.
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use dylink::Library;
-	///
-	/// fn main() -> std::io::Result<()> {
-	///     let mut lib = Library::open("foo.dll")?;
-	///     let path = lib.path()?;
-	///     Ok(())
-	/// }
-	/// ```
-	#[doc(
-		alias = "dlinfo",
-		alias = "_dyld_get_image_name",
-		alias = "GetModuleFileNameW"
-	)]
-	#[inline]
-	pub fn path(&self) -> io::Result<path::PathBuf> {
-		unsafe { self.0.path() }
-	}
+
 }
 
 /// Creates an `Option<Library>` that may contain a loaded library.

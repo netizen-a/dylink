@@ -12,6 +12,6 @@ fn test_sym_hdr() {
 #[test]
 fn test_path() {
 	let lib = Library::open("libSystem.dylib").unwrap();
-	let path = lib.path();
+	let path = lib.to_header().unwrap().path();
 	assert!(path.is_ok())
 }

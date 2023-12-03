@@ -5,12 +5,12 @@ mod windows;
 
 use dylink::*;
 
-#[test]
+/*#[test]
 fn test_this_path() {
 	let lib = Library::this();
 	let path = lib.path();
 	assert!(path.is_ok());
-}
+}*/
 
 #[test]
 fn test_try_clone() {
@@ -30,9 +30,9 @@ fn test_iter_images() {
 	for weak in images {
 		print!("weak addr: {:p}, ", weak.to_ptr());
 		if let Some(dylib) = weak.upgrade() {
-			println!("upgraded = {}", dylib.path().unwrap().display());
+			println!("upgraded = {}", dylib.to_header().unwrap().path().unwrap().display());
 			assert_eq!(unsafe {weak.to_ptr().as_ref()}, dylib.to_header());
-			assert_eq!(weak.path().ok(), dylib.path().ok());
+			assert_eq!(weak.path().ok(), dylib.to_header().unwrap().path().ok());
 		} else {
 			println!("upgrade failed = {}", weak.path().unwrap().display());
 		}
@@ -59,11 +59,11 @@ fn test_path_soundness() {
 			}
 		}
 		for lib in other_vlib.drain(0..) {
-			let _ = lib.path().unwrap();
+			let _ = lib.try_clone().unwrap();
 		}
 	});
 	for lib in vlib.drain(0..) {
-		let _ = lib.path().unwrap();
+		let _ = lib.try_clone().unwrap();
 	}
 	t.join().unwrap();
 }
@@ -115,11 +115,5 @@ fn test_hdr_path() {
 		};
 
 		assert_eq!(img.path().unwrap(), hdr.path().unwrap());
-	}
-
-	if cfg!(not(target_os = "macos")) {
-		let this = Library::this();
-		let this_ptr = this.to_header().unwrap();
-		assert_eq!(this.path().unwrap(), this_ptr.path().unwrap())
 	}
 }
