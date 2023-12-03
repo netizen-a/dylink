@@ -101,8 +101,6 @@ impl Library {
 	/// use dylink::Library;
 	///
 	/// let this = Library::this();
-	/// let path = this.path().unwrap();
-	/// println!("{}", path.display());
 	/// ```
 	#[must_use]
 	#[inline]
