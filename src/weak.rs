@@ -1,7 +1,7 @@
 use crate::img;
 use crate::os;
 use crate::Library;
-use std::{io, path};
+use std::path;
 
 #[cfg(unix)]
 use os::unix as imp;
@@ -19,6 +19,9 @@ pub struct Weak {
 impl crate::sealed::Sealed for Weak {}
 
 impl Weak {
+	/// Attempts to upgrade the `Weak` pointer to a [`Library`], delaying dropping of the inner value if successful.
+	///
+	/// Returns [`None`] if the inner value has since been dropped.
 	pub fn upgrade(&self) -> Option<Library> {
 		unsafe { imp::InnerLibrary::from_ptr(self.base_addr.cast_mut()) }.map(Library)
 	}
@@ -31,18 +34,18 @@ impl Weak {
 	/// [`null`]: core::ptr::null "ptr::null"
 	#[inline]
 	pub fn to_ptr(&self) -> *const img::Header {
-		if img::is_dangling(self.base_addr) {
-			std::ptr::null()
-		} else {
-			self.base_addr
-		}
+		unsafe { imp::base_addr(self.base_addr.cast_mut().cast()) }
 	}
+	/// Returns [`None`] if there is no asscociated image path, otherwise returns the path.
+	///
+	/// # Platform-specific Behavior
+	///
+	/// May return [`None`] on Linux if the image is the executable.
 	#[inline]
-	pub fn path(&self) -> io::Result<path::PathBuf> {
+	pub fn path(&self) -> Option<&path::Path> {
 		match self.path_name {
-			Some(ref val) => Ok(val.clone()),
-			None => Err(io::Error::new(io::ErrorKind::NotFound, "No path available")),
+			Some(ref path) => Some(&path),
+			None => None,
 		}
 	}
 }
-

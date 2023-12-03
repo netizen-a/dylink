@@ -43,10 +43,6 @@ impl<'a> Symbol<'a> {
 		self.0 as _
 	}
 	/// Attempts to get the base address of the library.
-	///
-	/// # Platform support
-	///
-	/// This function is supported on all platforms unconditionally.
 	#[inline]
 	pub fn header(self) -> Option<&'a img::Header> {
 		unsafe { imp::base_addr(self.0).as_ref() }
@@ -76,6 +72,11 @@ impl Library {
 	/// The library maintains an internal reference count that increments
 	/// for every time the library is opened. Library symbols are eagerly resolved
 	/// before the function returns.
+	///
+	/// # Security
+	///
+	/// To prevent dynamic library [preloading attacks](https://support.microsoft.com/en-us/topic/secure-loading-of-libraries-to-prevent-dll-preloading-attacks-d41303ec-0748-9211-f317-2edc819682e1) its recommended to use a fully qualified path,
+	/// or remove the current working directory from the list of search paths.
 	///
 	/// # Examples
 	///
@@ -163,6 +164,12 @@ impl Library {
 		unsafe { self.0.try_clone().map(Library) }
 	}
 
+	// May not be applicable to running process (Self::this), hence Option type.
+	/// Converts this library to a header.
+	pub fn to_header<'a>(&'a self) -> Option<&'a img::Header> {
+		unsafe { self.0.to_ptr().as_ref() }
+	}
+
 	/// Creates a new [`Weak`] pointer to this Library.
 	///
 	/// # Examples
@@ -184,12 +191,6 @@ impl Library {
 			path_name: unsafe {this.0.path()}.ok(),
 		})
 	}
-
-	// May not be applicable to running process (Self::this), hence Option type.
-	pub fn to_header<'a>(&'a self) -> Option<&'a img::Header> {
-		unsafe { self.0.to_ptr().as_ref() }
-	}
-
 }
 
 /// Creates an `Option<Library>` that may contain a loaded library.
@@ -206,4 +207,3 @@ macro_rules! lib {
 			.find_map(|elem| $crate::Library::open(elem).ok())
 	};
 }
-

@@ -176,7 +176,8 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			let module_handles = module_handles
 				.into_iter()
 				.map(|base_addr| {
-					let hmodule = InnerLibrary(ptr::NonNull::new_unchecked(base_addr.cast()));
+					let base_nonnull = ptr::NonNull::new_unchecked(base_addr.cast());
+					let hmodule = mem::ManuallyDrop::new(InnerLibrary(base_nonnull));
 					weak::Weak {
 						base_addr,
 						path_name: hmodule.path().ok(),
@@ -204,7 +205,7 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 
 pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
 	let Some(nonnull_hdr) = ptr::NonNull::new(hdr as *mut _) else {
-		return Err(io::Error::new(io::ErrorKind::Other, "invalid header"))
+		return Err(io::Error::new(io::ErrorKind::Other, "invalid header"));
 	};
 	let lib = mem::ManuallyDrop::new(InnerLibrary(nonnull_hdr));
 	lib.path()

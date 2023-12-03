@@ -24,6 +24,14 @@ impl Images {
 	}
 }
 
+impl From<Vec<weak::Weak>> for Images {
+	fn from(value: Vec<weak::Weak>) -> Self {
+		Self {
+			inner: value.into_iter(),
+		}
+	}
+}
+
 impl Iterator for Images {
 	type Item = weak::Weak;
 	#[inline]
@@ -59,16 +67,15 @@ impl ExactSizeIterator for Images {
 
 impl FusedIterator for Images {}
 
-// This function only works for executable images.
-#[inline]
-pub(crate) fn is_dangling(addr: *const Header) -> bool {
-	unsafe { imp::base_addr(addr.cast_mut().cast()).is_null() }
-}
-
-// Platform behavior:
-//     MacOS   -> mach_header | mach_header_64
-//     Windows -> IMAGE_DOS_HEADER -> IMAGE_FILE_HEADER | IMAGE_OS2_HEADER | IMAGE_VXD_HEADER
-//     Linux   -> Elf32_Ehdr | Elf64_Ehdr
+// # Platform behavior
+//
+// The following are the expected headers to be encountered per each platform.
+//
+// | Platform | Headers                                              |
+// | -------- | ---------------------------------------------------- |
+// | MacOS    | mach_header, mach_header_64                          |
+// | Windows  | IMAGE_DOS_HEADER, IMAGE_OS2_HEADER, IMAGE_VXD_HEADER |
+// | Linux    | Elf32_Ehdr, Elf64_Ehdr                               |
 #[repr(C)]
 pub struct Header {
 	_data: [u8; 0],
@@ -82,15 +89,17 @@ impl Header {
 		let len: usize = if cfg!(windows) { 2 } else { 4 };
 		unsafe { std::slice::from_raw_parts(hdr.cast::<u8>(), len) }
 	}
+
+	/// Converts this header to a byte slice.
 	pub fn to_bytes(&self) -> io::Result<&[u8]> {
 		let len = unsafe { imp::hdr_size(self)? };
 		let data = self as *const Header as *const u8;
 		let slice = unsafe { std::slice::from_raw_parts(data, len) };
 		Ok(slice)
 	}
-	// This should work on all platforms..
+	/// Returns the path to the image.
 	pub fn path(&self) -> io::Result<path::PathBuf> {
-		unsafe {imp::hdr_path(self as *const Header)}
+		unsafe { imp::hdr_path(self as *const Header) }
 	}
 }
 
@@ -100,8 +109,8 @@ impl std::fmt::Debug for Header {
 	}
 }
 
-impl PartialEq<&Header> for &Header {
-	fn eq(&self, other: &&Header) -> bool {
+impl PartialEq<Header> for Header {
+	fn eq(&self, other: &Header) -> bool {
 		self.to_bytes().unwrap() == other.to_bytes().unwrap()
 	}
 }

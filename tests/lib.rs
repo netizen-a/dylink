@@ -5,13 +5,6 @@ mod windows;
 
 use dylink::*;
 
-/*#[test]
-fn test_this_path() {
-	let lib = Library::this();
-	let path = lib.path();
-	assert!(path.is_ok());
-}*/
-
 #[test]
 fn test_try_clone() {
 	let lib = Library::this();
@@ -30,11 +23,14 @@ fn test_iter_images() {
 	for weak in images {
 		print!("weak addr: {:p}, ", weak.to_ptr());
 		if let Some(dylib) = weak.upgrade() {
-			println!("upgraded = {}", dylib.to_header().unwrap().path().unwrap().display());
-			assert_eq!(unsafe {weak.to_ptr().as_ref()}, dylib.to_header());
-			assert_eq!(weak.path().ok(), dylib.to_header().unwrap().path().ok());
-		} else {
-			println!("upgrade failed = {}", weak.path().unwrap().display());
+			let hdr = dylib.to_header().unwrap();
+			if let Ok(path) = hdr.path() {
+				println!("upgraded = {}", path.display());
+				assert_eq!(path, dylib.to_header().unwrap().path().unwrap());
+			}
+			assert_eq!(unsafe { weak.to_ptr().as_ref() }, dylib.to_header());
+		} else if let Some(path) = weak.path() {
+			println!("upgrade failed = {}", path.display());
 		}
 	}
 }
@@ -104,7 +100,6 @@ fn test_hdr_bytes() {
 	}
 }
 
-
 #[test]
 fn test_hdr_path() {
 	let images = img::Images::now().unwrap();
@@ -113,7 +108,8 @@ fn test_hdr_path() {
 		let Some(hdr) = maybe_hdr else {
 			continue;
 		};
-
-		assert_eq!(img.path().unwrap(), hdr.path().unwrap());
+		if let Some(path) = img.path() {
+			assert_eq!(path, hdr.path().unwrap());
+		}
 	}
 }

@@ -6,7 +6,6 @@ use std::ffi;
 type cpu_type_t = ffi::c_int;
 type cpu_subtype_t = ffi::c_int;
 
-
 // 32-bit header
 #[repr(C)]
 pub struct mach_header {
