@@ -184,12 +184,12 @@ impl Library {
 	/// }
 	/// ```
 	#[must_use]
-	pub fn downgrade(this: &Self) -> Option<weak::Weak> {
-		let base_addr = this.to_header()?;
-		Some(weak::Weak {
+	pub fn downgrade(this: &Self) -> weak::Weak {
+		let base_addr = this.to_header().expect("header not found");
+		weak::Weak {
 			base_addr,
-			path_name: unsafe {this.0.path()}.ok(),
-		})
+			path_name: base_addr.path().ok(),
+		}
 	}
 }
 

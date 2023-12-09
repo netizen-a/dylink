@@ -240,8 +240,10 @@ where
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	let mut data = Vec::new();
 	let _ = iter_phdr(|info, _| {
-		let path_name = if (*info).dlpi_name.is_null() || (*info).dlpi_name.read() == 0i8 {
+		let path_name = if (*info).dlpi_name.is_null() {
 			None
+		} else if (*info).dlpi_name.read() == 0i8 {
+			std::env::current_exe().ok()
 		} else {
 			let path = ffi::CStr::from_ptr((*info).dlpi_name);
 			let path = ffi::OsStr::from_bytes(path.to_bytes());

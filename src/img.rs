@@ -98,6 +98,11 @@ impl Header {
 		Ok(slice)
 	}
 	/// Returns the path to the image.
+	///
+	/// # Security
+	///
+	/// If the header comes from [`Library::this`](crate::Library) then this function should heed the same
+	/// security implications as [`current_env`](std::env::current_exe).
 	pub fn path(&self) -> io::Result<path::PathBuf> {
 		unsafe { imp::hdr_path(self as *const Header) }
 	}
