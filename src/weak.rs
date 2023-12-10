@@ -19,13 +19,16 @@ pub struct Weak {
 impl crate::sealed::Sealed for Weak {}
 
 impl Weak {
+
+	// The `Library::this` instance doesn't work well in doc tests.
+
 	/// Attempts to upgrade the `Weak` pointer to a [`Library`], delaying dropping of the inner value if successful.
 	///
 	/// Returns [`None`] if the inner value has since been dropped.
 	///
 	/// # Examples
 	///
-	/// ```
+	/// ```no_run
 	/// use dylink::Library;
 	///
 	/// let this = Library::this();
