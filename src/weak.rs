@@ -22,6 +22,19 @@ impl Weak {
 	/// Attempts to upgrade the `Weak` pointer to a [`Library`], delaying dropping of the inner value if successful.
 	///
 	/// Returns [`None`] if the inner value has since been dropped.
+	///
+    /// # Examples
+    ///
+    /// ```
+    /// use dylink::Library;
+    ///
+    /// let this = Library::this();
+    ///
+    /// let weak_this = Library::downgrade(&this);
+    ///
+    /// let strong_this: Option<Library> = weak_this.upgrade();
+    /// assert!(strong_this.is_some());
+    /// ```
 	pub fn upgrade(&self) -> Option<Library> {
 		unsafe { imp::InnerLibrary::from_ptr(self.base_addr.cast_mut()) }.map(Library)
 	}
