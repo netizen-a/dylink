@@ -166,6 +166,8 @@ impl Library {
 
 	// May not be applicable to running process (Self::this), hence Option type.
 	/// Converts this library to a header.
+	///
+	/// *Note: Whenever possible, [`Symbol::header`] should be preferred.*
 	pub fn to_header<'a>(&'a self) -> Option<&'a img::Header> {
 		unsafe { self.0.to_ptr().as_ref() }
 	}

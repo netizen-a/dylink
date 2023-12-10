@@ -39,6 +39,8 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 	}
 }
 
+// dlopen may return a different handle if the path is not null.
+// This function solves the problem of `Library::to_library` not working with `Library::this`
 fn dlopen_fname(fname: &ffi::CStr) -> *const ffi::c_char {
 	if fname.to_str().unwrap() == std::env::current_exe().unwrap().to_str().unwrap() {
 		std::ptr::null()
@@ -104,6 +106,12 @@ impl InnerLibrary {
 			let path = hdr.path()?;
 			Self::open(path.as_os_str())
 		}
+	}
+
+	// This is to handle any platforms that I cannot deal with.
+	#[cfg(not(any(target_env = "gnu", target_os = "macos")))]
+	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
+		std::ptr::null()
 	}
 
 	// returns null if handle is invalid
