@@ -113,3 +113,12 @@ fn test_hdr_path() {
 		}
 	}
 }
+
+#[test]
+fn test_downgrade_upgrade() {
+	let strong = Library::this();
+	let weak = Library::downgrade(&strong).unwrap();
+	let strong_clone = weak.upgrade();
+
+	assert!(strong_clone.is_some());
+}
