@@ -168,8 +168,11 @@ impl Library {
 	/// Converts this library to a header.
 	///
 	/// *Note: Whenever possible, [`Symbol::header`] should be preferred.*
-	pub fn to_header<'a>(&'a self) -> Option<&'a img::Header> {
-		unsafe { self.0.to_ptr().as_ref() }
+	pub fn to_header<'a>(&'a self) -> io::Result<&'a img::Header> {
+		unsafe { self.0.to_ptr().as_ref() }.ok_or(io::Error::new(
+			io::ErrorKind::Unsupported,
+			"Header cannot be retrieved on this platform. Use `Symbol::header` instead.",
+		))
 	}
 
 	/// Creates a new [`Weak`] pointer to this Library.
@@ -186,12 +189,12 @@ impl Library {
 	/// }
 	/// ```
 	#[must_use]
-	pub fn downgrade(this: &Self) -> weak::Weak {
-		let base_addr = this.to_header().expect("header not found");
-		weak::Weak {
+	pub fn downgrade(this: &Self) -> io::Result<weak::Weak> {
+		let base_addr = this.to_header()?;
+		Ok(weak::Weak {
 			base_addr,
 			path_name: base_addr.path().ok(),
-		}
+		})
 	}
 }
 

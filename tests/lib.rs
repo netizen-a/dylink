@@ -9,7 +9,7 @@ use dylink::*;
 fn test_try_clone() {
 	let lib = Library::this();
 	let other = lib.try_clone().unwrap();
-	assert_eq!(lib.to_header(), other.to_header());
+	assert_eq!(lib.to_header().unwrap(), other.to_header().unwrap());
 	let t = std::thread::spawn(move || {
 		println!("other: {:?}", other);
 	});
@@ -28,7 +28,7 @@ fn test_iter_images() {
 				println!("upgraded = {}", path.display());
 				assert_eq!(path, dylib.to_header().unwrap().path().unwrap());
 			}
-			assert_eq!(unsafe { weak.to_ptr().as_ref() }, dylib.to_header());
+			assert_eq!(unsafe { weak.to_ptr().as_ref() }.unwrap(), dylib.to_header().unwrap());
 		} else if let Some(path) = weak.path() {
 			println!("upgrade failed = {}", path.display());
 		}
