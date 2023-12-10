@@ -39,6 +39,14 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 	}
 }
 
+fn dlopen_fname(fname: &ffi::CStr) -> *const ffi::c_char {
+	if fname.to_str().unwrap() == std::env::current_exe().unwrap().to_str().unwrap() {
+		std::ptr::null()
+	} else {
+		fname.as_ptr()
+	}
+}
+
 #[derive(Debug)]
 #[repr(transparent)]
 pub(crate) struct InnerLibrary(ptr::NonNull<ffi::c_void>);
@@ -122,12 +130,7 @@ impl InnerLibrary {
 		let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 			for image_index in (0..image_index).rev() {
 				let image_name = c::_dyld_get_image_name(image_index);
-				let fname_cstr = ffi::CStr::from_ptr(image_name);
-				let filename = if fname_cstr.to_str().unwrap() == std::env::current_exe().unwrap().to_str().unwrap() {
-					std::ptr::null()
-				} else {
-					image_name
-				};
+				let filename = dlopen_fname(ffi::CStr::from_ptr(image_name));
 				let active_handle =
 					c::dlopen(filename, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
 				if !active_handle.is_null() {
@@ -146,12 +149,7 @@ impl InnerLibrary {
 		let mut info = mem::MaybeUninit::zeroed();
 		if c::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
 			let info = info.assume_init();
-			let fname_cstr = ffi::CStr::from_ptr(info.dli_fname);
-			let filename = if fname_cstr.to_str().unwrap() == std::env::current_exe().unwrap().to_str().unwrap() {
-				std::ptr::null()
-			} else {
-				info.dli_fname
-			};
+			let filename = dlopen_fname(ffi::CStr::from_ptr(info.dli_fname));
 			let handle = c::dlopen(filename, c::RTLD_NOW | c::RTLD_LOCAL);
 			ptr::NonNull::new(handle).map(Self)
 		} else {
