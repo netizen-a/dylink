@@ -140,7 +140,13 @@ impl InnerLibrary {
 		let mut info = mem::MaybeUninit::zeroed();
 		if c::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
 			let info = info.assume_init();
-			let handle = c::dlopen(info.dli_fname, c::RTLD_NOW | c::RTLD_LOCAL);
+			let fname_cstr = ffi::CStr::from_ptr(info.dli_fname);
+			let filename = if fname_cstr.to_str().unwrap() == std::env::current_exe().unwrap().to_str().unwrap() {
+				std::ptr::null()
+			} else {
+				info.dli_fname
+			};
+			let handle = c::dlopen(filename, c::RTLD_NOW | c::RTLD_LOCAL);
 			ptr::NonNull::new(handle).map(Self)
 		} else {
 			None
