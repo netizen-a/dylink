@@ -59,6 +59,6 @@ impl Weak {
 	/// May return [`None`] on Linux if the image is the executable.
 	#[inline]
 	pub fn path(&self) -> Option<&path::Path> {
-		self.path_name.as_ref().map(path::PathBuf::as_path)
+		self.path_name.as_deref()
 	}
 }
