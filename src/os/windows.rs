@@ -210,29 +210,3 @@ pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
 	let lib = mem::ManuallyDrop::new(InnerLibrary(nonnull_hdr));
 	lib.path()
 }
-
-/*#[cfg(test)]
-mod tests {
-	use super::*;
-	// this test will fail
-	#[test]
-	fn test_size() {
-		let iter = crate::img::Images::now().unwrap();
-		for weak in iter {
-			let hdr = weak.base_addr;
-			unsafe {
-				let sys_size = hdr_size(hdr).unwrap();
-				let winhdr = c::ImageNtHeader(hdr as *mut std::ffi::c_void);
-				if (*winhdr).FileHeader.Machine == 0x014c {
-					let hdr32 = winhdr as *mut c::IMAGE_NT_HEADERS32;
-					let found_size = (*hdr32).OptionalHeader.SizeOfHeaders;
-					assert_eq!(sys_size, found_size as _);
-				} else {
-					let hdr64 = winhdr as *mut c::IMAGE_NT_HEADERS64;
-					let found_size = (*hdr64).OptionalHeader.SizeOfHeaders;
-					assert_eq!(sys_size, found_size as _);
-				}
-			}
-		}
-	}
-}*/

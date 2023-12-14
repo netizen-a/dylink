@@ -83,11 +83,15 @@ pub struct Header {
 }
 
 impl Header {
-	/// Returns the magic number of the image.
-	pub const fn magic(&self) -> &[u8] {
+	/// Returns the magic number of the image at the start of the header.
+	///
+	/// # Safety
+	///
+	/// Header must be at least 4 bytes to be safe to call this function.
+	pub const unsafe fn magic(&self) -> &[u8] {
 		let hdr = self as *const Header;
 		let len: usize = if cfg!(windows) { 2 } else { 4 };
-		unsafe { std::slice::from_raw_parts(hdr.cast::<u8>(), len) }
+		std::slice::from_raw_parts(hdr.cast::<u8>(), len)
 	}
 
 	/// Converts this header to a byte slice.

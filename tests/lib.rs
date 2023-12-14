@@ -72,7 +72,7 @@ fn test_hdr_magic() {
 		let Some(hdr) = maybe_hdr else {
 			continue;
 		};
-		let magic = hdr.magic();
+		let magic = unsafe {hdr.magic()};
 		if cfg!(windows) {
 			assert!(magic == [b'M', b'Z'] || magic == [b'Z', b'M'])
 		} else if cfg!(target_os = "macos") {
