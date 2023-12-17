@@ -71,7 +71,7 @@ impl Weak {
 	pub fn to_ptr(&self) -> *const img::Header {
 		unsafe { imp::base_addr(self.base_addr.cast_mut().cast()) }
 	}
-	/// Returns [`None`] if there is no asscociated image path, otherwise returns the path.
+	/// Returns [`None`] if there is no associated image path, otherwise returns the path.
 	///
 	/// # Platform-specific Behavior
 	///

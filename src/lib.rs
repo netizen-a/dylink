@@ -75,8 +75,10 @@ impl Library {
 	///
 	/// # Security
 	///
-	/// To prevent dynamic library [preloading attacks](https://support.microsoft.com/en-us/topic/secure-loading-of-libraries-to-prevent-dll-preloading-attacks-d41303ec-0748-9211-f317-2edc819682e1) its recommended to use a fully qualified path,
+	/// To prevent dynamic library [preloading attacks] its recommended to use a fully qualified path,
 	/// or remove the current working directory from the list of search paths.
+	///
+	/// [preloading attacks]: https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-security
 	///
 	/// # Examples
 	///
