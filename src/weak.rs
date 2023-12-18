@@ -9,7 +9,7 @@ use os::unix as imp;
 #[cfg(windows)]
 use os::windows as imp;
 
-/// Represents an executable image.
+/// Represents a weak pointer to an executable image.
 ///
 /// This object can be obtained through either [`Images`](img::Images) or [`Library`].
 #[derive(Debug, Clone)]

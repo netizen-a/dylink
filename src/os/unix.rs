@@ -301,7 +301,8 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
 	const MH_MAGIC_64: &[u8] = &0xfeedfacf_u32.to_le_bytes();
 	const ELF_MAGIC: &[u8] = &[0x7f, b'E', b'L', b'F'];
 
-	let magic: &[u8] = hdr.as_ref().unwrap_unchecked().magic();
+	let magic_len: usize = if cfg!(windows) { 2 } else { 4 };
+	let magic: &[u8] = std::slice::from_raw_parts(hdr.cast(), magic_len);
 	match magic {
 		MH_MAGIC => {
 			let hdr = hdr as *const c::mach_header;
@@ -336,12 +337,13 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
 }
 
 pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
-	let mut result = Err(io::Error::new(
-		io::ErrorKind::NotFound,
-		"Header path not found",
-	));
-	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
-	unsafe {
+	#[cfg(not(target_os = "aix"))]
+	{
+		let mut result = Err(io::Error::new(
+			io::ErrorKind::NotFound,
+			"Header path not found",
+		));
+		let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 		if c::dladdr(hdr as *const _, info.as_mut_ptr()) != 0 {
 			let info = info.assume_init();
 			let path = ffi::CStr::from_ptr(info.dli_fname);
@@ -353,6 +355,10 @@ pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
 				result = std::env::current_exe();
 			}
 		}
+		result
 	}
-	result
+	#[cfg(target_os = "aix")]
+	{
+		Err(io::Error::new(io::ErrorKind::Unsupported, "path retrieval is unsupported on AIX"))
+	}
 }
