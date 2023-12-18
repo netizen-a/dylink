@@ -43,13 +43,13 @@ fn test_atoi_linux() {
 fn test_sym_hdr() {
 	let lib = Library::open("libX11.so.6").unwrap();
 	let sym = lib.symbol("XOpenDisplay").unwrap();
-	let base = sym.header();
+	let base = sym.image();
 	assert!(base.is_some())
 }
 
 #[test]
 fn test_path() {
 	let lib = Library::open("libX11.so.6").unwrap();
-	let path = lib.to_header().unwrap().path();
+	let path = lib.to_image().unwrap().path();
 	assert!(path.is_ok())
 }

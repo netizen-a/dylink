@@ -96,7 +96,7 @@ impl InnerLibrary {
 			.ok_or_else(io::Error::last_os_error)
 			.map(Self)
 	}
-	pub(crate) unsafe fn from_ptr(addr: *mut img::Header) -> Option<Self> {
+	pub(crate) unsafe fn from_ptr(addr: *mut img::Image) -> Option<Self> {
 		if let Some(addr) = ptr::NonNull::new(addr.cast::<ffi::c_void>()) {
 			let new_lib = InnerLibrary(addr);
 			new_lib.try_clone().ok()
@@ -106,7 +106,7 @@ impl InnerLibrary {
 	}
 
 	#[inline]
-	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const img::Image {
 		self.0.as_ptr().cast()
 	}
 }
@@ -131,7 +131,7 @@ impl AsRawHandle for Library {
 	}
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Header {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Image {
 	let mut handle = ptr::null_mut();
 	let _ = c::GetModuleHandleExW(
 		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT | c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
@@ -144,7 +144,7 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Heade
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	const INITIAL_SIZE: usize = 1000;
 	let process_handle = c::GetCurrentProcess();
-	let mut module_handles = vec![ptr::null_mut::<img::Header>(); INITIAL_SIZE];
+	let mut module_handles = vec![ptr::null_mut::<img::Image>(); INITIAL_SIZE];
 	let mut len_needed: u32 = 0;
 	let mut prev_size = INITIAL_SIZE;
 
@@ -190,7 +190,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	}
 }
 
-pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
+pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
 	let hprocess = c::GetCurrentProcess();
 	let hmodule = hdr as *mut ffi::c_void;
 	let mut lpmodinfo = mem::MaybeUninit::zeroed();
@@ -203,7 +203,7 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 	}
 }
 
-pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
+pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
 	let Some(nonnull_hdr) = ptr::NonNull::new(hdr as *mut _) else {
 		return Err(io::Error::new(io::ErrorKind::Other, "invalid header"));
 	};

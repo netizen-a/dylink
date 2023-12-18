@@ -41,16 +41,16 @@ fn test_macro_impl() {
 }
 
 #[test]
-fn test_sym_hdr() {
+fn test_sym_img() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let sym = lib.symbol("SetLastError").unwrap();
-	let base = sym.header();
+	let base = sym.image();
 	assert!(base.is_some())
 }
 
 #[test]
 fn test_path() {
 	let lib = Library::open("Kernel32.dll").unwrap();
-	let path = lib.to_header().unwrap().path();
+	let path = lib.to_image().unwrap().path();
 	assert!(path.is_ok())
 }

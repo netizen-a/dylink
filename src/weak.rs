@@ -14,7 +14,7 @@ use os::windows as imp;
 /// This object can be obtained through either [`Images`](img::Images) or [`Library`].
 #[derive(Debug, Clone)]
 pub struct Weak {
-	pub(crate) base_addr: *const img::Header,
+	pub(crate) base_addr: *const img::Image,
 	pub(crate) path_name: Option<path::PathBuf>,
 }
 impl crate::sealed::Sealed for Weak {}
@@ -32,6 +32,7 @@ impl Weak {
     /// let empty: Weak = Weak::new();
     /// assert!(empty.upgrade().is_none());
     /// ```
+	#[inline]
 	pub const fn new() -> Self {
 		Self {
 			base_addr: ptr::null(),
@@ -68,7 +69,7 @@ impl Weak {
 	///
 	/// [`null`]: core::ptr::null "ptr::null"
 	#[inline]
-	pub fn to_ptr(&self) -> *const img::Header {
+	pub fn to_ptr(&self) -> *const img::Image {
 		unsafe { imp::base_addr(self.base_addr.cast_mut().cast()) }
 	}
 	/// Returns [`None`] if there is no associated image path, otherwise returns the path.

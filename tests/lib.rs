@@ -9,7 +9,7 @@ use dylink::*;
 fn test_try_clone() {
 	let lib = Library::this();
 	let other = lib.try_clone().unwrap();
-	assert_eq!(lib.to_header().unwrap(), other.to_header().unwrap());
+	assert_eq!(lib.to_image().unwrap(), other.to_image().unwrap());
 	let t = std::thread::spawn(move || {
 		println!("other: {:?}", other);
 	});
@@ -23,12 +23,12 @@ fn test_iter_images() {
 	for weak in images {
 		print!("weak addr: {:p}, ", weak.to_ptr());
 		if let Some(dylib) = weak.upgrade() {
-			let hdr = dylib.to_header().unwrap();
+			let hdr = dylib.to_image().unwrap();
 			if let Ok(path) = hdr.path() {
 				println!("upgraded = {}", path.display());
-				assert_eq!(path, dylib.to_header().unwrap().path().unwrap());
+				assert_eq!(path, dylib.to_image().unwrap().path().unwrap());
 			}
-			assert_eq!(unsafe { weak.to_ptr().as_ref() }.unwrap(), dylib.to_header().unwrap());
+			assert_eq!(unsafe { weak.to_ptr().as_ref() }.unwrap(), dylib.to_image().unwrap());
 		} else if let Some(path) = weak.path() {
 			println!("upgrade failed = {}", path.display());
 		}
@@ -62,28 +62,6 @@ fn test_path_soundness() {
 		let _ = lib.try_clone().unwrap();
 	}
 	t.join().unwrap();
-}
-
-#[test]
-fn test_hdr_magic() {
-	let images = img::Images::now().unwrap();
-	for img in images {
-		let maybe_hdr = unsafe { img.to_ptr().as_ref() };
-		let Some(hdr) = maybe_hdr else {
-			continue;
-		};
-		let magic = unsafe {hdr.magic()};
-		if cfg!(windows) {
-			assert!(magic == [b'M', b'Z'] || magic == [b'Z', b'M'])
-		} else if cfg!(target_os = "macos") {
-			const MH_MAGIC: u32 = 0xfeedface;
-			const MH_MAGIC_64: u32 = 0xfeedfacf;
-			assert!(magic == MH_MAGIC.to_le_bytes() || magic == MH_MAGIC_64.to_le_bytes())
-		} else if cfg!(unix) {
-			const EI_MAG: [u8; 4] = [0x7f, b'E', b'L', b'F'];
-			assert_eq!(magic, EI_MAG);
-		}
-	}
 }
 
 #[test]

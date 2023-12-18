@@ -67,37 +67,28 @@ impl ExactSizeIterator for Images {
 
 impl FusedIterator for Images {}
 
-// # Platform behavior
-//
-// The following are the expected headers to be encountered per each platform.
-//
-// | Platform | Headers                                              |
-// | -------- | ---------------------------------------------------- |
-// | MacOS    | mach_header, mach_header_64                          |
-// | Windows  | IMAGE_DOS_HEADER, IMAGE_OS2_HEADER, IMAGE_VXD_HEADER |
-// | Linux    | Elf32_Ehdr, Elf64_Ehdr                               |
+/// An object providing access to an executable image.
+///
+/// # Platform behavior
+///
+/// The following are the expected headers the image may represent per each platform.
+///
+/// | Platform | Headers                                              |
+/// | -------- | ---------------------------------------------------- |
+/// | MacOS    | mach_header, mach_header_64                          |
+/// | Windows  | IMAGE_DOS_HEADER, IMAGE_OS2_HEADER, IMAGE_VXD_HEADER |
+/// | Linux    | Elf32_Ehdr, Elf64_Ehdr                               |
 #[repr(C)]
-pub struct Header {
+pub struct Image {
 	_data: [u8; 0],
 	_marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
 }
 
-impl Header {
-	/// Returns the magic number of the image at the start of the header.
-	///
-	/// # Safety
-	///
-	/// Header must be at least 4 bytes to be safe to call this function.
-	pub const unsafe fn magic(&self) -> &[u8] {
-		let hdr = self as *const Header;
-		let len: usize = if cfg!(windows) { 2 } else { 4 };
-		std::slice::from_raw_parts(hdr.cast::<u8>(), len)
-	}
-
-	/// Converts this header to a byte slice.
+impl Image {
+	/// Converts this Image to a byte slice.
 	pub fn to_bytes(&self) -> io::Result<&[u8]> {
 		let len = unsafe { imp::hdr_size(self)? };
-		let data = self as *const Header as *const u8;
+		let data = self as *const Image as *const u8;
 		let slice = unsafe { std::slice::from_raw_parts(data, len) };
 		Ok(slice)
 	}
@@ -105,21 +96,21 @@ impl Header {
 	///
 	/// # Security
 	///
-	/// If the header comes from [`Library::this`](crate::Library) then this function should heed the same
+	/// If the Image comes from [`Library::this`](crate::Library) then this function should heed the same
 	/// security implications as [`current_env`](std::env::current_exe).
 	pub fn path(&self) -> io::Result<path::PathBuf> {
-		unsafe { imp::hdr_path(self as *const Header) }
+		unsafe { imp::hdr_path(self as *const Image) }
 	}
 }
 
-impl std::fmt::Debug for Header {
+impl std::fmt::Debug for Image {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		self.to_bytes().fmt(f)
 	}
 }
 
-impl PartialEq<Header> for Header {
-	fn eq(&self, other: &Header) -> bool {
+impl PartialEq<Image> for Image {
+	fn eq(&self, other: &Image) -> bool {
 		self.to_bytes().unwrap() == other.to_bytes().unwrap()
 	}
 }

@@ -44,7 +44,7 @@ impl<'a> Symbol<'a> {
 	}
 	/// Attempts to get the base address of the library.
 	#[inline]
-	pub fn header(self) -> Option<&'a img::Header> {
+	pub fn image(self) -> Option<&'a img::Image> {
 		unsafe { imp::base_addr(self.0).as_ref() }
 	}
 }
@@ -169,8 +169,8 @@ impl Library {
 	// May not be applicable to running process (Self::this), hence Option type.
 	/// Converts this library to a header.
 	///
-	/// *Note: Whenever possible, [`Symbol::header`] should be preferred.*
-	pub fn to_header(&self) -> io::Result<&img::Header> {
+	/// *Note: Whenever possible, [`Symbol::image`] should be preferred.*
+	pub fn to_image(&self) -> io::Result<&img::Image> {
 		unsafe { self.0.to_ptr().as_ref() }.ok_or(io::Error::new(
 			io::ErrorKind::Unsupported,
 			"Header cannot be retrieved on this platform. Use `Symbol::header` instead.",
@@ -191,7 +191,7 @@ impl Library {
 	/// }
 	/// ```
 	pub fn downgrade(this: &Self) -> io::Result<weak::Weak> {
-		let base_addr = this.to_header()?;
+		let base_addr = this.to_image()?;
 		Ok(weak::Weak {
 			base_addr,
 			path_name: base_addr.path().ok(),

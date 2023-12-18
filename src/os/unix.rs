@@ -110,13 +110,13 @@ impl InnerLibrary {
 
 	// This is to handle any platforms that I cannot deal with.
 	#[cfg(not(any(target_env = "gnu", target_os = "macos")))]
-	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const img::Image {
 		std::ptr::null()
 	}
 
 	// returns null if handle is invalid
 	#[cfg(target_env = "gnu")]
-	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const img::Image {
 		let mut map_ptr = ptr::null_mut::<c::link_map>();
 		if c::dlinfo(
 			self.0.as_ptr(),
@@ -124,7 +124,7 @@ impl InnerLibrary {
 			&mut map_ptr as *mut _ as *mut _,
 		) == 0
 		{
-			(*map_ptr).l_addr as *const img::Header
+			(*map_ptr).l_addr as *const img::Image
 		} else {
 			ptr::null()
 		}
@@ -132,7 +132,7 @@ impl InnerLibrary {
 
 	// returns null if handle is invalid
 	#[cfg(target_os = "macos")]
-	pub(crate) unsafe fn to_ptr(&self) -> *const img::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const img::Image {
 		let handle = self.0;
 		let mut result = ptr::null();
 		let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
@@ -145,7 +145,7 @@ impl InnerLibrary {
 					let _ = c::dlclose(active_handle);
 				}
 				if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
-					result = c::_dyld_get_image_header(image_index) as *const img::Header;
+					result = c::_dyld_get_image_header(image_index) as *const img::Image;
 					break;
 				}
 			}
@@ -153,7 +153,7 @@ impl InnerLibrary {
 		});
 		result
 	}
-	pub(crate) unsafe fn from_ptr(addr: *const img::Header) -> Option<Self> {
+	pub(crate) unsafe fn from_ptr(addr: *const img::Image) -> Option<Self> {
 		let mut info = mem::MaybeUninit::zeroed();
 		if c::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
 			let info = info.assume_init();
@@ -189,7 +189,7 @@ fn get_image_count() -> &'static AtomicU32 {
 	&IMAGE_COUNT
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Header {
+pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Image {
 	let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 	if c::dladdr(symbol, info.as_mut_ptr()) != 0 {
 		let info = info.assume_init();
@@ -202,7 +202,7 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Heade
 #[derive(Debug)]
 pub struct DlInfo {
 	pub dli_fname: ffi::CString,
-	pub dli_fbase: *mut img::Header,
+	pub dli_fbase: *mut img::Image,
 	pub dli_sname: ffi::CString,
 	pub dli_saddr: *mut ffi::c_void,
 }
@@ -268,7 +268,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			Some(PathBuf::from(path))
 		};
 		let weak_ptr = weak::Weak {
-			base_addr: (*info).dlpi_addr as *mut img::Header,
+			base_addr: (*info).dlpi_addr as *mut img::Image,
 			path_name,
 		};
 		data.push(weak_ptr);
@@ -286,7 +286,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			let path = ffi::CStr::from_ptr(c::_dyld_get_image_name(image_index));
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
 			let weak_ptr = weak::Weak {
-				base_addr: c::_dyld_get_image_header(image_index) as *const img::Header,
+				base_addr: c::_dyld_get_image_header(image_index) as *const img::Image,
 				path_name: Some(PathBuf::from(path)),
 			};
 			data.push(weak_ptr);
@@ -296,7 +296,7 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	Ok(data)
 }
 
-pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
+pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
 	const MH_MAGIC: &[u8] = &0xfeedface_u32.to_le_bytes();
 	const MH_MAGIC_64: &[u8] = &0xfeedfacf_u32.to_le_bytes();
 	const ELF_MAGIC: &[u8] = &[0x7f, b'E', b'L', b'F'];
@@ -335,7 +335,7 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Header) -> io::Result<usize> {
 	}
 }
 
-pub(crate) unsafe fn hdr_path(hdr: *const img::Header) -> io::Result<PathBuf> {
+pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
 	let mut result = Err(io::Error::new(
 		io::ErrorKind::NotFound,
 		"Header path not found",
