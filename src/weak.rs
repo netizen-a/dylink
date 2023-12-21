@@ -22,16 +22,16 @@ impl crate::sealed::Sealed for Weak {}
 impl Weak {
 	/// Constructs a new `Weak`, without allocating any memory. Calling [`upgrade`] on the return value always gives [`None`].
 	///
-    /// [`upgrade`]: Weak::upgrade
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use dylink::Weak;
-    ///
-    /// let empty: Weak = Weak::new();
-    /// assert!(empty.upgrade().is_none());
-    /// ```
+	/// [`upgrade`]: Weak::upgrade
+	///
+	/// # Examples
+	///
+	/// ```
+	/// use dylink::Weak;
+	///
+	/// let empty: Weak = Weak::new();
+	/// assert!(empty.upgrade().is_none());
+	/// ```
 	#[inline]
 	pub const fn new() -> Self {
 		Self {

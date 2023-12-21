@@ -28,7 +28,10 @@ fn test_iter_images() {
 				println!("upgraded = {}", path.display());
 				assert_eq!(path, dylib.to_image().unwrap().path().unwrap());
 			}
-			assert_eq!(unsafe { weak.to_ptr().as_ref() }.unwrap(), dylib.to_image().unwrap());
+			assert_eq!(
+				unsafe { weak.to_ptr().as_ref() }.unwrap(),
+				dylib.to_image().unwrap()
+			);
 		} else if let Some(path) = weak.path() {
 			println!("upgrade failed = {}", path.display());
 		}

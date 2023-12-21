@@ -197,7 +197,7 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
 	let cb = mem::size_of::<c::MODULEINFO>();
 	let result = c::GetModuleInformation(hprocess, hmodule, lpmodinfo.as_mut_ptr(), cb as u32);
 	if result != 0 {
-		Ok(lpmodinfo.assume_init().SizeOfImage as usize)
+		Ok(lpmodinfo.assume_init().sizeofimage as usize)
 	} else {
 		Err(io::Error::last_os_error())
 	}

@@ -359,6 +359,9 @@ pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
 	}
 	#[cfg(target_os = "aix")]
 	{
-		Err(io::Error::new(io::ErrorKind::Unsupported, "path retrieval is unsupported on AIX"))
+		Err(io::Error::new(
+			io::ErrorKind::Unsupported,
+			"path retrieval is unsupported on AIX",
+		))
 	}
 }
