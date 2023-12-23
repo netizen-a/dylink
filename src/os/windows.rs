@@ -191,6 +191,14 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 }
 
 pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
+	// checks if it's a PE header (fast)
+	let pe_hdr = c::ImageNtHeader(hdr as *const _ as *mut _);
+	// if it's PE we can skip all sys calls and return the size immediately.
+	if !pe_hdr.is_null() {
+		let pe_hdr32 = pe_hdr as *mut c::IMAGE_NT_HEADERS32;
+		return Ok((*pe_hdr32).optionalheader.sizeofimage as usize)
+	}
+
 	let hprocess = c::GetCurrentProcess();
 	let hmodule = hdr as *mut ffi::c_void;
 	let mut lpmodinfo = mem::MaybeUninit::zeroed();
@@ -209,4 +217,23 @@ pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
 	};
 	let lib = mem::ManuallyDrop::new(InnerLibrary(nonnull_hdr));
 	lib.path()
+}
+
+
+mod tests {
+	#[test]
+	fn test_size() {
+		use super::*;
+		let imgs = crate::img::Images::now().unwrap();
+		for weak in imgs {
+			println!("{}", weak.path().unwrap().display());
+			let img = weak.base_addr;
+			let hdr = unsafe {c::ImageNtHeader(weak.base_addr.cast_mut().cast())};
+			assert!(!hdr.is_null(), "{:?}", std::io::Error::last_os_error());
+			let hdr32 = hdr as *mut c::IMAGE_NT_HEADERS32;
+			let hdr_len = unsafe {hdr_size(img).unwrap()};
+			let img_len = unsafe {(*hdr32).optionalheader.sizeofimage};
+			assert!(img_len == hdr_len as u32, "{img_len} == {hdr_len}");
+		}
+	}
 }

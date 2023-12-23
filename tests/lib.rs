@@ -9,7 +9,9 @@ use dylink::*;
 fn test_try_clone() {
 	let lib = Library::this();
 	let other = lib.try_clone().unwrap();
-	assert_eq!(lib.to_image().unwrap(), other.to_image().unwrap());
+	let lib_data = lib.to_image().unwrap().to_bytes().unwrap();
+	let other_data = other.to_image().unwrap().to_bytes().unwrap();
+	assert_eq!(lib_data, other_data);
 	let t = std::thread::spawn(move || {
 		println!("other: {:?}", other);
 	});
@@ -28,9 +30,12 @@ fn test_iter_images() {
 				println!("upgraded = {}", path.display());
 				assert_eq!(path, dylib.to_image().unwrap().path().unwrap());
 			}
+			let weak_img = unsafe { weak.to_ptr().as_ref() }.unwrap();
+			let weak_data = weak_img.to_bytes().unwrap();
+			let hdr_data = hdr.to_bytes().unwrap();
 			assert_eq!(
-				unsafe { weak.to_ptr().as_ref() }.unwrap(),
-				dylib.to_image().unwrap()
+				weak_data,
+				hdr_data
 			);
 		} else if let Some(path) = weak.path() {
 			println!("upgrade failed = {}", path.display());
@@ -65,20 +70,6 @@ fn test_path_soundness() {
 		let _ = lib.try_clone().unwrap();
 	}
 	t.join().unwrap();
-}
-
-#[test]
-fn test_hdr_bytes() {
-	let images = img::Images::now().unwrap();
-	for img in images {
-		let maybe_hdr = unsafe { img.to_ptr().as_ref() };
-		let Some(hdr) = maybe_hdr else {
-			continue;
-		};
-		let bytes = hdr.to_bytes().unwrap();
-		assert!(bytes.len() > 0);
-		let _ = bytes[bytes.len() - 1];
-	}
 }
 
 #[test]

@@ -8,7 +8,7 @@
 pub use std::os::windows::raw::HANDLE;
 use std::{
 	ffi,
-	marker::{PhantomData, PhantomPinned},
+	marker::{PhantomData, PhantomPinned}, ptr, mem,
 };
 
 pub type HMODULE = HANDLE;
@@ -72,6 +72,7 @@ pub struct IMAGE_OPTIONAL_HEADER32 {
 	pub datadirectory: [IMAGE_DATA_DIRECTORY; IMAGE_NUMBEROF_DIRECTORY_ENTRIES],
 }
 
+#[cfg(target_pointer_width = "64")]
 #[repr(C)]
 pub struct IMAGE_OPTIONAL_HEADER64 {
 	pub magic: WORD,
@@ -172,12 +173,102 @@ extern "system" {
 		readonly: BOOL,
 	) -> BOOL;
 	pub fn UnMapAndLoad(loadedimage: *mut LOADED_IMAGE) -> BOOL;
+	fn GetSystemInfo(
+		lpsysteminfo: *mut SYSTEM_INFO,
+	);
 }
 
-// this should be replaced with a const function later.
-#[link(name = "Dbghelp")]
-extern "system" {
-	pub fn ImageNtHeader(base: *mut ffi::c_void) -> *mut IMAGE_NT_HEADERS;
+#[derive(Clone, Copy)]
+#[repr(C)]
+struct SYSTEM_INFO_0_0 {
+	pub wprocessorarchitecture: WORD,
+	pub wreserved: WORD,
+}
+
+#[repr(C)]
+union SYSTEM_INFO_0 {
+	pub dwoemid: DWORD,
+	pub anonymous: SYSTEM_INFO_0_0,
+}
+
+#[repr(C)]
+struct SYSTEM_INFO {
+	anonymous: SYSTEM_INFO_0,
+	dwpagesize: DWORD,
+	lpminimumapplicationaddress: *mut ffi::c_void,
+	lpmaximumapplicationaddress: *mut ffi::c_void,
+	dwactiveprocessormask: usize,
+	dwnumberofprocessors: DWORD,
+	dwprocessortype: DWORD,
+	dwallocationgranularity: DWORD,
+	wprocessorlevel: WORD,
+	wprocessorrevision: WORD,
+}
+
+#[repr(C)]
+pub struct IMAGE_DOS_HEADER {
+    pub e_magic: WORD,
+    pub e_cblp: WORD,
+    pub e_cp: WORD,
+    pub e_crlc: WORD,
+    pub e_cparhdr: WORD,
+    pub e_minalloc: WORD,
+    pub e_maxalloc: WORD,
+    pub e_ss: WORD,
+    pub e_sp: WORD,
+    pub e_csum: WORD,
+    pub e_ip: WORD,
+    pub e_cs: WORD,
+    pub e_lfarlc: WORD,
+    pub e_ovno: WORD,
+    pub e_res: [WORD; 4],
+    pub e_oemid: WORD,
+    pub e_oeminfo: WORD,
+    pub e_res2: [WORD; 10],
+    pub e_lfanew: i32,
+}
+
+const IMAGE_DOS_SIGNATURE: u16 = 0x5A4D;
+const IMAGE_DOS_SIGNATURE2: u16 = 0x4D5A;
+const IMAGE_NT_SIGNATURE: u32 = u32::from_le_bytes([b'P', b'E', 0, 0]);
+
+// thread-safe version of win32's ImageNtHeader.
+pub unsafe fn ImageNtHeader(base: *mut IMAGE_DOS_HEADER) -> *mut IMAGE_NT_HEADERS {
+	use std::sync::OnceLock;
+	static DOS_SIZE: OnceLock<u32> = OnceLock::new();
+	if base.is_null() {
+		return ptr::null_mut();
+	}
+	let dos_hdr = &mut *base;
+
+	// check if the DOS siginature
+	if dos_hdr.e_magic != IMAGE_DOS_SIGNATURE && (*base).e_magic != IMAGE_DOS_SIGNATURE2 {
+		return ptr::null_mut();
+	}
+
+	// cache and get the dos size
+	let dos_size = DOS_SIZE.get_or_init(||{
+		let mut sys_info = mem::MaybeUninit::<SYSTEM_INFO>::zeroed();
+		GetSystemInfo(sys_info.as_mut_ptr());
+		let sys_info = sys_info.assume_init();
+		let page_size = sys_info.dwpagesize;
+		dos_hdr.e_cp as u32 * page_size - dos_hdr.e_cblp as u32
+	});
+
+	// check if the PE header offset is within bounds
+	if *dos_size + 4 < dos_hdr.e_lfanew as u32 {
+		return ptr::null_mut();
+	}
+
+	// calculate the new offset and return a pointer to the NT header
+	let pe_hdr = (base as *mut u8).offset(dos_hdr.e_lfanew as isize) as *mut IMAGE_NT_HEADERS;
+
+	// we need to check if it's really the PE header. If the magic matches then return a pointer to the header.
+	if (*pe_hdr).signature == IMAGE_NT_SIGNATURE {
+		pe_hdr
+	} else {
+		ptr::null_mut()
+	}
 }
 
 pub const GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT: DWORD = 0x00000002u32;

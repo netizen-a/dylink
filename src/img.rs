@@ -67,7 +67,7 @@ impl ExactSizeIterator for Images {
 
 impl FusedIterator for Images {}
 
-/// An object providing access to an executable image.
+/// An opaque object representing an executable image.
 ///
 /// # Platform behavior
 ///
@@ -85,13 +85,6 @@ pub struct Image {
 }
 
 impl Image {
-	/// Converts this Image to a byte slice.
-	pub fn to_bytes(&self) -> io::Result<&[u8]> {
-		let len = unsafe { imp::hdr_size(self)? };
-		let data = self as *const Image as *const u8;
-		let slice = unsafe { std::slice::from_raw_parts(data, len) };
-		Ok(slice)
-	}
 	/// Returns the path to the image.
 	///
 	/// # Security
@@ -101,16 +94,12 @@ impl Image {
 	pub fn path(&self) -> io::Result<path::PathBuf> {
 		unsafe { imp::hdr_path(self as *const Image) }
 	}
-}
 
-impl std::fmt::Debug for Image {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.to_bytes().fmt(f)
-	}
-}
-
-impl PartialEq<Image> for Image {
-	fn eq(&self, other: &Image) -> bool {
-		self.to_bytes().unwrap() == other.to_bytes().unwrap()
+	/// Converts this Image to a byte slice.
+	pub fn to_bytes(&self) -> io::Result<&[u8]> {
+		let len = unsafe { imp::hdr_size(self)? };
+		let data = self as *const Image as *const u8;
+		let slice = unsafe { std::slice::from_raw_parts(data, len) };
+		Ok(slice)
 	}
 }
