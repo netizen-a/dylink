@@ -96,10 +96,10 @@ impl Image {
 	}
 
 	/// Converts this Image to a byte slice.
-	pub fn to_bytes(&self) -> io::Result<&[u8]> {
+	pub fn to_bytes(&self) -> io::Result<*const [u8]> {
 		let len = unsafe { imp::hdr_size(self)? };
 		let data = self as *const Image as *const u8;
-		let slice = unsafe { std::slice::from_raw_parts(data, len) };
+		let slice = std::ptr::slice_from_raw_parts::<u8>(data, len);
 		Ok(slice)
 	}
 }

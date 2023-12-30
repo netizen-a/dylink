@@ -196,7 +196,7 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
 	// if it's PE we can skip all sys calls and return the size immediately.
 	if !pe_hdr.is_null() {
 		let pe_hdr32 = pe_hdr as *mut c::IMAGE_NT_HEADERS32;
-		return Ok((*pe_hdr32).optionalheader.sizeofimage as usize)
+		return Ok((*pe_hdr32).optionalheader.sizeofimage as usize);
 	}
 
 	let hprocess = c::GetCurrentProcess();
@@ -219,7 +219,6 @@ pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
 	lib.path()
 }
 
-
 mod tests {
 	#[test]
 	fn test_size() {
@@ -228,11 +227,11 @@ mod tests {
 		for weak in imgs {
 			println!("{}", weak.path().unwrap().display());
 			let img = weak.base_addr;
-			let hdr = unsafe {c::ImageNtHeader(weak.base_addr.cast_mut().cast())};
+			let hdr = unsafe { c::ImageNtHeader(weak.base_addr.cast_mut().cast()) };
 			assert!(!hdr.is_null(), "{:?}", std::io::Error::last_os_error());
 			let hdr32 = hdr as *mut c::IMAGE_NT_HEADERS32;
-			let hdr_len = unsafe {hdr_size(img).unwrap()};
-			let img_len = unsafe {(*hdr32).optionalheader.sizeofimage};
+			let hdr_len = unsafe { hdr_size(img).unwrap() };
+			let img_len = unsafe { (*hdr32).optionalheader.sizeofimage };
 			assert!(img_len == hdr_len as u32, "{img_len} == {hdr_len}");
 		}
 	}

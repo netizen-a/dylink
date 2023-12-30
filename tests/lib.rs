@@ -33,10 +33,7 @@ fn test_iter_images() {
 			let weak_img = unsafe { weak.to_ptr().as_ref() }.unwrap();
 			let weak_data = weak_img.to_bytes().unwrap();
 			let hdr_data = hdr.to_bytes().unwrap();
-			assert_eq!(
-				weak_data,
-				hdr_data
-			);
+			assert_eq!(weak_data, hdr_data);
 		} else if let Some(path) = weak.path() {
 			println!("upgrade failed = {}", path.display());
 		}

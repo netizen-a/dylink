@@ -190,7 +190,7 @@ fn get_image_count() -> &'static AtomicU32 {
 }
 
 pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Image {
-	#[cfg(not(target_os="aix"))]
+	#[cfg(not(target_os = "aix"))]
 	{
 		let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 		if c::dladdr(symbol, info.as_mut_ptr()) != 0 {
@@ -200,7 +200,7 @@ pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Image
 			ptr::null_mut()
 		}
 	}
-	#[cfg(target_os="aix")]
+	#[cfg(target_os = "aix")]
 	{
 		// aix doesn't have dladdr
 		ptr::null_mut()

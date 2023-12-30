@@ -8,7 +8,8 @@
 pub use std::os::windows::raw::HANDLE;
 use std::{
 	ffi,
-	marker::{PhantomData, PhantomPinned}, ptr, mem,
+	marker::{PhantomData, PhantomPinned},
+	mem, ptr,
 };
 
 pub type HMODULE = HANDLE;
@@ -173,9 +174,7 @@ extern "system" {
 		readonly: BOOL,
 	) -> BOOL;
 	pub fn UnMapAndLoad(loadedimage: *mut LOADED_IMAGE) -> BOOL;
-	fn GetSystemInfo(
-		lpsysteminfo: *mut SYSTEM_INFO,
-	);
+	fn GetSystemInfo(lpsysteminfo: *mut SYSTEM_INFO);
 }
 
 #[derive(Clone, Copy)]
@@ -207,25 +206,25 @@ struct SYSTEM_INFO {
 
 #[repr(C)]
 pub struct IMAGE_DOS_HEADER {
-    pub e_magic: WORD,
-    pub e_cblp: WORD,
-    pub e_cp: WORD,
-    pub e_crlc: WORD,
-    pub e_cparhdr: WORD,
-    pub e_minalloc: WORD,
-    pub e_maxalloc: WORD,
-    pub e_ss: WORD,
-    pub e_sp: WORD,
-    pub e_csum: WORD,
-    pub e_ip: WORD,
-    pub e_cs: WORD,
-    pub e_lfarlc: WORD,
-    pub e_ovno: WORD,
-    pub e_res: [WORD; 4],
-    pub e_oemid: WORD,
-    pub e_oeminfo: WORD,
-    pub e_res2: [WORD; 10],
-    pub e_lfanew: i32,
+	pub e_magic: WORD,
+	pub e_cblp: WORD,
+	pub e_cp: WORD,
+	pub e_crlc: WORD,
+	pub e_cparhdr: WORD,
+	pub e_minalloc: WORD,
+	pub e_maxalloc: WORD,
+	pub e_ss: WORD,
+	pub e_sp: WORD,
+	pub e_csum: WORD,
+	pub e_ip: WORD,
+	pub e_cs: WORD,
+	pub e_lfarlc: WORD,
+	pub e_ovno: WORD,
+	pub e_res: [WORD; 4],
+	pub e_oemid: WORD,
+	pub e_oeminfo: WORD,
+	pub e_res2: [WORD; 10],
+	pub e_lfanew: i32,
 }
 
 const IMAGE_DOS_SIGNATURE: u16 = 0x5A4D;
@@ -247,7 +246,7 @@ pub unsafe fn ImageNtHeader(base: *mut IMAGE_DOS_HEADER) -> *mut IMAGE_NT_HEADER
 	}
 
 	// cache and get the dos size
-	let dos_size = DOS_SIZE.get_or_init(||{
+	let dos_size = DOS_SIZE.get_or_init(|| {
 		let mut sys_info = mem::MaybeUninit::<SYSTEM_INFO>::zeroed();
 		GetSystemInfo(sys_info.as_mut_ptr());
 		let sys_info = sys_info.assume_init();
