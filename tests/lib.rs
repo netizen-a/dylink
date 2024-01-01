@@ -6,6 +6,17 @@ mod windows;
 use dylink::*;
 
 #[test]
+fn test_size_exact() {
+	let images = img::Images::now().unwrap();
+	for weak in images {
+		let img = unsafe {&*weak.to_ptr()};
+		let img_slice = img.to_bytes().unwrap();
+		let len = unsafe {(*img_slice).len()};
+		let _data = unsafe {(*img_slice)[len -1]};
+	}
+}
+
+#[test]
 fn test_try_clone() {
 	let lib = Library::this();
 	let other = lib.try_clone().unwrap();
