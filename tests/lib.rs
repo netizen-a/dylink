@@ -11,8 +11,8 @@ fn test_size_exact() {
 	for weak in images {
 		let img = unsafe {&*weak.to_ptr()};
 		let img_slice = img.to_bytes().unwrap();
-		let len = unsafe {(*img_slice).len()};
-		let _data = unsafe {(*img_slice)[len -1]};
+		let len = (*img_slice).len();
+		let _data = (*img_slice)[len -1];
 	}
 }
 

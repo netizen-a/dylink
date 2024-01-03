@@ -85,6 +85,12 @@ pub struct Image {
 }
 
 impl Image {
+	pub const fn magic(&self) -> *const [u8] {
+		let hdr = self as *const Image;
+		let len: usize = if cfg!(windows) { 2 } else { 4 };
+		std::ptr::slice_from_raw_parts(hdr.cast::<u8>(), len)
+	}
+
 	/// Returns the path to the image.
 	///
 	/// # Security
@@ -96,10 +102,10 @@ impl Image {
 	}
 
 	/// Converts this Image to a byte slice.
-	pub fn to_bytes(&self) -> io::Result<*const [u8]> {
+	pub fn to_bytes(&self) -> io::Result<&[u8]> {
 		let len = unsafe { imp::hdr_size(self)? };
 		let data = self as *const Image as *const u8;
-		let slice = std::ptr::slice_from_raw_parts::<u8>(data, len);
+		let slice = unsafe {std::slice::from_raw_parts::<u8>(data, len)};
 		Ok(slice)
 	}
 }
