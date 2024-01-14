@@ -71,8 +71,6 @@ impl FusedIterator for Images {}
 ///
 /// # Platform behavior
 ///
-/// The following are the expected headers the image may represent per each platform.
-///
 /// | Platform | Headers                                              |
 /// | -------- | ---------------------------------------------------- |
 /// | MacOS    | mach_header, mach_header_64                          |
@@ -85,9 +83,12 @@ pub struct Image {
 }
 
 impl Image {
+	/// Returns the magic number as a raw byte slice.
+	/// On windows the slice is length 2, on unix slice is length 4.
 	pub const fn magic(&self) -> *const [u8] {
 		let hdr = self as *const Image;
 		let len: usize = if cfg!(windows) { 2 } else { 4 };
+		// validity isn't checked, but length is correct, so return type is raw slice.
 		std::ptr::slice_from_raw_parts(hdr.cast::<u8>(), len)
 	}
 
@@ -105,6 +106,7 @@ impl Image {
 	pub fn to_bytes(&self) -> io::Result<&[u8]> {
 		let len = unsafe { imp::hdr_size(self)? };
 		let data = self as *const Image as *const u8;
+		// this is safe because hdr_size checks if the slice is valid.
 		let slice = unsafe {std::slice::from_raw_parts::<u8>(data, len)};
 		Ok(slice)
 	}
