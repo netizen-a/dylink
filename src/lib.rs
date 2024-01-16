@@ -126,9 +126,9 @@ impl Library {
 	}
 
 	/// Retrieves a symbol from the library if it exists. The difference from [`symbol`] is that this function accepts a raw c-string, which is
-	/// userful to avoid redundant string cloning.
+	/// useful to avoid redundant string cloning.
 	///
-	/// *note: On unix `NULL` may be a valid value, so it is recommended to use [`symbol`] for error handling.*
+	/// *note: On unix `NULL` may be a valid value, so it is recommended to use [`symbol`] if validity cannot be guarenteed.*
 	///
 	/// [`symbol`]: Library::symbol
 	///
