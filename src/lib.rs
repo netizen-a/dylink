@@ -125,11 +125,15 @@ impl Library {
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<Symbol<'a>> {
 		unsafe { self.0.symbol(name) }
 	}
-	#[cfg(feature = "unstable")]
+	
+	/// Retrieves a symbol from the library if it exists. The difference from [`symbol`] is that this function accepts a raw c-string, which is 
+	/// userful to avoid redundant string cloning. Unlike [`symbol`], there is no direct error handling.
+	/// 
+	/// [`symbol`]: Library::symbol
 	#[doc(alias = "dlsym")]
 	#[inline]
-	pub fn c_symbol(&self, name: &std::ffi::CStr) -> *const std::ffi::c_void {
-		unsafe { self.0.c_symbol(name) }
+	pub fn raw_symbol(&self, name: &std::ffi::CStr) -> *const std::ffi::c_void {
+		unsafe { self.0.raw_symbol(name) }
 	}
 
 	/// Creates a new `Library` instance that shares the same underlying library handle as the

@@ -77,7 +77,7 @@ impl InnerLibrary {
 	}
 
 	#[inline]
-	pub unsafe fn c_symbol(&self, name: &ffi::CStr) -> *const ffi::c_void {
+	pub unsafe fn raw_symbol(&self, name: &ffi::CStr) -> *const ffi::c_void {
 		c::dlsym(self.0.as_ptr(), name.as_ptr())
 	}
 
@@ -86,7 +86,7 @@ impl InnerLibrary {
 		let c_str = ffi::CString::new(name).unwrap();
 
 		let _ = c_dlerror(); // clear existing errors
-		let handle: *mut ffi::c_void = self.c_symbol(&c_str).cast_mut();
+		let handle: *mut ffi::c_void = self.raw_symbol(&c_str).cast_mut();
 
 		if let Some(err) = c_dlerror() {
 			Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
