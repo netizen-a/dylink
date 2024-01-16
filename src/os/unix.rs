@@ -3,7 +3,6 @@
 
 use crate::sealed::Sealed;
 use crate::{img, weak, Symbol};
-use std::marker::PhantomData;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 use std::{ffi, io, mem, path::PathBuf, ptr};
@@ -77,21 +76,21 @@ impl InnerLibrary {
 	}
 
 	#[inline]
-	pub unsafe fn raw_symbol(&self, name: &ffi::CStr) -> *const ffi::c_void {
-		c::dlsym(self.0.as_ptr(), name.as_ptr())
+	pub unsafe fn raw_symbol(&self, name: &ffi::CStr) -> *const Symbol {
+		c::dlsym(self.0.as_ptr(), name.as_ptr()).cast()
 	}
 
-	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<Symbol<'a>> {
+	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<*const Symbol> {
 		let _lock = dylib_guard();
 		let c_str = ffi::CString::new(name).unwrap();
 
 		let _ = c_dlerror(); // clear existing errors
-		let handle: *mut ffi::c_void = self.raw_symbol(&c_str).cast_mut();
+		let handle = self.raw_symbol(&c_str).cast_mut();
 
 		if let Some(err) = c_dlerror() {
 			Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
 		} else {
-			Ok(Symbol(handle, PhantomData))
+			Ok(handle)
 		}
 	}
 	pub(crate) unsafe fn try_clone(&self) -> io::Result<Self> {
@@ -189,7 +188,7 @@ fn get_image_count() -> &'static AtomicU32 {
 	&IMAGE_COUNT
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Image {
+pub(crate) unsafe fn base_addr(symbol: *const std::ffi::c_void) -> *mut img::Image {
 	#[cfg(not(target_os = "aix"))]
 	{
 		let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
@@ -216,15 +215,15 @@ pub struct DlInfo {
 }
 
 pub trait SymExt: Sealed {
-	fn info(&self) -> io::Result<DlInfo>;
+	fn info(this: *const Symbol) -> io::Result<DlInfo>;
 }
 
-impl SymExt for Symbol<'_> {
+impl SymExt for Symbol {
 	#[doc(alias = "dladdr")]
-	fn info(&self) -> io::Result<DlInfo> {
+	fn info(this: *const Symbol) -> io::Result<DlInfo> {
 		let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
 		unsafe {
-			if c::dladdr(self.0 as *const _, info.as_mut_ptr()) != 0 {
+			if c::dladdr(this.cast(), info.as_mut_ptr()) != 0 {
 				let info = info.assume_init();
 				Ok(DlInfo {
 					dli_fname: ffi::CStr::from_ptr(info.dli_fname).to_owned(),

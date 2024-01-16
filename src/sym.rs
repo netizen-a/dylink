@@ -1,27 +1,23 @@
 use std::marker;
 use crate::sealed::Sealed;
 use crate::img;
-use std::ffi;
 
 #[cfg(unix)]
 use crate::os::unix as imp;
 #[cfg(windows)]
 use crate::os::windows as imp;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(C)]
-pub struct Symbol<'a>(pub(crate) *mut ffi::c_void, pub(crate) marker::PhantomData<&'a ()>);
-impl Sealed for Symbol<'_> {}
+pub struct Symbol {
+	_data: [u8; 0],
+	_marker: marker::PhantomData<(*mut u8, marker::PhantomPinned)>,
+}
+impl Sealed for Symbol {}
 
-impl<'a> Symbol<'a> {
-	/// Returns the address of the symbol.
-	#[inline]
-	pub const fn as_ptr(self) -> *mut ffi::c_void {
-		self.0 as _
-	}
+impl Symbol {
 	/// Attempts to get the base address of the library.
 	#[inline]
-	pub fn image(self) -> Option<&'a img::Image> {
-		unsafe { imp::base_addr(self.0).as_ref() }
+	pub fn image<'a>(this: *const Symbol) -> Option<&'a img::Image> {
+		unsafe { imp::base_addr(this.cast()).as_ref() }
 	}
 }

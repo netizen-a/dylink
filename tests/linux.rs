@@ -43,7 +43,7 @@ fn test_atoi_linux() {
 fn test_sym_hdr() {
 	let lib = Library::open("libX11.so.6").unwrap();
 	let sym = lib.symbol("XOpenDisplay").unwrap();
-	let base = sym.image();
+	let base = Symbol::image(sym);
 	assert!(base.is_some())
 }
 

@@ -118,21 +118,24 @@ impl Library {
 	///
 	/// let lib = Library::open("libX11.so.6").unwrap();
 	/// let sym = lib.symbol("XOpenDisplay").unwrap();
-	/// let xopendisplay: PfnXOpenDisplay = unsafe {mem::transmute(sym.as_ptr())};
+	/// let xopendisplay: PfnXOpenDisplay = unsafe {mem::transmute(sym)};
 	/// ```
 	#[doc(alias = "dlsym")]
 	#[inline]
-	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<Symbol<'a>> {
+	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<*const Symbol> {
 		unsafe { self.0.symbol(name) }
 	}
 	
 	/// Retrieves a symbol from the library if it exists. The difference from [`symbol`] is that this function accepts a raw c-string, which is 
-	/// userful to avoid redundant string cloning. Unlike [`symbol`], there is no direct error handling.
+	/// userful to avoid redundant string cloning.
+	/// 
+	/// *note: On unix `NULL` may be a valid value, so it is recommended to use [`symbol`] for error handling.*
 	/// 
 	/// [`symbol`]: Library::symbol
+	/// 	
 	#[doc(alias = "dlsym")]
 	#[inline]
-	pub fn raw_symbol(&self, name: &std::ffi::CStr) -> *const std::ffi::c_void {
+	pub fn raw_symbol(&self, name: &std::ffi::CStr) -> *const Symbol {
 		unsafe { self.0.raw_symbol(name) }
 	}
 
