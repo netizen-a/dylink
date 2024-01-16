@@ -10,7 +10,6 @@
 //! are supported on Windows, Linux, and MacOS.
 
 mod sealed;
-use crate::sealed::Sealed;
 
 pub mod os;
 #[cfg(unix)]
@@ -20,10 +19,14 @@ use os::windows as imp;
 
 pub mod img;
 pub mod sync;
+
 mod weak;
 pub use weak::Weak;
 
-use std::{io, marker, path};
+mod sym;
+pub use sym::Symbol;
+
+use std::{io, path};
 
 pub use dylink_macro::dylink;
 
@@ -31,23 +34,7 @@ pub use dylink_macro::dylink;
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[repr(C)]
-pub struct Symbol<'a>(*mut std::ffi::c_void, marker::PhantomData<&'a ()>);
-impl Sealed for Symbol<'_> {}
 
-impl<'a> Symbol<'a> {
-	/// Casts to a pointer of another type.
-	#[inline]
-	pub const fn cast<T>(self) -> *mut T {
-		self.0 as _
-	}
-	/// Attempts to get the base address of the library.
-	#[inline]
-	pub fn image(self) -> Option<&'a img::Image> {
-		unsafe { imp::base_addr(self.0).as_ref() }
-	}
-}
 
 /// An object providing access to an open dynamic library.
 ///
