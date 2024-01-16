@@ -5,7 +5,7 @@ use dylink::*;
 fn test_sym_hdr() {
 	let lib = Library::open("libSystem.dylib").unwrap();
 	let sym = lib.symbol("malloc").unwrap();
-	let base = sym.image();
+	let base = Symbol::image(sym);
 	assert!(base.is_some())
 }
 
