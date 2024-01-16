@@ -1,4 +1,3 @@
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 use proc_macro2::Span;
 use syn::punctuated::Punctuated;
 use syn::{spanned::Spanned, *};

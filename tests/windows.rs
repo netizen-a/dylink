@@ -44,7 +44,7 @@ fn test_macro_impl() {
 fn test_sym_img() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let sym = lib.symbol("SetLastError").unwrap();
-	let base = sym.image();
+	let base = Symbol::image(sym);
 	assert!(base.is_some())
 }
 

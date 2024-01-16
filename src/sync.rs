@@ -1,5 +1,3 @@
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-
 use std::{io, sync};
 
 use crate::{Library, Symbol};

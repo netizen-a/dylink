@@ -1,4 +1,3 @@
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![allow(non_camel_case_types)]
 
 use std::ffi;

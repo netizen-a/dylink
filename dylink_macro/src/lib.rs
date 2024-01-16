@@ -1,4 +1,3 @@
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![cfg_attr(feature = "warnings", feature(proc_macro_diagnostic))]
 
 mod attr_data;

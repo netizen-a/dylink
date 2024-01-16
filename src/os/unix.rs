@@ -1,4 +1,3 @@
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![allow(clippy::let_unit_value)]
 
 use crate::sealed::Sealed;

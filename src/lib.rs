@@ -1,4 +1,3 @@
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
 //! Dylink provides a run-time dynamic linking framework for loading dynamic libraries.
@@ -125,14 +124,14 @@ impl Library {
 	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<*const Symbol> {
 		unsafe { self.0.symbol(name) }
 	}
-	
-	/// Retrieves a symbol from the library if it exists. The difference from [`symbol`] is that this function accepts a raw c-string, which is 
+
+	/// Retrieves a symbol from the library if it exists. The difference from [`symbol`] is that this function accepts a raw c-string, which is
 	/// userful to avoid redundant string cloning.
-	/// 
+	///
 	/// *note: On unix `NULL` may be a valid value, so it is recommended to use [`symbol`] for error handling.*
-	/// 
+	///
 	/// [`symbol`]: Library::symbol
-	/// 	
+	///
 	#[doc(alias = "dlsym")]
 	#[inline]
 	pub fn raw_symbol(&self, name: &std::ffi::CStr) -> *const Symbol {

@@ -1,5 +1,3 @@
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use std::marker::PhantomData;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
 use std::os::windows::prelude::*;
@@ -131,7 +129,7 @@ impl AsRawHandle for Library {
 	}
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> *mut img::Image {
+pub(crate) unsafe fn base_addr(symbol: *const Symbol) -> *mut img::Image {
 	let mut handle = ptr::null_mut();
 	let _ = c::GetModuleHandleExW(
 		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT | c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
