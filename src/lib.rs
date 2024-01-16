@@ -121,7 +121,7 @@ impl Library {
 	/// ```
 	#[doc(alias = "dlsym")]
 	#[inline]
-	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<*const Symbol> {
+	pub fn symbol(&self, name: &str) -> io::Result<*const Symbol> {
 		unsafe { self.0.symbol(name) }
 	}
 
@@ -160,7 +160,7 @@ impl Library {
 	}
 
 	// May not be applicable to running process (Self::this), hence Option type.
-	/// Converts this library to a header.
+	/// Converts this library to an opaque image.
 	///
 	/// *Note: Whenever possible, [`Symbol::image`] should be preferred.*
 	pub fn to_image(&self) -> io::Result<&img::Image> {
