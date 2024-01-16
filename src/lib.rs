@@ -1,4 +1,3 @@
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
 //! Dylink provides a run-time dynamic linking framework for loading dynamic libraries.
@@ -10,7 +9,6 @@
 //! are supported on Windows, Linux, and MacOS.
 
 mod sealed;
-use crate::sealed::Sealed;
 
 pub mod os;
 #[cfg(unix)]
@@ -18,43 +16,24 @@ use os::unix as imp;
 #[cfg(windows)]
 use os::windows as imp;
 
-pub mod iter;
+pub mod img;
 pub mod sync;
+
 mod weak;
 pub use weak::Weak;
 
-use std::{io, marker, path};
+mod sym;
+pub use sym::Symbol;
+
+use std::{io, path};
 
 pub use dylink_macro::dylink;
-
-use std::ptr;
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[repr(C)]
-pub struct Symbol<'a>(*mut std::ffi::c_void, marker::PhantomData<&'a ()>);
-impl Sealed for Symbol<'_> {}
 
-impl Symbol<'_> {
-	/// Casts to a pointer of another type.
-	#[inline]
-	pub const fn cast<T>(&self) -> *mut T {
-		self.0 as _
-	}
-	/// Attempts to get the base address of the library.
-	///
-	/// # Platform support
-	///
-	/// This function is supported on all platforms unconditionally, and should be
-	/// preferred over [`Image::as_ptr`] when possible.
-	#[inline]
-	pub fn base_address(&self) -> io::Result<*mut os::Header> {
-		unsafe { imp::base_addr(self.0) }
-	}
-}
 
 /// An object providing access to an open dynamic library.
 ///
@@ -80,6 +59,13 @@ impl Library {
 	/// for every time the library is opened. Library symbols are eagerly resolved
 	/// before the function returns.
 	///
+	/// # Security
+	///
+	/// To prevent dynamic library [preloading attacks] its recommended to use a fully qualified path,
+	/// or remove the current working directory from the list of search paths.
+	///
+	/// [preloading attacks]: https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-security
+	///
 	/// # Examples
 	///
 	/// ```no_run
@@ -92,7 +78,7 @@ impl Library {
 	pub fn open<P: AsRef<path::Path>>(path: P) -> io::Result<Self> {
 		unsafe { imp::InnerLibrary::open(path.as_ref().as_os_str()) }.map(Self)
 	}
-	/// Attempts to returns a library handle to the current process.
+	/// Attempts to return a library handle to the current process.
 	///
 	/// # Panics
 	///
@@ -101,11 +87,9 @@ impl Library {
 	/// # Examples
 	///
 	/// ```
-	/// use dylink::{Library, Image};
+	/// use dylink::Library;
 	///
 	/// let this = Library::this();
-	/// let path = this.path().unwrap();
-	/// println!("{}", path.display());
 	/// ```
 	#[must_use]
 	#[inline]
@@ -133,18 +117,25 @@ impl Library {
 	///
 	/// let lib = Library::open("libX11.so.6").unwrap();
 	/// let sym = lib.symbol("XOpenDisplay").unwrap();
-	/// let xopendisplay: PfnXOpenDisplay = unsafe {mem::transmute(sym.cast::<()>())};
+	/// let xopendisplay: PfnXOpenDisplay = unsafe {mem::transmute(sym)};
 	/// ```
 	#[doc(alias = "dlsym")]
 	#[inline]
-	pub fn symbol<'a>(&'a self, name: &str) -> io::Result<Symbol<'a>> {
+	pub fn symbol(&self, name: &str) -> io::Result<*const Symbol> {
 		unsafe { self.0.symbol(name) }
 	}
-	#[cfg(feature = "unstable")]
+
+	/// Retrieves a symbol from the library if it exists. The difference from [`symbol`] is that this function accepts a raw c-string, which is
+	/// useful to avoid redundant string cloning.
+	///
+	/// *note: On unix `NULL` may be a valid value, so it is recommended to use [`symbol`] if validity cannot be guarenteed.*
+	///
+	/// [`symbol`]: Library::symbol
+	///
 	#[doc(alias = "dlsym")]
 	#[inline]
-	pub fn c_symbol(&self, name: &std::ffi::CStr) -> *const std::ffi::c_void {
-		unsafe { self.0.c_symbol(name) }
+	pub fn raw_symbol(&self, name: &std::ffi::CStr) -> *const Symbol {
+		unsafe { self.0.raw_symbol(name) }
 	}
 
 	/// Creates a new `Library` instance that shares the same underlying library handle as the
@@ -168,6 +159,17 @@ impl Library {
 		unsafe { self.0.try_clone().map(Library) }
 	}
 
+	// May not be applicable to running process (Self::this), hence Option type.
+	/// Converts this library to an opaque image.
+	///
+	/// *Note: Whenever possible, [`Symbol::image`] should be preferred.*
+	pub fn to_image(&self) -> io::Result<&img::Image> {
+		unsafe { self.0.to_ptr().as_ref() }.ok_or(io::Error::new(
+			io::ErrorKind::Unsupported,
+			"Header cannot be retrieved on this platform. Use `Symbol::header` instead.",
+		))
+	}
+
 	/// Creates a new [`Weak`] pointer to this Library.
 	///
 	/// # Examples
@@ -181,52 +183,12 @@ impl Library {
 	///     Ok(())
 	/// }
 	/// ```
-	#[must_use]
-	pub fn downgrade(this: &Self) -> weak::Weak {
-		weak::Weak {
-			base_addr: Image::to_ptr(this),
-			path_name: Image::path(this).ok(),
-		}
-	}
-}
-
-impl Image for Library {
-	fn to_ptr(&self) -> *const os::Header {
-		unsafe { self.0.to_ptr() }
-	}
-	/// Gets the path to the dynamic library file.
-	///
-	/// # Platform-specific behavior
-	/// This function currently corresponds to the `dlinfo` function on Linux, `_dyld_get_image_name` on MacOS,
-	/// and `GetModuleFileNameW` function on Windows. Note that, this [may change in the future][changes]
-	///
-	/// [changes]: io#platform-specific-behavior
-	///
-	/// *Note: This function is not guarenteed to return the same path as the one passed in to open the library.*
-	///
-	/// # Errors
-	///
-	/// This function will return an error if there is no path associated with the library handle.
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use dylink::{Library, Image};
-	///
-	/// fn main() -> std::io::Result<()> {
-	///     let mut lib = Library::open("foo.dll")?;
-	///     let path = lib.path()?;
-	///     Ok(())
-	/// }
-	/// ```
-	#[doc(
-		alias = "dlinfo",
-		alias = "_dyld_get_image_name",
-		alias = "GetModuleFileNameW"
-	)]
-	#[inline]
-	fn path(&self) -> io::Result<path::PathBuf> {
-		unsafe { self.0.path() }
+	pub fn downgrade(this: &Self) -> io::Result<weak::Weak> {
+		let base_addr = this.to_image()?;
+		Ok(weak::Weak {
+			base_addr,
+			path_name: base_addr.path().ok(),
+		})
 	}
 }
 
@@ -243,44 +205,4 @@ macro_rules! lib {
 		[$($name),+].into_iter()
 			.find_map(|elem| $crate::Library::open(elem).ok())
 	};
-}
-
-/// A trait for objects that represent executable images.
-pub trait Image: crate::sealed::Sealed {
-	// TODO: next version bump remove `as_ptr`,
-	//       because getting the pointer on unix is non-trivial.
-
-	/// Returns the base address of the image.
-	///
-	/// The pointer is only valid if there are some strong references to the image.
-	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
-	///
-	/// [`null`]: core::ptr::null "ptr::null"
-	#[deprecated = "use to_ptr instead"]
-	#[inline]
-	fn as_ptr(&self) -> *const os::Header {
-		self.to_ptr()
-	}
-	/// Returns the base address of the image.
-	///
-	/// The pointer is only valid if there are some strong references to the image.
-	/// The pointer may be dangling, unaligned or even [`null`] otherwise.
-	///
-	/// [`null`]: core::ptr::null "ptr::null"
-	fn to_ptr(&self) -> *const os::Header;
-
-	fn path(&self) -> io::Result<path::PathBuf>;
-	/// Returns `true` if the two `Image`s point to the same base address in a vein similar to [`ptr::eq`].
-	/// This function ignores metadata of `dyn Trait` pointers.
-	///
-	/// [`ptr::eq`]: core::ptr::eq "ptr::eq"
-	#[inline]
-	fn ptr_eq(&self, other: &impl Image) -> bool {
-		self.to_ptr() == other.to_ptr()
-	}
-	fn magic(&self) -> *const [u8] {
-		let len: usize = if cfg!(windows) { 2 } else { 4 };
-		let data: *const u8 = self.to_ptr().cast();
-		ptr::slice_from_raw_parts(data, len)
-	}
 }

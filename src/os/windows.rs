@@ -1,10 +1,10 @@
-// Copyright (c) 2023 Jonathan "Razordor" Alan Thomason
-use std::marker::PhantomData;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
 use std::os::windows::prelude::*;
+use std::path::PathBuf;
 use std::{ffi, io, mem, path, ptr};
 
+use crate::img;
 use crate::weak;
 use crate::{Library, Symbol};
 
@@ -36,17 +36,17 @@ impl InnerLibrary {
 	}
 
 	#[inline]
-	pub unsafe fn c_symbol(&self, name: &ffi::CStr) -> *const ffi::c_void {
-		c::GetProcAddress(self.0.as_ptr(), name.as_ptr())
+	pub unsafe fn raw_symbol(&self, name: &ffi::CStr) -> *const Symbol {
+		c::GetProcAddress(self.0.as_ptr(), name.as_ptr()).cast()
 	}
 
-	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<Symbol<'a>> {
+	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<*const Symbol> {
 		let c_str = ffi::CString::new(name).unwrap();
-		let addr: *const ffi::c_void = self.c_symbol(&c_str);
+		let addr = self.raw_symbol(&c_str);
 		if addr.is_null() {
 			Err(io::Error::last_os_error())
 		} else {
-			Ok(Symbol(addr.cast_mut(), PhantomData))
+			Ok(addr)
 		}
 	}
 
@@ -94,7 +94,7 @@ impl InnerLibrary {
 			.ok_or_else(io::Error::last_os_error)
 			.map(Self)
 	}
-	pub(crate) unsafe fn from_ptr(addr: *mut super::Header) -> Option<Self> {
+	pub(crate) unsafe fn from_ptr(addr: *mut img::Image) -> Option<Self> {
 		if let Some(addr) = ptr::NonNull::new(addr.cast::<ffi::c_void>()) {
 			let new_lib = InnerLibrary(addr);
 			new_lib.try_clone().ok()
@@ -104,7 +104,7 @@ impl InnerLibrary {
 	}
 
 	#[inline]
-	pub(crate) unsafe fn to_ptr(&self) -> *const super::Header {
+	pub(crate) unsafe fn to_ptr(&self) -> *const img::Image {
 		self.0.as_ptr().cast()
 	}
 }
@@ -129,25 +129,20 @@ impl AsRawHandle for Library {
 	}
 }
 
-pub(crate) unsafe fn base_addr(symbol: *mut std::ffi::c_void) -> io::Result<*mut super::Header> {
+pub(crate) unsafe fn base_addr(symbol: *const Symbol) -> *mut img::Image {
 	let mut handle = ptr::null_mut();
-	let result = c::GetModuleHandleExW(
+	let _ = c::GetModuleHandleExW(
 		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT | c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
 		symbol.cast(),
 		&mut handle,
 	);
-	if result == 0 {
-		Err(io::Error::last_os_error())
-	} else {
-		// The handle doubles as the base address (this may not be true the other way around though).
-		Ok(handle.cast())
-	}
+	handle.cast()
 }
 
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	const INITIAL_SIZE: usize = 1000;
 	let process_handle = c::GetCurrentProcess();
-	let mut module_handles = vec![ptr::null_mut::<super::Header>(); INITIAL_SIZE];
+	let mut module_handles = vec![ptr::null_mut::<img::Image>(); INITIAL_SIZE];
 	let mut len_needed: u32 = 0;
 	let mut prev_size = INITIAL_SIZE;
 
@@ -179,7 +174,8 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 			let module_handles = module_handles
 				.into_iter()
 				.map(|base_addr| {
-					let hmodule = InnerLibrary(ptr::NonNull::new_unchecked(base_addr.cast()));
+					let base_nonnull = ptr::NonNull::new_unchecked(base_addr.cast());
+					let hmodule = mem::ManuallyDrop::new(InnerLibrary(base_nonnull));
 					weak::Weak {
 						base_addr,
 						path_name: hmodule.path().ok(),
@@ -188,6 +184,53 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 				.collect::<Vec<weak::Weak>>();
 			// box and return the slice
 			return Ok(module_handles);
+		}
+	}
+}
+
+pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
+	// checks if it's a PE header (fast)
+	let pe_hdr = c::ImageNtHeader(hdr as *const _ as *mut _);
+	// if it's PE we can skip all sys calls and return the size immediately.
+	if !pe_hdr.is_null() {
+		let pe_hdr32 = pe_hdr as *mut c::IMAGE_NT_HEADERS32;
+		return Ok((*pe_hdr32).optionalheader.sizeofimage as usize);
+	}
+
+	let hprocess = c::GetCurrentProcess();
+	let hmodule = hdr as *mut ffi::c_void;
+	let mut lpmodinfo = mem::MaybeUninit::zeroed();
+	let cb = mem::size_of::<c::MODULEINFO>();
+	let result = c::GetModuleInformation(hprocess, hmodule, lpmodinfo.as_mut_ptr(), cb as u32);
+	if result != 0 {
+		Ok(lpmodinfo.assume_init().sizeofimage as usize)
+	} else {
+		Err(io::Error::last_os_error())
+	}
+}
+
+pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
+	let Some(nonnull_hdr) = ptr::NonNull::new(hdr as *mut _) else {
+		return Err(io::Error::new(io::ErrorKind::Other, "invalid header"));
+	};
+	let lib = mem::ManuallyDrop::new(InnerLibrary(nonnull_hdr));
+	lib.path()
+}
+
+mod tests {
+	#[test]
+	fn test_size() {
+		use super::*;
+		let imgs = crate::img::Images::now().unwrap();
+		for weak in imgs {
+			println!("{}", weak.path().unwrap().display());
+			let img = weak.base_addr;
+			let hdr = unsafe { c::ImageNtHeader(weak.base_addr.cast_mut().cast()) };
+			assert!(!hdr.is_null(), "{:?}", std::io::Error::last_os_error());
+			let hdr32 = hdr as *mut c::IMAGE_NT_HEADERS32;
+			let hdr_len = unsafe { hdr_size(img).unwrap() };
+			let img_len = unsafe { (*hdr32).optionalheader.sizeofimage };
+			assert!(img_len == hdr_len as u32, "{img_len} == {hdr_len}");
 		}
 	}
 }

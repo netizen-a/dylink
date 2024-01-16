@@ -1,5 +1,4 @@
 #![cfg(windows)]
-
 use dylink::*;
 
 static KERNEL32: sync::LibLock = sync::LibLock::new(&["Kernel32.dll"]);
@@ -42,16 +41,16 @@ fn test_macro_impl() {
 }
 
 #[test]
-fn test_sym_addr() {
+fn test_sym_img() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let sym = lib.symbol("SetLastError").unwrap();
-	let base = sym.base_address().unwrap();
-	assert!(!base.is_null())
+	let base = Symbol::image(sym);
+	assert!(base.is_some())
 }
 
 #[test]
 fn test_path() {
 	let lib = Library::open("Kernel32.dll").unwrap();
-	let path = lib.path();
+	let path = lib.to_image().unwrap().path();
 	assert!(path.is_ok())
 }

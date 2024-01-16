@@ -1,5 +1,4 @@
 #![cfg(target_os = "linux")]
-
 use dylink::*;
 
 static LIB_X11: sync::LibLock = sync::LibLock::new(&["libX11.so.6"]);
@@ -41,16 +40,16 @@ fn test_atoi_linux() {
 }
 
 #[test]
-fn test_sym_addr() {
+fn test_sym_hdr() {
 	let lib = Library::open("libX11.so.6").unwrap();
 	let sym = lib.symbol("XOpenDisplay").unwrap();
-	let base = sym.base_address().unwrap();
-	assert!(!base.is_null())
+	let base = Symbol::image(sym);
+	assert!(base.is_some())
 }
 
 #[test]
 fn test_path() {
 	let lib = Library::open("libX11.so.6").unwrap();
-	let path = lib.path();
+	let path = lib.to_image().unwrap().path();
 	assert!(path.is_ok())
 }

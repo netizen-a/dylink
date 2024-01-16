@@ -1,6 +1,6 @@
 [package]
 name = "dylink"
-version = "0.9.1"
+version = "0.10.0"
 edition = "2021"
 authors = ["Jonathan Thomason"]
 license = "MIT OR Apache-2.0"
@@ -10,19 +10,11 @@ description = "Run-time dynamic linking loader utilities"
 repository = "https://github.com/Razordor/dylink.git"
 publish = true
 
-# TODO: Next version bump needs to make sure that this isn't required anymore.
-[profile]
-dev.panic = "unwind"
-release.panic = "unwind"
-
 [workspace]
 members = ["dylink_macro"]
 
-[target.'cfg(unix)'.dependencies]
-libc = "0.2"
-
 [dependencies.dylink_macro]
-version = "0.9"
+version = "0.10"
 path="./dylink_macro"
 
 [package.metadata.docs.rs]
