@@ -61,7 +61,7 @@ impl<'a> LibLock<'a> {
 	///
 	/// let kernel32 = sync::LibLock::new(&["foo.dll"]);
 	/// let sym = kernel32.symbol("my_symbol").unwrap();
-	/// let my_symbol: unsafe extern "C" fn() = unsafe {mem::transmute(sym.cast::<()>())};
+	/// let my_symbol: unsafe extern "C" fn() = unsafe {mem::transmute(sym.as_ptr())};
 	/// ```
 	pub fn symbol(&self, name: &str) -> io::Result<Symbol> {
 		let lib = self.hlib.get_or_init(|| {

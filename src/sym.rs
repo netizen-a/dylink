@@ -14,9 +14,9 @@ pub struct Symbol<'a>(pub(crate) *mut ffi::c_void, pub(crate) marker::PhantomDat
 impl Sealed for Symbol<'_> {}
 
 impl<'a> Symbol<'a> {
-	/// Casts to a pointer of another type.
+	/// Returns the address of the symbol.
 	#[inline]
-	pub const fn cast<T>(self) -> *mut T {
+	pub const fn as_ptr(self) -> *mut ffi::c_void {
 		self.0 as _
 	}
 	/// Attempts to get the base address of the library.

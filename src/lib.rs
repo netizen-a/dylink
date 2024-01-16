@@ -118,7 +118,7 @@ impl Library {
 	///
 	/// let lib = Library::open("libX11.so.6").unwrap();
 	/// let sym = lib.symbol("XOpenDisplay").unwrap();
-	/// let xopendisplay: PfnXOpenDisplay = unsafe {mem::transmute(sym.cast::<()>())};
+	/// let xopendisplay: PfnXOpenDisplay = unsafe {mem::transmute(sym.as_ptr())};
 	/// ```
 	#[doc(alias = "dlsym")]
 	#[inline]

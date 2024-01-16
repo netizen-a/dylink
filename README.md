@@ -51,7 +51,7 @@ let lib = Library::open("Kernel32.dll").expect("Failed to open library");
 let sym = lib.symbol("GetLastError").unwrap();
 
 // Cast the symbol to the appropriate function signature.
-let get_last_error: unsafe extern "system" fn() -> u32 = unsafe {mem::transmute(sym.cast::<()>())};
+let get_last_error: unsafe extern "system" fn() -> u32 = unsafe {mem::transmute(sym.as_ptr())};
 
 let result = unsafe {get_last_error()};
 
