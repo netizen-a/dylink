@@ -33,7 +33,7 @@ Add this to your `Cargo.toml`
 
 ```toml
 [dependencies]
-dylink = "0.9"
+dylink = "0.10"
 ```
 
 ## Examples
