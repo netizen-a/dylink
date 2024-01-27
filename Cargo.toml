@@ -14,7 +14,7 @@ publish = false
 members = ["dylink_macro"]
 
 [dependencies.dylink_macro]
-version = "0.10"
+version = "0.11"
 path="./dylink_macro"
 
 [package.metadata.docs.rs]

@@ -7,8 +7,7 @@ static LIB_X11: sync::LibLock = sync::LibLock::new(&["libX11.so.6"]);
 fn test_linux_x11() {
 	use std::ffi::{c_char, c_void, CStr};
 
-	#[repr(transparent)]
-	struct Display(*const c_void);
+	type Display = c_void;
 
 	#[dylink(library = LIB_X11)]
 	extern "C-unwind" {

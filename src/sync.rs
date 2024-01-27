@@ -26,7 +26,8 @@ impl<'a> LibLock<'a> {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use dylink::*;
+	/// use dylink::sync;
+	///
 	/// static KERNEL32: sync::LibLock = sync::LibLock::new(&["kernel32.dll"]);
 	/// ```
 	#[inline]

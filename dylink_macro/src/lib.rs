@@ -12,14 +12,15 @@ use syn::ForeignItem;
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
-/// May currently be used in 2 patterns:
-/// * foreign modules
-/// * foreign functions
+/// # Safety
 ///
 /// Using an `unwind` friendly abi should be used whenever possible to
-/// prevent undefined behavior from occuring.
+/// prevent undefined behavior from occuring should the function panic.
 ///
 /// # Examples
+///
+/// May currently be used in foreign modules, and foreign functions.
+///
 ///```rust
 /// use dylink::*;
 /// static FOOBAR: sync::LibLock = sync::LibLock::new(&["foobar.dll"]);
@@ -197,11 +198,22 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		Some(token) => quote!(, #token),
 	};
 
-	// The Rust ABI can use this token.
-	let asyncness = match &fn_item.sig.asyncness {
-		None => TokenStream2::default(),
-		Some(token) => token.to_token_stream(),
-	};
+
+	if let Some(token) = &fn_item.sig.asyncness {
+		return syn::Error::new(
+			token.span(),
+			"functions in `extern` blocks cannot have qualifiers",
+		)
+		.into_compile_error();
+	}
+
+	if let Some(token) = &fn_item.sig.unsafety {
+		return syn::Error::new(
+			token.span(),
+			"functions in `extern` blocks cannot have qualifiers",
+		)
+		.into_compile_error();
+	}
 
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
@@ -209,13 +221,13 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		#(#fn_attrs)*
 		#lint
 		#[inline]
-		#vis #asyncness unsafe #abi fn #generics #fn_name (#(#param_ty_list),* #variadic) #output {
+		#vis unsafe #abi fn #generics #fn_name (#(#param_ty_list),* #variadic) #output {
 			use ::std::sync::atomic::{AtomicPtr, Ordering};
 			static FUNC: AtomicPtr<::std::ffi::c_void> = AtomicPtr::new(
 				initializer as *mut _
 			);
 
-			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
+			unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
 				let symbol = ::dylink::sync::LibLock::symbol(&#library, #link_name)
 					.expect(&format!("Dylink Error: failed to load `{}`", stringify!(#fn_name)));
 				FUNC.store(symbol.cast_mut().cast(), Ordering::Relaxed);

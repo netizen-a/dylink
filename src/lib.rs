@@ -1,12 +1,14 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
-//! Dylink provides a run-time dynamic linking framework for loading dynamic libraries.
+//! Dylink provides run-time loading utilities for loading dynamic libraries.
 //! You can load libraries directly through [`Library`], which enables diverse error handling,
-//! or you can load libraries indirectly through [`LibLock`](crate::sync::LibLock) and `dylink`.
+//! or you can load libraries indirectly through [`LibLock`] and [`dylink`].
 //!
 //! # Platform support
 //! Platform support typically varies between functions, however unless otherwise specified, functions
 //! are supported on Windows, Linux, and MacOS.
+//!
+//! [`LibLock`]: crate::sync::LibLock
 
 mod sealed;
 
