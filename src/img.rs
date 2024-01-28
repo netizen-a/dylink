@@ -11,6 +11,11 @@ use os::unix as imp;
 use os::windows as imp;
 
 // This is an iterator and not a vector because the data should be assumed stale.
+/// An iterator over executable images.
+///
+/// # Safety
+///
+/// Images retrieved from this iterator should be assumed stale (possibly invalid or unloaded).
 #[derive(Debug, Clone)]
 pub struct Images {
 	inner: vec::IntoIter<weak::Weak>,
