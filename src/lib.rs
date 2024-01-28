@@ -48,7 +48,7 @@ struct ReadmeDoctests;
 /// optional entry point may be executed for each library, which may impose arbitrary requirements on the
 /// user for the access to the library to be sound.
 #[derive(Debug)]
-#[repr(transparent)]
+#[cfg_attr(not(doc), repr(transparent))]
 pub struct Library(imp::InnerLibrary);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
@@ -110,8 +110,7 @@ impl Library {
 	/// # Examples
 	///
 	/// ```no_run
-	/// # #[repr(transparent)]
-	/// # struct Display(*const ffi::c_void);
+	/// # type Display = ffi::c_void;
 	/// use std::{mem, ffi};
 	/// use dylink::Library;
 	///
