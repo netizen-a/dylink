@@ -79,7 +79,7 @@ impl InnerLibrary {
 		c::dlsym(self.0.as_ptr(), name.as_ptr()).cast()
 	}
 
-	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<*const Symbol> {
+	pub unsafe fn symbol(&self, name: &str) -> io::Result<*const Symbol> {
 		let _lock = dylib_guard();
 		let c_str = ffi::CString::new(name).unwrap();
 

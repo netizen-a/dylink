@@ -1,4 +1,4 @@
-use std::{io, sync};
+use std::{ffi::CStr, io, sync};
 
 use crate::{Library, Symbol};
 
@@ -75,6 +75,46 @@ impl<'a> LibLock<'a> {
 		});
 		lib.symbol(name)
 	}
+
+	/// May block if another thread is currently attempting to initialize the cell. The difference
+	/// from [`symbol`] is that this function accepts a raw c-string, which is useful to avoid redundant string cloning.
+	///
+	/// This will lazily initialize the LibLock.
+	///
+	/// # Errors
+	///
+	/// If [`LibLock`] failed to be initialized, then this call will return an error.
+	///
+	/// If the requested symbol does not exist in the dynamic library, then this call will return an error.
+	///
+	/// # Panics
+	///
+	/// Panics if library cannot be initialized
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::*;
+	/// use std::mem;
+	///
+	/// let kernel32 = sync::LibLock::new(&["foo.dll"]);
+	/// let sym = kernel32.symbol("my_symbol").unwrap();
+	/// let my_symbol: unsafe extern "C" fn() = unsafe {mem::transmute(sym)};
+	/// ```
+	pub fn raw_symbol(&self, name: &CStr) -> *const Symbol {
+		let lib = self.hlib.get_or_init(|| {
+			if self.libs.is_empty() {
+				Library::this()
+			} else {
+				self.libs
+					.iter()
+					.find_map(|path| Library::open(path).ok())
+					.unwrap()
+			}
+		});
+		lib.raw_symbol(name)
+	}
+
 	/// Gets the reference to the underlying value.
 	///
 	/// Returns `None` if the cell is empty, or being initialized. This
