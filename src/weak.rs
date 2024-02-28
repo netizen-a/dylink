@@ -76,7 +76,7 @@ impl Weak {
 	///
 	/// # Platform-specific Behavior
 	///
-	/// May return [`None`] on Linux if the image is the executable.
+	/// May return [`None`] on Linux if the image is the current program.
 	#[inline]
 	pub fn path(&self) -> Option<&path::Path> {
 		self.path_name.as_deref()

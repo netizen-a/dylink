@@ -5,7 +5,7 @@
 //! or you can load libraries indirectly through [`LibLock`] and [`dylink`].
 //!
 //! # Platform support
-//! Platform support typically varies between functions, however unless otherwise specified, functions
+//! Complete platform support may vary between functions, however unless otherwise specified, functions
 //! are supported on Windows, Linux, and MacOS.
 //!
 //! [`LibLock`]: crate::sync::LibLock
@@ -101,7 +101,8 @@ impl Library {
 			.expect("failed to acquire library process handle")
 	}
 
-	/// Retrieves a symbol from the library if it exists
+	/// Retrieves a symbol from the library if it exists. The symbol must not be used past
+	/// the lifetime of the library or the symbol will be invalid.
 	///
 	/// # Errors
 	///
