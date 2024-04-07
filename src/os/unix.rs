@@ -49,7 +49,7 @@ fn dlopen_fname(fname: &ffi::CStr) -> *const ffi::c_char {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub(crate) struct InnerLibrary(ptr::NonNull<ffi::c_void>);
+pub(crate) struct InnerLibrary(pub ptr::NonNull<ffi::c_void>);
 
 impl InnerLibrary {
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {

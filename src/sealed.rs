@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 pub trait Sealed {}
 
 #[repr(C)]

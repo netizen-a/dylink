@@ -5,6 +5,13 @@ mod windows;
 
 use dylink::*;
 
+#[cfg(feature = "unstable")]
+#[test]
+fn test_leak() {
+	let lib = Library::this();
+	let _handle = lib.leak();
+}
+
 #[test]
 fn test_size_exact() {
 	let images = img::Images::now().unwrap();

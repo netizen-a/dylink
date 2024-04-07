@@ -29,6 +29,9 @@ pub use sym::Symbol;
 
 use std::{io, path};
 
+#[cfg(feature = "unstable")]
+use std::{ptr, ffi};
+
 pub use dylink_macro::dylink;
 
 #[doc = include_str!("../README.md")]
@@ -99,6 +102,12 @@ impl Library {
 		unsafe { imp::InnerLibrary::this() }
 			.map(Library)
 			.expect("failed to acquire library process handle")
+	}
+
+	#[cfg(feature = "unstable")]
+	#[inline]
+	pub fn leak(self) -> ptr::NonNull<ffi::c_void> {
+		self.0.0
 	}
 
 	/// Retrieves a symbol from the library if it exists. The symbol must not be used past

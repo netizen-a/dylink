@@ -1,5 +1,3 @@
-use std::os::windows::ffi::{OsStrExt, OsStringExt};
-
 use std::os::windows::prelude::*;
 use std::path::PathBuf;
 use std::{ffi, io, mem, path, ptr};
@@ -16,7 +14,7 @@ fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub(crate) struct InnerLibrary(std::ptr::NonNull<ffi::c_void>);
+pub(crate) struct InnerLibrary(pub std::ptr::NonNull<ffi::c_void>);
 
 impl InnerLibrary {
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {
