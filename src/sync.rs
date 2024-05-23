@@ -81,6 +81,8 @@ impl<'a> LibLock<'a> {
 	///
 	/// This will lazily initialize the LibLock.
 	///
+	/// [`symbol`]: self::LibLock::symbol
+	/// 
 	/// # Errors
 	///
 	/// If [`LibLock`] failed to be initialized, then this call will return an error.

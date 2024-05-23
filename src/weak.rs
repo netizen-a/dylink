@@ -19,6 +19,15 @@ pub struct Weak {
 }
 impl crate::sealed::Sealed for Weak {}
 
+impl Default for Weak {
+	fn default() -> Self {
+		Self {
+			base_addr: ptr::null(),
+			path_name: None,
+		}
+	}
+}
+
 impl Weak {
 	/// Constructs a new `Weak`, without allocating any memory. Calling [`upgrade`] on the return value always gives [`None`].
 	///

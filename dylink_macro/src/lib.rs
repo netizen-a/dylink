@@ -1,5 +1,3 @@
-#![cfg_attr(feature = "warnings", feature(proc_macro_diagnostic))]
-
 mod attr_data;
 
 use proc_macro::TokenStream as TokenStream1;

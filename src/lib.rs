@@ -27,10 +27,7 @@ pub use weak::Weak;
 mod sym;
 pub use sym::Symbol;
 
-use std::{io, path};
-
-#[cfg(feature = "unstable")]
-use std::{ptr, ffi};
+use std::{io, path, ffi};
 
 pub use dylink_macro::dylink;
 
@@ -104,10 +101,27 @@ impl Library {
 			.expect("failed to acquire library process handle")
 	}
 
-	#[cfg(feature = "unstable")]
+	/// Consumes and leaks the `Library`, returning a raw handle to the library.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// # mod libc {
+	/// #     use std::ffi::{c_void, c_char};
+	/// #     pub unsafe extern "C" fn dlsym(_: *mut c_void,_: *const c_char){}
+	/// # }
+	/// # fn main() -> std::io::Result<()> {
+	/// let lib = dylink::Library::open("foo.so")?;
+	/// let handle = lib.leak();
+	/// unsafe {
+	///     libc::dlsym(handle, c"bar".as_ptr());
+	/// }
+	/// # Ok(())
+	/// # }
+	/// ```
 	#[inline]
-	pub fn leak(self) -> ptr::NonNull<ffi::c_void> {
-		self.0.0
+	pub fn leak(self) -> *mut ffi::c_void {
+		self.0.0.as_ptr()
 	}
 
 	/// Retrieves a symbol from the library if it exists. The symbol must not be used past
