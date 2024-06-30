@@ -27,6 +27,8 @@ pub use weak::Weak;
 mod sym;
 pub use sym::Symbol;
 
+pub mod elf;
+
 use std::{io, path, ffi};
 
 pub use dylink_macro::dylink;
