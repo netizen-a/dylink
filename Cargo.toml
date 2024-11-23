@@ -1,6 +1,6 @@
 [package]
 name = "dylink"
-version = "0.10.1"
+version = "0.11.0"
 edition = "2021"
 authors = ["Jonathan Thomason"]
 license = "MIT OR Apache-2.0"
@@ -16,11 +16,14 @@ members = ["dylink_macro"]
 [dependencies.dylink_macro]
 version = "0.11"
 path="./dylink_macro"
+optional = true
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
 
 [features]
+default = ["dylink_macro"]
 # features still being tested. marked items must not be relied upon between versions.
 unstable = []
+dylink_macro = ["dep:dylink_macro"]

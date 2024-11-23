@@ -29,15 +29,14 @@ pub use sym::Symbol;
 
 pub mod elf;
 
-use std::{io, path, ffi};
+use std::{ffi, io, path};
 
+#[cfg(feature = "dylink_macro")]
 pub use dylink_macro::dylink;
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
-
-
 
 /// An object providing access to an open dynamic library.
 ///
@@ -123,7 +122,7 @@ impl Library {
 	/// ```
 	#[inline]
 	pub fn leak(self) -> *mut ffi::c_void {
-		self.0.0.as_ptr()
+		self.0 .0.as_ptr()
 	}
 
 	/// Retrieves a symbol from the library if it exists. The symbol must not be used past
