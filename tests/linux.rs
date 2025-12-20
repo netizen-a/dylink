@@ -5,7 +5,11 @@ static LIB_X11: sync::LibLock = sync::LibLock::new(&["libX11.so.6"]);
 
 #[test]
 fn test_linux_x11() {
-	use std::ffi::{c_char, c_void, CStr};
+	use std::ffi::{
+		CStr,
+		c_char,
+		c_void,
+	};
 
 	type Display = c_void;
 
@@ -27,7 +31,10 @@ fn test_linux_x11() {
 
 #[test]
 fn test_atoi_linux() {
-	use std::ffi::{c_char, c_int};
+	use std::ffi::{
+		c_char,
+		c_int,
+	};
 	static THIS: sync::LibLock = sync::LibLock::new(&[]);
 	#[dylink(library=THIS)]
 	extern "C-unwind" {

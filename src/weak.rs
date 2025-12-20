@@ -1,6 +1,6 @@
+use crate::Library;
 use crate::img;
 use crate::os;
-use crate::Library;
 use std::path;
 use std::ptr;
 

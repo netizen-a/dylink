@@ -1,6 +1,13 @@
-use std::{ffi::CStr, io, sync};
+use std::{
+	ffi::CStr,
+	io,
+	sync,
+};
 
-use crate::{Library, Symbol};
+use crate::{
+	Library,
+	Symbol,
+};
 
 /// An object providing access to a lazily loaded LibLock on the filesystem.
 ///
@@ -82,7 +89,7 @@ impl<'a> LibLock<'a> {
 	/// This will lazily initialize the LibLock.
 	///
 	/// [`symbol`]: self::LibLock::symbol
-	/// 
+	///
 	/// # Errors
 	///
 	/// If [`LibLock`] failed to be initialized, then this call will return an error.

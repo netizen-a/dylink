@@ -112,7 +112,7 @@ impl Image {
 		let len = unsafe { imp::hdr_size(self)? };
 		let data = self as *const Image as *const u8;
 		// this is safe because hdr_size checks if the slice is valid.
-		let slice = unsafe {std::slice::from_raw_parts::<u8>(data, len)};
+		let slice = unsafe { std::slice::from_raw_parts::<u8>(data, len) };
 		Ok(slice)
 	}
 }

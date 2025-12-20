@@ -1,10 +1,19 @@
 use std::os::windows::prelude::*;
 use std::path::PathBuf;
-use std::{ffi, io, mem, path, ptr};
+use std::{
+	ffi,
+	io,
+	mem,
+	path,
+	ptr,
+};
 
 use crate::img;
 use crate::weak;
-use crate::{Library, Symbol};
+use crate::{
+	Library,
+	Symbol,
+};
 
 mod c;
 
@@ -105,10 +114,8 @@ impl InnerLibrary {
 	pub(crate) unsafe fn to_ptr(&self) -> *const img::Image {
 		self.0.as_ptr().cast()
 	}
-}
 
-impl Drop for InnerLibrary {
-	fn drop(&mut self) {
+	pub(crate) fn close(self) {
 		unsafe {
 			c::FreeLibrary(self.0.as_ptr());
 		}

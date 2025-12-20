@@ -3,7 +3,13 @@ mod attr_data;
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::*;
-use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned, Expr, Token};
+use syn::{
+	Expr,
+	Token,
+	parse::Parser,
+	punctuated::Punctuated,
+	spanned::Spanned,
+};
 
 use attr_data::*;
 use syn::ForeignItem;
@@ -88,7 +94,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		Ok(ref path) => path,
 		Err(span) => {
 			return syn::Error::new(span, "`link_name` should be applied to a foreign function")
-				.to_compile_error()
+				.to_compile_error();
 		}
 	};
 	// constness makes no sense in this context
@@ -96,7 +102,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		None => (),
 		Some(kw) => {
 			return syn::Error::new(kw.span(), "`const` functions are unsupported")
-				.into_compile_error()
+				.into_compile_error();
 		}
 	}
 
@@ -107,16 +113,15 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		.collect();
 
 	// `self` can be used, but not inferred, so it's conditionally useful.
-	if let syn::ReturnType::Type(_, ret_type) = &fn_item.sig.output {
-		if let syn::Type::Path(syn::TypePath { path, .. }) = ret_type.as_ref() {
-			if path.is_ident("Self") {
-				return syn::Error::new(
-					path.span(),
-					"`Self` cannot be inferred. Try using an explicit type instead",
-				)
-				.to_compile_error();
-			}
-		}
+	if let syn::ReturnType::Type(_, ret_type) = &fn_item.sig.output
+		&& let syn::Type::Path(syn::TypePath { path, .. }) = ret_type.as_ref()
+		&& path.is_ident("Self")
+	{
+		return syn::Error::new(
+			path.span(),
+			"`Self` cannot be inferred. Try using an explicit type instead",
+		)
+		.to_compile_error();
 	}
 
 	let mut param_list = Vec::new();
@@ -126,14 +131,14 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	for (i, arg) in fn_item.sig.inputs.iter().enumerate() {
 		match arg {
 			syn::FnArg::Typed(pat_type) => {
-				if let syn::Type::Path(syn::TypePath { path, .. }) = pat_type.ty.as_ref() {
-					if path.is_ident("Self") {
-						return syn::Error::new(
-							path.span(),
-							"`Self` cannot be inferred. Try using an explicit type instead",
-						)
-						.to_compile_error();
-					}
+				if let syn::Type::Path(syn::TypePath { path, .. }) = pat_type.ty.as_ref()
+					&& path.is_ident("Self")
+				{
+					return syn::Error::new(
+						path.span(),
+						"`Self` cannot be inferred. Try using an explicit type instead",
+					)
+					.to_compile_error();
 				}
 				let ty = pat_type.ty.to_token_stream();
 				let param_name = match pat_type.pat.as_ref() {
@@ -155,14 +160,14 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 					)
 					.into_compile_error();
 				} else {
-					if let syn::Type::Path(syn::TypePath { path, .. }) = rec.ty.as_ref() {
-						if path.is_ident("Self") {
-							return syn::Error::new(
-								path.span(),
-								"type of `self` cannot be inferred. Try using an explicit type instead",
-							)
-							.to_compile_error();
-						}
+					if let syn::Type::Path(syn::TypePath { path, .. }) = rec.ty.as_ref()
+						&& path.is_ident("Self")
+					{
+						return syn::Error::new(
+							path.span(),
+							"type of `self` cannot be inferred. Try using an explicit type instead",
+						)
+						.to_compile_error();
 					}
 					let ty = rec.ty.to_token_stream();
 					let param_name = format!("p{i}").parse::<TokenStream2>().unwrap();
@@ -195,7 +200,6 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		None => TokenStream2::default(),
 		Some(token) => quote!(, #token),
 	};
-
 
 	if let Some(token) = &fn_item.sig.asyncness {
 		return syn::Error::new(

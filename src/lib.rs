@@ -29,7 +29,11 @@ pub use sym::Symbol;
 
 pub mod elf;
 
-use std::{ffi, io, path};
+use std::{
+	ffi,
+	io,
+	path,
+};
 
 #[cfg(feature = "dylink_macro")]
 pub use dylink_macro::dylink;
@@ -122,7 +126,7 @@ impl Library {
 	/// ```
 	#[inline]
 	pub fn leak(self) -> *mut ffi::c_void {
-		self.0 .0.as_ptr()
+		self.0.0.as_ptr()
 	}
 
 	/// Retrieves a symbol from the library if it exists. The symbol must not be used past
@@ -213,6 +217,10 @@ impl Library {
 			base_addr,
 			path_name: base_addr.path().ok(),
 		})
+	}
+
+	pub fn close(self) {
+		self.0.close()
 	}
 }
 

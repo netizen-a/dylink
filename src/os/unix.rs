@@ -1,19 +1,36 @@
 #![allow(clippy::let_unit_value)]
 
 use crate::sealed::Sealed;
-use crate::{img, weak, Symbol};
+use crate::{
+	Symbol,
+	img,
+	weak,
+};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
-use std::{ffi, io, mem, path::PathBuf, ptr};
+use std::{
+	ffi,
+	io,
+	mem,
+	path::PathBuf,
+	ptr,
+};
 
 #[cfg(target_os = "macos")]
 use std::sync::{
-	atomic::{AtomicU32, Ordering},
 	Once,
+	atomic::{
+		AtomicU32,
+		Ordering,
+	},
 };
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_env = "gnu")))]
-use std::sync::{LockResult, Mutex, MutexGuard};
+use std::sync::{
+	LockResult,
+	Mutex,
+	MutexGuard,
+};
 
 mod c;
 
@@ -60,7 +77,7 @@ impl InnerLibrary {
 			Ok(Self(ret))
 		} else {
 			let err = c_dlerror().unwrap();
-			Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
+			Err(io::Error::other(err.to_string_lossy()))
 		}
 	}
 	pub unsafe fn this() -> io::Result<Self> {
@@ -70,7 +87,7 @@ impl InnerLibrary {
 			Ok(Self(ret))
 		} else {
 			let err = c_dlerror().unwrap();
-			Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
+			Err(io::Error::other(err.to_string_lossy()))
 		}
 	}
 
@@ -87,7 +104,7 @@ impl InnerLibrary {
 		let handle = self.raw_symbol(&c_str).cast_mut();
 
 		if let Some(err) = c_dlerror() {
-			Err(io::Error::new(io::ErrorKind::Other, err.to_string_lossy()))
+			Err(io::Error::other(err.to_string_lossy()))
 		} else {
 			Ok(handle)
 		}
@@ -97,7 +114,7 @@ impl InnerLibrary {
 		if this.0 == self.0 {
 			Ok(this)
 		} else {
-			std::mem::drop(this);
+			this.close();
 			let Some(hdr) = self.to_ptr().as_ref() else {
 				return Err(io::Error::new(io::ErrorKind::NotFound, "header not found"));
 			};
@@ -162,9 +179,7 @@ impl InnerLibrary {
 			None
 		}
 	}
-}
-impl Drop for InnerLibrary {
-	fn drop(&mut self) {
+	pub(crate) fn close(self) {
 		unsafe { c::dlclose(self.0.as_ptr()) };
 	}
 }
@@ -232,10 +247,7 @@ impl SymExt for Symbol {
 				})
 			} else {
 				// dlerror isn't available for dlinfo, so I can only provide a general error message here
-				Err(io::Error::new(
-					io::ErrorKind::Other,
-					"Failed to retrieve symbol information",
-				))
+				Err(io::Error::other("Failed to retrieve symbol information"))
 			}
 		}
 	}
@@ -335,10 +347,7 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
 				)),
 			}
 		}
-		_ => Err(io::Error::new(
-			io::ErrorKind::Other,
-			"unknown header detected",
-		)),
+		_ => Err(io::Error::other("unknown header detected")),
 	}
 }
 

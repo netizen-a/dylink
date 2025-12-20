@@ -16,10 +16,10 @@ fn test_leak() {
 fn test_size_exact() {
 	let images = img::Images::now().unwrap();
 	for weak in images {
-		let img = unsafe {&*weak.to_ptr()};
+		let img = unsafe { &*weak.to_ptr() };
 		let img_slice = img.to_bytes().unwrap();
 		let len = (*img_slice).len();
-		let _data = (*img_slice)[len -1];
+		let _data = (*img_slice)[len - 1];
 	}
 }
 

@@ -139,7 +139,7 @@ pub struct dl_phdr_info {
 	pub dlpi_phnum: ElfW_Half,
 }
 
-extern "C" {
+unsafe extern "C" {
 	pub fn dlopen(filename: *const ffi::c_char, flag: ffi::c_int) -> *mut ffi::c_void;
 	pub fn dlerror() -> *const ffi::c_char;
 	pub fn dlsym(handle: *mut ffi::c_void, symbol: *const ffi::c_char) -> *const ffi::c_void;
@@ -162,7 +162,7 @@ pub type DlIteratePhdrCallback = unsafe extern "C" fn(
 ) -> ffi::c_int;
 
 #[cfg(target_os = "linux")]
-extern "C" {
+unsafe extern "C" {
 	pub fn dl_iterate_phdr(callback: DlIteratePhdrCallback, data: *mut ffi::c_void) -> ffi::c_int;
 }
 

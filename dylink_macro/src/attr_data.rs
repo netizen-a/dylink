@@ -1,6 +1,9 @@
 use proc_macro2::Span;
 use syn::punctuated::Punctuated;
-use syn::{spanned::Spanned, *};
+use syn::{
+	spanned::Spanned,
+	*,
+};
 
 pub struct AttrData {
 	pub library: std::result::Result<syn::Path, Span>,

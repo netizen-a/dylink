@@ -1,6 +1,6 @@
-use std::marker;
-use crate::sealed::Sealed;
 use crate::img;
+use crate::sealed::Sealed;
+use std::marker;
 
 #[cfg(unix)]
 use crate::os::unix as imp;

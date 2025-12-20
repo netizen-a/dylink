@@ -7,8 +7,12 @@
 pub use std::os::windows::raw::HANDLE;
 use std::{
 	ffi,
-	marker::{PhantomData, PhantomPinned},
-	mem, ptr,
+	marker::{
+		PhantomData,
+		PhantomPinned,
+	},
+	mem,
+	ptr,
 };
 
 pub type HMODULE = HANDLE;
