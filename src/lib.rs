@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
 //! Dylink provides run-time loading utilities for loading dynamic libraries.

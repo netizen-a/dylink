@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+# SPDX-License-Identifier: CC0-1.0
+
 edition = "2024"
 
 hard_tabs = true

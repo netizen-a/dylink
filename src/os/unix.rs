@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 #![allow(clippy::let_unit_value)]
 
 use crate::sealed::Sealed;
@@ -59,15 +62,12 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 // dlopen may return a different handle if the path is not null.
 // This function solves the problem of `Library::to_library` not working with `Library::this`
 fn dlopen_fname(fname: &ffi::CStr) -> *const ffi::c_char {
-	if let Ok(exe) = std::env::current_exe() {
-		if let Some(exe_str) = exe.as_os_str().to_str() {
-			if let Ok(fname_str) = fname.to_str() {
-				if fname_str == exe_str {
+	if let Ok(exe) = std::env::current_exe()
+		&& let Some(exe_str) = exe.as_os_str().to_str()
+			&& let Ok(fname_str) = fname.to_str()
+				&& fname_str == exe_str {
 					return std::ptr::null();
 				}
-			}
-		}
-	}
 	fname.as_ptr()
 }
 
