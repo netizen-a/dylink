@@ -74,7 +74,12 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 			} else if let Ok(foreign_fn) = syn::parse2::<syn::ForeignItemFn>(input.into()) {
 				parse_fn::<false>(foreign_fn.sig.abi.as_ref(), &foreign_fn, &attr_data).into()
 			} else {
-				panic!("failed to parse");
+				syn::Error::new(
+					proc_macro2::Span::call_site(),
+					"expected a foreign function block (`extern { ... }`) or a foreign function declaration",
+				)
+				.to_compile_error()
+				.into()
 			}
 		}
 		Err(e) => syn::Error::into_compile_error(e).into(),

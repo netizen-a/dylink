@@ -59,11 +59,16 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 // dlopen may return a different handle if the path is not null.
 // This function solves the problem of `Library::to_library` not working with `Library::this`
 fn dlopen_fname(fname: &ffi::CStr) -> *const ffi::c_char {
-	if fname.to_str().unwrap() == std::env::current_exe().unwrap().to_str().unwrap() {
-		std::ptr::null()
-	} else {
-		fname.as_ptr()
+	if let Ok(exe) = std::env::current_exe() {
+		if let Some(exe_str) = exe.as_os_str().to_str() {
+			if let Ok(fname_str) = fname.to_str() {
+				if fname_str == exe_str {
+					return std::ptr::null();
+				}
+			}
+		}
 	}
+	fname.as_ptr()
 }
 
 #[derive(Debug)]
@@ -105,7 +110,10 @@ impl InnerLibrary {
 	pub unsafe fn symbol(&self, name: &str) -> io::Result<*const Symbol> {
 		unsafe {
 			let _lock = dylib_guard();
-			let c_str = ffi::CString::new(name).unwrap();
+			let c_str = match ffi::CString::new(name) {
+				Ok(s) => s,
+				Err(err) => return Err(io::Error::new(io::ErrorKind::InvalidData, err)),
+			};
 
 			let _ = c_dlerror(); // clear existing errors
 			let handle = self.raw_symbol(&c_str).cast_mut();

@@ -48,7 +48,10 @@ impl InnerLibrary {
 	}
 
 	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<*const Symbol> {
-		let c_str = ffi::CString::new(name).unwrap();
+		let c_str = match ffi::CString::new(name) {
+			Ok(s) => s,
+			Err(err) => return Err(io::Error::new(io::ErrorKind::InvalidData, err)),
+		};
 		let addr = self.raw_symbol(&c_str);
 		if addr.is_null() {
 			Err(io::Error::last_os_error())
