@@ -46,11 +46,13 @@ fn dylib_guard<'a>() -> LockResult<MutexGuard<'a, ()>> {
 fn dylib_guard() {}
 
 unsafe fn c_dlerror() -> Option<ffi::CString> {
-	let raw = c::dlerror();
-	if raw.is_null() {
-		None
-	} else {
-		Some(ffi::CStr::from_ptr(raw).to_owned())
+	unsafe {
+		let raw = c::dlerror();
+		if raw.is_null() {
+			None
+		} else {
+			Some(ffi::CStr::from_ptr(raw).to_owned())
+		}
 	}
 }
 
@@ -70,56 +72,64 @@ pub(crate) struct InnerLibrary(pub ptr::NonNull<ffi::c_void>);
 
 impl InnerLibrary {
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {
-		let _lock = dylib_guard();
-		let c_str = ffi::CString::new(path.as_bytes())?;
-		let handle: *mut ffi::c_void = c::dlopen(c_str.as_ptr(), c::RTLD_NOW | c::RTLD_LOCAL);
-		if let Some(ret) = ptr::NonNull::new(handle) {
-			Ok(Self(ret))
-		} else {
-			let err = c_dlerror().unwrap();
-			Err(io::Error::other(err.to_string_lossy()))
+		unsafe {
+			let _lock = dylib_guard();
+			let c_str = ffi::CString::new(path.as_bytes())?;
+			let handle: *mut ffi::c_void = c::dlopen(c_str.as_ptr(), c::RTLD_NOW | c::RTLD_LOCAL);
+			if let Some(ret) = ptr::NonNull::new(handle) {
+				Ok(Self(ret))
+			} else {
+				let err = c_dlerror().unwrap();
+				Err(io::Error::other(err.to_string_lossy()))
+			}
 		}
 	}
 	pub unsafe fn this() -> io::Result<Self> {
-		let _lock = dylib_guard();
-		let handle: *mut ffi::c_void = c::dlopen(ptr::null(), c::RTLD_NOW | c::RTLD_LOCAL);
-		if let Some(ret) = ptr::NonNull::new(handle) {
-			Ok(Self(ret))
-		} else {
-			let err = c_dlerror().unwrap();
-			Err(io::Error::other(err.to_string_lossy()))
+		unsafe {
+			let _lock = dylib_guard();
+			let handle: *mut ffi::c_void = c::dlopen(ptr::null(), c::RTLD_NOW | c::RTLD_LOCAL);
+			if let Some(ret) = ptr::NonNull::new(handle) {
+				Ok(Self(ret))
+			} else {
+				let err = c_dlerror().unwrap();
+				Err(io::Error::other(err.to_string_lossy()))
+			}
 		}
 	}
 
 	#[inline]
 	pub unsafe fn raw_symbol(&self, name: &ffi::CStr) -> *const Symbol {
-		c::dlsym(self.0.as_ptr(), name.as_ptr()).cast()
+		unsafe { c::dlsym(self.0.as_ptr(), name.as_ptr()).cast() }
 	}
 
 	pub unsafe fn symbol(&self, name: &str) -> io::Result<*const Symbol> {
-		let _lock = dylib_guard();
-		let c_str = ffi::CString::new(name).unwrap();
+		unsafe {
+			let _lock = dylib_guard();
+			let c_str = ffi::CString::new(name).unwrap();
 
-		let _ = c_dlerror(); // clear existing errors
-		let handle = self.raw_symbol(&c_str).cast_mut();
+			let _ = c_dlerror(); // clear existing errors
+			let handle = self.raw_symbol(&c_str).cast_mut();
 
-		if let Some(err) = c_dlerror() {
-			Err(io::Error::other(err.to_string_lossy()))
-		} else {
-			Ok(handle)
+			if let Some(err) = c_dlerror() {
+				Err(io::Error::other(err.to_string_lossy()))
+			} else {
+				Ok(handle)
+			}
 		}
 	}
 	pub(crate) unsafe fn try_clone(&self) -> io::Result<Self> {
-		let this = Self::this()?;
-		if this.0 == self.0 {
-			Ok(this)
-		} else {
-			this.close();
-			let Some(hdr) = self.to_ptr().as_ref() else {
-				return Err(io::Error::new(io::ErrorKind::NotFound, "header not found"));
-			};
-			let path = hdr.path()?;
-			Self::open(path.as_os_str())
+		unsafe {
+			let this = Self::this()?;
+			if this.0 == self.0 {
+				Ok(this)
+			} else {
+				this.close();
+				let Some(hdr) = self.to_ptr().as_ref() else {
+					return Err(io::Error::new(io::ErrorKind::NotFound, "header not found"));
+				};
+				let path = hdr.path()?;
+				Self::open(path.as_os_str())
+			}
 		}
 	}
 
@@ -132,16 +142,18 @@ impl InnerLibrary {
 	// returns null if handle is invalid
 	#[cfg(target_env = "gnu")]
 	pub(crate) unsafe fn to_ptr(&self) -> *const img::Image {
-		let mut map_ptr = ptr::null_mut::<c::link_map>();
-		if c::dlinfo(
-			self.0.as_ptr(),
-			c::RTLD_DI_LINKMAP,
-			&mut map_ptr as *mut _ as *mut _,
-		) == 0
-		{
-			(*map_ptr).l_addr as *const img::Image
-		} else {
-			ptr::null()
+		unsafe {
+			let mut map_ptr = ptr::null_mut::<c::link_map>();
+			if c::dlinfo(
+				self.0.as_ptr(),
+				c::RTLD_DI_LINKMAP,
+				&mut map_ptr as *mut _ as *mut _,
+			) == 0
+			{
+				(*map_ptr).l_addr as *const img::Image
+			} else {
+				ptr::null()
+			}
 		}
 	}
 
@@ -169,14 +181,16 @@ impl InnerLibrary {
 		result
 	}
 	pub(crate) unsafe fn from_ptr(addr: *const img::Image) -> Option<Self> {
-		let mut info = mem::MaybeUninit::zeroed();
-		if c::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
-			let info = info.assume_init();
-			let filename = dlopen_fname(ffi::CStr::from_ptr(info.dli_fname));
-			let handle = c::dlopen(filename, c::RTLD_NOW | c::RTLD_LOCAL);
-			ptr::NonNull::new(handle).map(Self)
-		} else {
-			None
+		unsafe {
+			let mut info = mem::MaybeUninit::zeroed();
+			if c::dladdr(addr.cast(), info.as_mut_ptr()) != 0 {
+				let info = info.assume_init();
+				let filename = dlopen_fname(ffi::CStr::from_ptr(info.dli_fname));
+				let handle = c::dlopen(filename, c::RTLD_NOW | c::RTLD_LOCAL);
+				ptr::NonNull::new(handle).map(Self)
+			} else {
+				None
+			}
 		}
 	}
 	pub(crate) fn close(self) {
@@ -203,20 +217,22 @@ fn get_image_count() -> &'static AtomicU32 {
 }
 
 pub(crate) unsafe fn base_addr(symbol: *const std::ffi::c_void) -> *mut img::Image {
-	#[cfg(not(target_os = "aix"))]
-	{
-		let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
-		if c::dladdr(symbol, info.as_mut_ptr()) != 0 {
-			let info = info.assume_init();
-			info.dli_fbase.cast()
-		} else {
+	unsafe {
+		#[cfg(not(target_os = "aix"))]
+		{
+			let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
+			if c::dladdr(symbol, info.as_mut_ptr()) != 0 {
+				let info = info.assume_init();
+				info.dli_fbase.cast()
+			} else {
+				ptr::null_mut()
+			}
+		}
+		#[cfg(target_os = "aix")]
+		{
+			// aix doesn't have dladdr
 			ptr::null_mut()
 		}
-	}
-	#[cfg(target_os = "aix")]
-	{
-		// aix doesn't have dladdr
-		ptr::null_mut()
 	}
 }
 
@@ -258,41 +274,47 @@ unsafe fn iter_phdr<F>(mut f: F) -> ffi::c_int
 where
 	F: FnMut(*mut c::dl_phdr_info, usize) -> ffi::c_int,
 {
-	unsafe extern "C" fn callback<F>(
-		info: *mut c::dl_phdr_info,
-		size: usize,
-		data: *mut ffi::c_void,
-	) -> ffi::c_int
-	where
-		F: FnMut(*mut c::dl_phdr_info, usize) -> ffi::c_int,
-	{
-		let f = data as *mut F;
-		(*f)(info, size)
+	unsafe {
+		unsafe extern "C" fn callback<F>(
+			info: *mut c::dl_phdr_info,
+			size: usize,
+			data: *mut ffi::c_void,
+		) -> ffi::c_int
+		where
+			F: FnMut(*mut c::dl_phdr_info, usize) -> ffi::c_int,
+		{
+			unsafe {
+				let f = data as *mut F;
+				(*f)(info, size)
+			}
+		}
+		c::dl_iterate_phdr(callback::<F>, &mut f as *mut _ as *mut _)
 	}
-	c::dl_iterate_phdr(callback::<F>, &mut f as *mut _ as *mut _)
 }
 
 #[cfg(target_env = "gnu")]
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
-	let mut data = Vec::new();
-	let _ = iter_phdr(|info, _| {
-		let path_name = if (*info).dlpi_name.is_null() {
-			None
-		} else if (*info).dlpi_name.read() == 0i8 {
-			std::env::current_exe().ok()
-		} else {
-			let path = ffi::CStr::from_ptr((*info).dlpi_name);
-			let path = ffi::OsStr::from_bytes(path.to_bytes());
-			Some(PathBuf::from(path))
-		};
-		let weak_ptr = weak::Weak {
-			base_addr: (*info).dlpi_addr as *mut img::Image,
-			path_name,
-		};
-		data.push(weak_ptr);
-		0
-	});
-	Ok(data)
+	unsafe {
+		let mut data = Vec::new();
+		let _ = iter_phdr(|info, _| {
+			let path_name = if (*info).dlpi_name.is_null() {
+				None
+			} else if (*info).dlpi_name.read() == 0i8 {
+				std::env::current_exe().ok()
+			} else {
+				let path = ffi::CStr::from_ptr((*info).dlpi_name);
+				let path = ffi::OsStr::from_bytes(path.to_bytes());
+				Some(PathBuf::from(path))
+			};
+			let weak_ptr = weak::Weak {
+				base_addr: (*info).dlpi_addr as *mut img::Image,
+				path_name,
+			};
+			data.push(weak_ptr);
+			0
+		});
+		Ok(data)
+	}
 }
 
 #[cfg(target_os = "macos")]
@@ -315,68 +337,72 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 }
 
 pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
-	const MH_MAGIC: &[u8] = &0xfeedface_u32.to_le_bytes();
-	const MH_MAGIC_64: &[u8] = &0xfeedfacf_u32.to_le_bytes();
-	const ELF_MAGIC: &[u8] = &[0x7f, b'E', b'L', b'F'];
+	unsafe {
+		const MH_MAGIC: &[u8] = &0xfeedface_u32.to_le_bytes();
+		const MH_MAGIC_64: &[u8] = &0xfeedfacf_u32.to_le_bytes();
+		const ELF_MAGIC: &[u8] = &[0x7f, b'E', b'L', b'F'];
 
-	let magic_len: usize = if cfg!(windows) { 2 } else { 4 };
-	let magic: &[u8] = std::slice::from_raw_parts(hdr.cast(), magic_len);
-	match magic {
-		MH_MAGIC => {
-			let hdr = hdr as *const c::mach_header;
-			Ok(mem::size_of::<c::mach_header>() + (*hdr).sizeofcmds as usize)
-		}
-		MH_MAGIC_64 => {
-			let hdr = hdr as *const c::mach_header_64;
-			Ok(mem::size_of::<c::mach_header_64>() + (*hdr).sizeofcmds as usize)
-		}
-		ELF_MAGIC => {
-			let data: *const u8 = hdr as *const u8;
-			match *data.offset(4) {
-				c::ELFCLASS32 => {
-					let hdr = hdr as *const c::Elf32_Ehdr;
-					Ok((*hdr).e_ehsize as usize)
-				}
-				c::ELFCLASS64 => {
-					let hdr = hdr as *const c::Elf64_Ehdr;
-					Ok((*hdr).e_ehsize as usize)
-				}
-				_ => Err(io::Error::new(
-					io::ErrorKind::InvalidData,
-					"invalid ELF file",
-				)),
+		let magic_len: usize = if cfg!(windows) { 2 } else { 4 };
+		let magic: &[u8] = std::slice::from_raw_parts(hdr.cast(), magic_len);
+		match magic {
+			MH_MAGIC => {
+				let hdr = hdr as *const c::mach_header;
+				Ok(mem::size_of::<c::mach_header>() + (*hdr).sizeofcmds as usize)
 			}
+			MH_MAGIC_64 => {
+				let hdr = hdr as *const c::mach_header_64;
+				Ok(mem::size_of::<c::mach_header_64>() + (*hdr).sizeofcmds as usize)
+			}
+			ELF_MAGIC => {
+				let data: *const u8 = hdr as *const u8;
+				match *data.offset(4) {
+					c::ELFCLASS32 => {
+						let hdr = hdr as *const c::Elf32_Ehdr;
+						Ok((*hdr).e_ehsize as usize)
+					}
+					c::ELFCLASS64 => {
+						let hdr = hdr as *const c::Elf64_Ehdr;
+						Ok((*hdr).e_ehsize as usize)
+					}
+					_ => Err(io::Error::new(
+						io::ErrorKind::InvalidData,
+						"invalid ELF file",
+					)),
+				}
+			}
+			_ => Err(io::Error::other("unknown header detected")),
 		}
-		_ => Err(io::Error::other("unknown header detected")),
 	}
 }
 
 pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
-	#[cfg(not(target_os = "aix"))]
-	{
-		let mut result = Err(io::Error::new(
-			io::ErrorKind::NotFound,
-			"Header path not found",
-		));
-		let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
-		if c::dladdr(hdr as *const _, info.as_mut_ptr()) != 0 {
-			let info = info.assume_init();
-			let path = ffi::CStr::from_ptr(info.dli_fname);
-			let path = ffi::OsStr::from_bytes(path.to_bytes());
-			result = Ok(path.into());
-		} else {
-			let this = InnerLibrary::this()?;
-			if this.to_ptr() == hdr {
-				result = std::env::current_exe();
+	unsafe {
+		#[cfg(not(target_os = "aix"))]
+		{
+			let mut result = Err(io::Error::new(
+				io::ErrorKind::NotFound,
+				"Header path not found",
+			));
+			let mut info = mem::MaybeUninit::<c::Dl_info>::zeroed();
+			if c::dladdr(hdr as *const _, info.as_mut_ptr()) != 0 {
+				let info = info.assume_init();
+				let path = ffi::CStr::from_ptr(info.dli_fname);
+				let path = ffi::OsStr::from_bytes(path.to_bytes());
+				result = Ok(path.into());
+			} else {
+				let this = InnerLibrary::this()?;
+				if this.to_ptr() == hdr {
+					result = std::env::current_exe();
+				}
 			}
+			result
 		}
-		result
-	}
-	#[cfg(target_os = "aix")]
-	{
-		Err(io::Error::new(
-			io::ErrorKind::Unsupported,
-			"path retrieval is unsupported on AIX",
-		))
+		#[cfg(target_os = "aix")]
+		{
+			Err(io::Error::new(
+				io::ErrorKind::Unsupported,
+				"path retrieval is unsupported on AIX",
+			))
+		}
 	}
 }
