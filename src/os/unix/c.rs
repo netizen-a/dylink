@@ -169,7 +169,7 @@ unsafe extern "C" {
 }
 
 #[cfg(target_os = "macos")]
-extern "C" {
+unsafe extern "C" {
 	pub fn _dyld_get_image_name(image_index: u32) -> *const ffi::c_char;
 	pub fn _dyld_register_func_for_add_image(func: PfnImageCallback);
 	pub fn _dyld_register_func_for_remove_image(func: PfnImageCallback);
