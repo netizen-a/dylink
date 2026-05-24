@@ -1,8 +1,11 @@
+# SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+# SPDX-License-Identifier: MIT OR Apache-2.0
+
 [package]
 name = "dylink_macro"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["Jonathan Thomason"]
-edition = "2021"
+edition = "2024"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["ffi", "macro", "macros", "attribute"]
@@ -19,7 +22,6 @@ proc-macro2 = "1.0"
 [dependencies.quote]
 version="1.0"
 default-features=false
-
 
 [dependencies.syn]
 version = "2.0"

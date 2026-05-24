@@ -1,12 +1,17 @@
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
-//! Dylink provides a run-time dynamic linking framework for loading dynamic libraries.
+//! Dylink provides run-time loading utilities for loading dynamic libraries.
 //! You can load libraries directly through [`Library`], which enables diverse error handling,
-//! or you can load libraries indirectly through [`LibLock`](crate::sync::LibLock) and `dylink`.
+//! or you can load libraries indirectly through [`LibLock`] and [`dylink`].
 //!
 //! # Platform support
-//! Platform support typically varies between functions, however unless otherwise specified, functions
+//! Complete platform support may vary between functions, however unless otherwise specified, functions
 //! are supported on Windows, Linux, and MacOS.
+//!
+//! [`LibLock`]: crate::sync::LibLock
 
 mod sealed;
 
@@ -25,15 +30,18 @@ pub use weak::Weak;
 mod sym;
 pub use sym::Symbol;
 
-use std::{io, path};
+use std::{
+	ffi,
+	io,
+	path,
+};
 
+#[cfg(feature = "dylink_macro")]
 pub use dylink_macro::dylink;
 
 #[doc = include_str!("../README.md")]
 #[cfg(all(doctest, windows))]
 struct ReadmeDoctests;
-
-
 
 /// An object providing access to an open dynamic library.
 ///
@@ -46,7 +54,7 @@ struct ReadmeDoctests;
 /// optional entry point may be executed for each library, which may impose arbitrary requirements on the
 /// user for the access to the library to be sound.
 #[derive(Debug)]
-#[repr(transparent)]
+#[cfg_attr(not(doc), repr(transparent))]
 pub struct Library(imp::InnerLibrary);
 unsafe impl Send for Library {}
 unsafe impl Sync for Library {}
@@ -99,7 +107,31 @@ impl Library {
 			.expect("failed to acquire library process handle")
 	}
 
-	/// Retrieves a symbol from the library if it exists
+	/// Consumes and leaks the `Library`, returning a raw handle to the library.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// # mod libc {
+	/// #     use std::ffi::{c_void, c_char};
+	/// #     pub unsafe extern "C" fn dlsym(_: *mut c_void,_: *const c_char){}
+	/// # }
+	/// # fn main() -> std::io::Result<()> {
+	/// let lib = dylink::Library::open("foo.so")?;
+	/// let handle = lib.leak();
+	/// unsafe {
+	///     libc::dlsym(handle, c"bar".as_ptr());
+	/// }
+	/// # Ok(())
+	/// # }
+	/// ```
+	#[inline]
+	pub fn leak(self) -> *mut ffi::c_void {
+		self.0.0.as_ptr()
+	}
+
+	/// Retrieves a symbol from the library if it exists. The symbol must not be used past
+	/// the lifetime of the library or the symbol will be invalid.
 	///
 	/// # Errors
 	///
@@ -108,8 +140,7 @@ impl Library {
 	/// # Examples
 	///
 	/// ```no_run
-	/// # #[repr(transparent)]
-	/// # struct Display(*const ffi::c_void);
+	/// # type Display = ffi::c_void;
 	/// use std::{mem, ffi};
 	/// use dylink::Library;
 	///
@@ -127,8 +158,6 @@ impl Library {
 
 	/// Retrieves a symbol from the library if it exists. The difference from [`symbol`] is that this function accepts a raw c-string, which is
 	/// useful to avoid redundant string cloning.
-	///
-	/// *note: On unix `NULL` may be a valid value, so it is recommended to use [`symbol`] if validity cannot be guarenteed.*
 	///
 	/// [`symbol`]: Library::symbol
 	///
@@ -189,6 +218,10 @@ impl Library {
 			base_addr,
 			path_name: base_addr.path().ok(),
 		})
+	}
+
+	pub fn close(self) {
+		self.0.close()
 	}
 }
 

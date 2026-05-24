@@ -1,12 +1,22 @@
-use std::os::windows::ffi::{OsStrExt, OsStringExt};
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
 
 use std::os::windows::prelude::*;
 use std::path::PathBuf;
-use std::{ffi, io, mem, path, ptr};
+use std::{
+	ffi,
+	io,
+	mem,
+	path,
+	ptr,
+};
 
 use crate::img;
 use crate::weak;
-use crate::{Library, Symbol};
+use crate::{
+	Library,
+	Symbol,
+};
 
 mod c;
 
@@ -16,7 +26,7 @@ fn to_wide(path: &ffi::OsStr) -> Vec<u16> {
 
 #[derive(Debug)]
 #[repr(transparent)]
-pub(crate) struct InnerLibrary(std::ptr::NonNull<ffi::c_void>);
+pub(crate) struct InnerLibrary(pub std::ptr::NonNull<ffi::c_void>);
 
 impl InnerLibrary {
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {
@@ -41,7 +51,10 @@ impl InnerLibrary {
 	}
 
 	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<*const Symbol> {
-		let c_str = ffi::CString::new(name).unwrap();
+		let c_str = match ffi::CString::new(name) {
+			Ok(s) => s,
+			Err(err) => return Err(io::Error::new(io::ErrorKind::InvalidData, err)),
+		};
 		let addr = self.raw_symbol(&c_str);
 		if addr.is_null() {
 			Err(io::Error::last_os_error())
@@ -107,10 +120,8 @@ impl InnerLibrary {
 	pub(crate) unsafe fn to_ptr(&self) -> *const img::Image {
 		self.0.as_ptr().cast()
 	}
-}
 
-impl Drop for InnerLibrary {
-	fn drop(&mut self) {
+	pub(crate) fn close(self) {
 		unsafe {
 			c::FreeLibrary(self.0.as_ptr());
 		}

@@ -1,25 +1,33 @@
-#![cfg_attr(feature = "warnings", feature(proc_macro_diagnostic))]
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
 
 mod attr_data;
 
 use proc_macro::TokenStream as TokenStream1;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::*;
-use syn::{parse::Parser, punctuated::Punctuated, spanned::Spanned, Expr, Token};
+use syn::{
+	Expr,
+	Token,
+	parse::Parser,
+	punctuated::Punctuated,
+	spanned::Spanned,
+};
 
 use attr_data::*;
 use syn::ForeignItem;
 
 /// Macro for generating shared symbol thunks procedurally.
 ///
-/// May currently be used in 2 patterns:
-/// * foreign modules
-/// * foreign functions
+/// # Safety
 ///
 /// Using an `unwind` friendly abi should be used whenever possible to
-/// prevent undefined behavior from occuring.
+/// prevent undefined behavior from occuring should the function panic.
 ///
 /// # Examples
+///
+/// May currently be used in foreign modules, and foreign functions.
+///
 ///```rust
 /// use dylink::*;
 /// static FOOBAR: sync::LibLock = sync::LibLock::new(&["foobar.dll"]);
@@ -69,7 +77,12 @@ pub fn dylink(args: TokenStream1, input: TokenStream1) -> TokenStream1 {
 			} else if let Ok(foreign_fn) = syn::parse2::<syn::ForeignItemFn>(input.into()) {
 				parse_fn::<false>(foreign_fn.sig.abi.as_ref(), &foreign_fn, &attr_data).into()
 			} else {
-				panic!("failed to parse");
+				syn::Error::new(
+					proc_macro2::Span::call_site(),
+					"expected a foreign function block (`extern { ... }`) or a foreign function declaration",
+				)
+				.to_compile_error()
+				.into()
 			}
 		}
 		Err(e) => syn::Error::into_compile_error(e).into(),
@@ -89,7 +102,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		Ok(ref path) => path,
 		Err(span) => {
 			return syn::Error::new(span, "`link_name` should be applied to a foreign function")
-				.to_compile_error()
+				.to_compile_error();
 		}
 	};
 	// constness makes no sense in this context
@@ -97,7 +110,7 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		None => (),
 		Some(kw) => {
 			return syn::Error::new(kw.span(), "`const` functions are unsupported")
-				.into_compile_error()
+				.into_compile_error();
 		}
 	}
 
@@ -108,16 +121,15 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		.collect();
 
 	// `self` can be used, but not inferred, so it's conditionally useful.
-	if let syn::ReturnType::Type(_, ret_type) = &fn_item.sig.output {
-		if let syn::Type::Path(syn::TypePath { path, .. }) = ret_type.as_ref() {
-			if path.is_ident("Self") {
-				return syn::Error::new(
-					path.span(),
-					"`Self` cannot be inferred. Try using an explicit type instead",
-				)
-				.to_compile_error();
-			}
-		}
+	if let syn::ReturnType::Type(_, ret_type) = &fn_item.sig.output
+		&& let syn::Type::Path(syn::TypePath { path, .. }) = ret_type.as_ref()
+		&& path.is_ident("Self")
+	{
+		return syn::Error::new(
+			path.span(),
+			"`Self` cannot be inferred. Try using an explicit type instead",
+		)
+		.to_compile_error();
 	}
 
 	let mut param_list = Vec::new();
@@ -127,14 +139,14 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 	for (i, arg) in fn_item.sig.inputs.iter().enumerate() {
 		match arg {
 			syn::FnArg::Typed(pat_type) => {
-				if let syn::Type::Path(syn::TypePath { path, .. }) = pat_type.ty.as_ref() {
-					if path.is_ident("Self") {
-						return syn::Error::new(
-							path.span(),
-							"`Self` cannot be inferred. Try using an explicit type instead",
-						)
-						.to_compile_error();
-					}
+				if let syn::Type::Path(syn::TypePath { path, .. }) = pat_type.ty.as_ref()
+					&& path.is_ident("Self")
+				{
+					return syn::Error::new(
+						path.span(),
+						"`Self` cannot be inferred. Try using an explicit type instead",
+					)
+					.to_compile_error();
 				}
 				let ty = pat_type.ty.to_token_stream();
 				let param_name = match pat_type.pat.as_ref() {
@@ -156,14 +168,14 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 					)
 					.into_compile_error();
 				} else {
-					if let syn::Type::Path(syn::TypePath { path, .. }) = rec.ty.as_ref() {
-						if path.is_ident("Self") {
-							return syn::Error::new(
-								path.span(),
-								"type of `self` cannot be inferred. Try using an explicit type instead",
-							)
-							.to_compile_error();
-						}
+					if let syn::Type::Path(syn::TypePath { path, .. }) = rec.ty.as_ref()
+						&& path.is_ident("Self")
+					{
+						return syn::Error::new(
+							path.span(),
+							"type of `self` cannot be inferred. Try using an explicit type instead",
+						)
+						.to_compile_error();
 					}
 					let ty = rec.ty.to_token_stream();
 					let param_name = format!("p{i}").parse::<TokenStream2>().unwrap();
@@ -197,11 +209,21 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		Some(token) => quote!(, #token),
 	};
 
-	// The Rust ABI can use this token.
-	let asyncness = match &fn_item.sig.asyncness {
-		None => TokenStream2::default(),
-		Some(token) => token.to_token_stream(),
-	};
+	if let Some(token) = &fn_item.sig.asyncness {
+		return syn::Error::new(
+			token.span(),
+			"functions in `extern` blocks cannot have qualifiers",
+		)
+		.into_compile_error();
+	}
+
+	if let Some(token) = &fn_item.sig.unsafety {
+		return syn::Error::new(
+			token.span(),
+			"functions in `extern` blocks cannot have qualifiers",
+		)
+		.into_compile_error();
+	}
 
 	// According to "The Rustonomicon" foreign functions are assumed unsafe,
 	// so functions are implicitly prepended with `unsafe`
@@ -209,21 +231,21 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 		#(#fn_attrs)*
 		#lint
 		#[inline]
-		#vis #asyncness unsafe #abi fn #generics #fn_name (#(#param_ty_list),* #variadic) #output {
+		#vis unsafe #abi fn #generics #fn_name (#(#param_ty_list),* #variadic) #output {
 			use ::std::sync::atomic::{AtomicPtr, Ordering};
 			static FUNC: AtomicPtr<::std::ffi::c_void> = AtomicPtr::new(
 				initializer as *mut _
 			);
 
-			#asyncness unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
+			unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
 				let symbol = ::dylink::sync::LibLock::symbol(&#library, #link_name)
 					.expect(&format!("Dylink Error: failed to load `{}`", stringify!(#fn_name)));
-				FUNC.store(symbol.cast_mut().cast(), Ordering::Relaxed);
+				FUNC.store(symbol.cast_mut().cast(), Ordering::Release);
 				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = ::std::mem::transmute(symbol);
 				pfn(#(#internal_param_list),*)
 			}
 
-			let symbol = FUNC.load(Ordering::Relaxed);
+			let symbol = FUNC.load(Ordering::Acquire);
 			::std::sync::atomic::compiler_fence(Ordering::Acquire);
 			let pfn : #abi fn (#(#internal_param_ty_list),*) #output = ::std::mem::transmute(symbol);
 			pfn(#(#param_list),*)

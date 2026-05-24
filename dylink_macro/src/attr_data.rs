@@ -1,6 +1,12 @@
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 use proc_macro2::Span;
 use syn::punctuated::Punctuated;
-use syn::{spanned::Spanned, *};
+use syn::{
+	spanned::Spanned,
+	*,
+};
 
 pub struct AttrData {
 	pub library: std::result::Result<syn::Path, Span>,
@@ -49,7 +55,7 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 								} else {
 									errors.push(Error::new(
 										assign.span(),
-										"linker is already defined",
+										"link_name is already defined",
 									));
 								}
 							}

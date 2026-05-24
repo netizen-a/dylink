@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 #![allow(non_camel_case_types)]
 
 use std::ffi;
@@ -49,7 +52,7 @@ pub const RTLD_NOLOAD: ffi::c_int = 0x4;
 pub const RTLD_DI_LINKMAP: ffi::c_int = 2;
 #[cfg(target_env = "gnu")]
 pub type ElfW_Addr = usize;
-#[cfg(target_env = "gnu")]
+#[cfg(target_pointer_width = "64")]
 pub type Elf64_Xword = u64;
 
 pub type ElfW_Half = u16;
@@ -101,7 +104,6 @@ pub struct Elf64_Ehdr {
 	pub e_shstrndx: ElfW_Half,
 }
 
-#[cfg(all(target_env = "gnu", target_pointer_width = "32"))]
 #[repr(C)]
 pub struct Elf32_Phdr {
 	pub p_type: ElfW_Word,
@@ -114,7 +116,7 @@ pub struct Elf32_Phdr {
 	pub p_align: ElfW_Word,
 }
 
-#[cfg(all(target_env = "gnu", target_pointer_width = "64"))]
+#[cfg(target_pointer_width = "64")]
 #[repr(C)]
 pub struct Elf64_Phdr {
 	pub p_type: ElfW_Word,
@@ -127,7 +129,7 @@ pub struct Elf64_Phdr {
 	pub p_align: Elf64_Xword,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(target_env = "gnu")]
 #[repr(C)]
 pub struct dl_phdr_info {
 	pub dlpi_addr: ElfW_Addr,
@@ -139,7 +141,7 @@ pub struct dl_phdr_info {
 	pub dlpi_phnum: ElfW_Half,
 }
 
-extern "C" {
+unsafe extern "C" {
 	pub fn dlopen(filename: *const ffi::c_char, flag: ffi::c_int) -> *mut ffi::c_void;
 	pub fn dlerror() -> *const ffi::c_char;
 	pub fn dlsym(handle: *mut ffi::c_void, symbol: *const ffi::c_char) -> *const ffi::c_void;
@@ -154,20 +156,20 @@ extern "C" {
 	) -> ffi::c_int;
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(target_env = "gnu")]
 pub type DlIteratePhdrCallback = unsafe extern "C" fn(
 	info: *mut dl_phdr_info,
 	size: usize,
 	data: *mut ffi::c_void,
 ) -> ffi::c_int;
 
-#[cfg(target_os = "linux")]
-extern "C" {
+#[cfg(target_env = "gnu")]
+unsafe extern "C" {
 	pub fn dl_iterate_phdr(callback: DlIteratePhdrCallback, data: *mut ffi::c_void) -> ffi::c_int;
 }
 
 #[cfg(target_os = "macos")]
-extern "C" {
+unsafe extern "C" {
 	pub fn _dyld_get_image_name(image_index: u32) -> *const ffi::c_char;
 	pub fn _dyld_register_func_for_add_image(func: PfnImageCallback);
 	pub fn _dyld_register_func_for_remove_image(func: PfnImageCallback);

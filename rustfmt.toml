@@ -1,4 +1,7 @@
-edition = "2021"
+# SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+# SPDX-License-Identifier: CC0-1.0
+
+edition = "2024"
 
 hard_tabs = true
 newline_style = "Unix"
@@ -6,22 +9,4 @@ reorder_imports = true
 reorder_modules = true
 use_small_heuristics = "Default"
 use_try_shorthand = true
-
-#condense_wildcard_suffixes = true
-#fn_single_line = true
-#format_code_in_doc_comments = true
-#format_strings = true
-#hex_literal_case = "Upper"
-#indent_style = "Block"
-#imports_granularity = "Crate"
-#normalize_comments = true
-#normalize_doc_attributes = true
-#overflow_delimited_expr = true
-#reorder_impl_items = true
-#group_imports = "StdExternalCrate"
-#space_after_colon = true
-#space_before_colon = false
-#struct_field_align_threshold = 50
-#enum_discrim_align_threshold = 30
-#unstable_features = true
-#where_single_line = false
+imports_layout = "Vertical"

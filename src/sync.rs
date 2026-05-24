@@ -1,6 +1,16 @@
-use std::{io, sync};
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
 
-use crate::{Library, Symbol};
+use std::{
+	ffi::CStr,
+	io,
+	sync,
+};
+
+use crate::{
+	Library,
+	Symbol,
+};
 
 /// An object providing access to a lazily loaded LibLock on the filesystem.
 ///
@@ -26,7 +36,8 @@ impl<'a> LibLock<'a> {
 	/// # Examples
 	///
 	/// ```rust
-	/// # use dylink::*;
+	/// use dylink::sync;
+	///
 	/// static KERNEL32: sync::LibLock = sync::LibLock::new(&["kernel32.dll"]);
 	/// ```
 	#[inline]
@@ -74,6 +85,48 @@ impl<'a> LibLock<'a> {
 		});
 		lib.symbol(name)
 	}
+
+	/// May block if another thread is currently attempting to initialize the cell. The difference
+	/// from [`symbol`] is that this function accepts a raw c-string, which is useful to avoid redundant string cloning.
+	///
+	/// This will lazily initialize the LibLock.
+	///
+	/// [`symbol`]: self::LibLock::symbol
+	///
+	/// # Errors
+	///
+	/// If [`LibLock`] failed to be initialized, then this call will return an error.
+	///
+	/// If the requested symbol does not exist in the dynamic library, then this call will return an error.
+	///
+	/// # Panics
+	///
+	/// Panics if library cannot be initialized
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use dylink::*;
+	/// use std::mem;
+	///
+	/// let kernel32 = sync::LibLock::new(&["foo.dll"]);
+	/// let sym = kernel32.symbol("my_symbol").unwrap();
+	/// let my_symbol: unsafe extern "C" fn() = unsafe {mem::transmute(sym)};
+	/// ```
+	pub fn raw_symbol(&self, name: &CStr) -> *const Symbol {
+		let lib = self.hlib.get_or_init(|| {
+			if self.libs.is_empty() {
+				Library::this()
+			} else {
+				self.libs
+					.iter()
+					.find_map(|path| Library::open(path).ok())
+					.unwrap()
+			}
+		});
+		lib.raw_symbol(name)
+	}
+
 	/// Gets the reference to the underlying value.
 	///
 	/// Returns `None` if the cell is empty, or being initialized. This

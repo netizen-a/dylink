@@ -1,6 +1,9 @@
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
+use crate::Library;
 use crate::img;
 use crate::os;
-use crate::Library;
 use std::path;
 use std::ptr;
 
@@ -18,6 +21,15 @@ pub struct Weak {
 	pub(crate) path_name: Option<path::PathBuf>,
 }
 impl crate::sealed::Sealed for Weak {}
+
+impl Default for Weak {
+	fn default() -> Self {
+		Self {
+			base_addr: ptr::null(),
+			path_name: None,
+		}
+	}
+}
 
 impl Weak {
 	/// Constructs a new `Weak`, without allocating any memory. Calling [`upgrade`] on the return value always gives [`None`].
@@ -76,7 +88,7 @@ impl Weak {
 	///
 	/// # Platform-specific Behavior
 	///
-	/// May return [`None`] on Linux if the image is the executable.
+	/// May return [`None`] on Linux if the image is the current program.
 	#[inline]
 	pub fn path(&self) -> Option<&path::Path> {
 		self.path_name.as_deref()

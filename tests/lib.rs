@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 mod linux;
 mod macos;
 mod unix;
@@ -5,14 +8,21 @@ mod windows;
 
 use dylink::*;
 
+#[cfg(feature = "unstable")]
+#[test]
+fn test_leak() {
+	let lib = Library::this();
+	let _handle = lib.leak();
+}
+
 #[test]
 fn test_size_exact() {
 	let images = img::Images::now().unwrap();
 	for weak in images {
-		let img = unsafe {&*weak.to_ptr()};
+		let img = unsafe { &*weak.to_ptr() };
 		let img_slice = img.to_bytes().unwrap();
 		let len = (*img_slice).len();
-		let _data = (*img_slice)[len -1];
+		let _data = (*img_slice)[len - 1];
 	}
 }
 

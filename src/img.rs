@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 use crate::os;
 use crate::weak;
 use std::io;
@@ -11,6 +14,11 @@ use os::unix as imp;
 use os::windows as imp;
 
 // This is an iterator and not a vector because the data should be assumed stale.
+/// An iterator over executable images.
+///
+/// # Safety
+///
+/// Images retrieved from this iterator should be assumed stale (possibly invalid or unloaded).
 #[derive(Debug, Clone)]
 pub struct Images {
 	inner: vec::IntoIter<weak::Weak>,
@@ -107,7 +115,7 @@ impl Image {
 		let len = unsafe { imp::hdr_size(self)? };
 		let data = self as *const Image as *const u8;
 		// this is safe because hdr_size checks if the slice is valid.
-		let slice = unsafe {std::slice::from_raw_parts::<u8>(data, len)};
+		let slice = unsafe { std::slice::from_raw_parts::<u8>(data, len) };
 		Ok(slice)
 	}
 }

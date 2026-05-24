@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com>
+// SPDX-License-Identifier: MIT OR Apache-2.0
+
 #![allow(clippy::upper_case_acronyms)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
@@ -7,8 +10,12 @@
 pub use std::os::windows::raw::HANDLE;
 use std::{
 	ffi,
-	marker::{PhantomData, PhantomPinned},
-	mem, ptr,
+	marker::{
+		PhantomData,
+		PhantomPinned,
+	},
+	mem,
+	ptr,
 };
 
 pub type HMODULE = HANDLE;
@@ -143,7 +150,7 @@ pub struct IMAGE_NT_HEADERS {
 	_optionalheader: IMAGE_OPTIONAL_HEADER,
 }
 
-extern "system" {
+unsafe extern "system" {
 	pub fn LoadLibraryExW(lplibfilename: PCWSTR, hfile: HANDLE, dwflags: u32) -> HMODULE;
 	pub fn GetModuleHandleExW(dwflags: u32, lpmodulename: PCWSTR, phmodule: *mut HMODULE) -> BOOL;
 	pub fn GetProcAddress(handle: HMODULE, symbol: PCSTR) -> *const ffi::c_void;

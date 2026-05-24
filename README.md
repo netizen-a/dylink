@@ -1,10 +1,13 @@
+<!-- SPDX-FileCopyrightText: 2022-2026 Jonathan A. Thomason <contact@jonathan-thomason.com> -->
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+
 # Dylink
 
 ![Crates.io](https://img.shields.io/crates/l/dylink) ![Crates.io](https://img.shields.io/crates/v/dylink) ![Crates.io](https://img.shields.io/crates/d/dylink) ![docs.rs](https://img.shields.io/docsrs/dylink) [![dylink-rs](https://github.com/Razordor/dylink/actions/workflows/rust.yml/badge.svg)](https://github.com/Razordor/dylink/actions/workflows/rust.yml)
 
 Dylink provides a run-time dynamic linking framework for loading dynamic libraries.
 
-This crate may be useful if the dynamic library you are loading is not always guarenteed
+This crate may be useful if the dynamic library you are loading is not always guaranteed
 to exist, which may enable you to provide fallbacks in your code.
 
 ----
@@ -33,7 +36,7 @@ Add this to your `Cargo.toml`
 
 ```toml
 [dependencies]
-dylink = "0.9"
+dylink = "0.11"
 ```
 
 ## Examples
@@ -87,9 +90,9 @@ unsafe {
 Licensed under either of
 
 * Apache License, Version 2.0
-   ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+   ([LICENSES/Apache-2.0.txt](LICENSES/Apache-2.0.txt) or <http://www.apache.org/licenses/LICENSE-2.0>)
 * MIT license
-   ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
+   ([LICENSES/MIT.txt](LICENSES/MIT.txt) or <http://opensource.org/licenses/MIT>)
 
 at your option.
 
