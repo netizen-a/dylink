@@ -52,7 +52,7 @@ pub const RTLD_NOLOAD: ffi::c_int = 0x4;
 pub const RTLD_DI_LINKMAP: ffi::c_int = 2;
 #[cfg(target_env = "gnu")]
 pub type ElfW_Addr = usize;
-#[cfg(target_env = "gnu")]
+#[cfg(target_pointer_width = "64")]
 pub type Elf64_Xword = u64;
 
 pub type ElfW_Half = u16;
@@ -156,14 +156,14 @@ unsafe extern "C" {
 	) -> ffi::c_int;
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(target_env = "gnu")]
 pub type DlIteratePhdrCallback = unsafe extern "C" fn(
 	info: *mut dl_phdr_info,
 	size: usize,
 	data: *mut ffi::c_void,
 ) -> ffi::c_int;
 
-#[cfg(target_os = "linux")]
+#[cfg(target_env = "gnu")]
 unsafe extern "C" {
 	pub fn dl_iterate_phdr(callback: DlIteratePhdrCallback, data: *mut ffi::c_void) -> ffi::c_int;
 }

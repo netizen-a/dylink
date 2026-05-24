@@ -173,15 +173,15 @@ impl InnerLibrary {
 		let mut result = ptr::null();
 		let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 			for image_index in (0..image_index).rev() {
-				let image_name = c::_dyld_get_image_name(image_index);
-				let filename = dlopen_fname(ffi::CStr::from_ptr(image_name));
+				let image_name = unsafe { c::_dyld_get_image_name(image_index) };
+				let filename = dlopen_fname(unsafe { ffi::CStr::from_ptr(image_name) });
 				let active_handle =
-					c::dlopen(filename, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD);
+					unsafe { c::dlopen(filename, c::RTLD_NOW | c::RTLD_LOCAL | c::RTLD_NOLOAD) };
 				if !active_handle.is_null() {
-					let _ = c::dlclose(active_handle);
+					let _ = unsafe { c::dlclose(active_handle) };
 				}
 				if (handle.as_ptr() as isize & (-4)) == (active_handle as isize & (-4)) {
-					result = c::_dyld_get_image_header(image_index) as *const img::Image;
+					result = unsafe { c::_dyld_get_image_header(image_index) } as *const img::Image;
 					break;
 				}
 			}
@@ -332,10 +332,10 @@ pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	let _ = get_image_count().fetch_update(Ordering::SeqCst, Ordering::SeqCst, |image_index| {
 		data.clear();
 		for image_index in 0..image_index {
-			let path = ffi::CStr::from_ptr(c::_dyld_get_image_name(image_index));
+			let path = unsafe { ffi::CStr::from_ptr(c::_dyld_get_image_name(image_index)) };
 			let path = ffi::OsStr::from_bytes(path.to_bytes());
 			let weak_ptr = weak::Weak {
-				base_addr: c::_dyld_get_image_header(image_index) as *const img::Image,
+				base_addr: unsafe { c::_dyld_get_image_header(image_index) } as *const img::Image,
 				path_name: Some(PathBuf::from(path)),
 			};
 			data.push(weak_ptr);
