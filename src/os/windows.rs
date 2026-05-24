@@ -122,9 +122,7 @@ impl InnerLibrary {
 	}
 
 	pub(crate) fn close(self) -> io::Result<()> {
-		let result = unsafe {
-			c::FreeLibrary(self.0.as_ptr());
-		};
+		let result = unsafe { c::FreeLibrary(self.0.as_ptr()) };
 		match result {
 			0 => Err(io::Error::last_os_error()),
 			_ => Ok(()),
