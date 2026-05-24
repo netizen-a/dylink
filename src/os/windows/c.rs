@@ -150,7 +150,7 @@ pub struct IMAGE_NT_HEADERS {
 	_optionalheader: IMAGE_OPTIONAL_HEADER,
 }
 
-extern "system" {
+unsafe extern "system" {
 	pub fn LoadLibraryExW(lplibfilename: PCWSTR, hfile: HANDLE, dwflags: u32) -> HMODULE;
 	pub fn GetModuleHandleExW(dwflags: u32, lpmodulename: PCWSTR, phmodule: *mut HMODULE) -> BOOL;
 	pub fn GetProcAddress(handle: HMODULE, symbol: PCSTR) -> *const ffi::c_void;
