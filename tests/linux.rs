@@ -62,3 +62,21 @@ fn test_path() {
 	let path = lib.to_image().unwrap().path();
 	assert!(path.is_ok())
 }
+
+/// Test that to_bytes returns the full image size, not just the ELF header size.
+#[test]
+fn to_bytes_returns_full_image_size() {
+	let lib = Library::open("libX11.so.6").expect("Should open libX11");
+	let image = lib.to_image().expect("Should get image from library");
+	let bytes = image.to_bytes().expect("Should get bytes from image");
+
+	let path = image.path().expect("Should get image path");
+	let metadata = std::fs::metadata(&path).expect("Should read file metadata");
+	let file_size = metadata.len() as usize;
+
+	assert!(
+		bytes.len() >= file_size,
+		"to_bytes returned {} bytes, expected at least {file_size} bytes (file size)",
+		bytes.len()
+	);
+}

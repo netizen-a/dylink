@@ -55,7 +55,7 @@ impl TryFrom<Punctuated<Expr, Token!(,)>> for AttrData {
 								} else {
 									errors.push(Error::new(
 										assign.span(),
-										"linker is already defined",
+										"link_name is already defined",
 									));
 								}
 							}

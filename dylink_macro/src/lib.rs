@@ -240,12 +240,12 @@ fn parse_fn<const IS_MOD_ITEM: bool>(
 			unsafe #abi fn initializer #generics (#(#internal_param_ty_list),* #variadic) #output {
 				let symbol = ::dylink::sync::LibLock::symbol(&#library, #link_name)
 					.expect(&format!("Dylink Error: failed to load `{}`", stringify!(#fn_name)));
-				FUNC.store(symbol.cast_mut().cast(), Ordering::Relaxed);
+				FUNC.store(symbol.cast_mut().cast(), Ordering::Release);
 				let pfn: #abi fn (#(#internal_param_ty_list),*) #output = ::std::mem::transmute(symbol);
 				pfn(#(#internal_param_list),*)
 			}
 
-			let symbol = FUNC.load(Ordering::Relaxed);
+			let symbol = FUNC.load(Ordering::Acquire);
 			::std::sync::atomic::compiler_fence(Ordering::Acquire);
 			let pfn : #abi fn (#(#internal_param_ty_list),*) #output = ::std::mem::transmute(symbol);
 			pfn(#(#param_list),*)

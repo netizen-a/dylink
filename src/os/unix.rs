@@ -64,10 +64,11 @@ unsafe fn c_dlerror() -> Option<ffi::CString> {
 fn dlopen_fname(fname: &ffi::CStr) -> *const ffi::c_char {
 	if let Ok(exe) = std::env::current_exe()
 		&& let Some(exe_str) = exe.as_os_str().to_str()
-			&& let Ok(fname_str) = fname.to_str()
-				&& fname_str == exe_str {
-					return std::ptr::null();
-				}
+		&& let Ok(fname_str) = fname.to_str()
+		&& fname_str == exe_str
+	{
+		return std::ptr::null();
+	}
 	fname.as_ptr()
 }
 
