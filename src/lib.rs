@@ -45,8 +45,6 @@ struct ReadmeDoctests;
 
 /// An object providing access to an open dynamic library.
 ///
-/// Errors detected on closing are ignored by the implementation of `Drop`.
-///
 /// # Safety
 ///
 /// Threads executed by a dynamic library must be terminated before the Library can be freed
@@ -220,7 +218,20 @@ impl Library {
 		})
 	}
 
-	pub fn close(self) {
+	/// Unloads the dynamic library from memory.
+	///
+	/// This decrements the library's reference count and unloads it when the
+	/// count reaches zero. The underlying platform function
+	/// ([`dlclose`] on Unix, [`FreeLibrary`] on Windows) is called
+	///
+	/// # Safety
+	///
+	/// All threads executed by this library must be terminated before calling
+	/// this method, otherwise undefined behavior may occur.
+	///
+	/// [`dlclose`]: https://man7.org/linux/man-pages/man3/dlclose.3.html
+	/// [`FreeLibrary`]: https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-freelibrary
+	pub fn close(self) -> io::Result<()> {
 		self.0.close()
 	}
 }
