@@ -132,7 +132,7 @@ impl InnerLibrary {
 			if this.0 == self.0 {
 				Ok(this)
 			} else {
-				this.close();
+				this.close()?;
 				let Some(hdr) = self.to_ptr().as_ref() else {
 					return Err(io::Error::new(io::ErrorKind::NotFound, "header not found"));
 				};
@@ -202,8 +202,11 @@ impl InnerLibrary {
 			}
 		}
 	}
-	pub(crate) fn close(self) {
-		unsafe { c::dlclose(self.0.as_ptr()) };
+	pub(crate) fn close(self) -> io::Result<()> {
+		match unsafe { c::dlclose(self.0.as_ptr()) } {
+			0 => Ok(()),
+			_ => Err(io::Error::last_os_error()),
+		}
 	}
 }
 
