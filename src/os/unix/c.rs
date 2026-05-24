@@ -104,7 +104,6 @@ pub struct Elf64_Ehdr {
 	pub e_shstrndx: ElfW_Half,
 }
 
-#[cfg(all(target_env = "gnu", target_pointer_width = "32"))]
 #[repr(C)]
 pub struct Elf32_Phdr {
 	pub p_type: ElfW_Word,
@@ -117,7 +116,7 @@ pub struct Elf32_Phdr {
 	pub p_align: ElfW_Word,
 }
 
-#[cfg(all(target_env = "gnu", target_pointer_width = "64"))]
+#[cfg(target_pointer_width = "64")]
 #[repr(C)]
 pub struct Elf64_Phdr {
 	pub p_type: ElfW_Word,
@@ -130,7 +129,7 @@ pub struct Elf64_Phdr {
 	pub p_align: Elf64_Xword,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(target_env = "gnu")]
 #[repr(C)]
 pub struct dl_phdr_info {
 	pub dlpi_addr: ElfW_Addr,

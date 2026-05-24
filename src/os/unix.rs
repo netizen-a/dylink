@@ -363,20 +363,65 @@ pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
 				Ok(mem::size_of::<c::mach_header_64>() + (*hdr).sizeofcmds as usize)
 			}
 			ELF_MAGIC => {
+				// Check ELF class byte at offset 4 (e_ident[4])
 				let data: *const u8 = hdr as *const u8;
+				let mut min_vaddr = usize::MAX;
+				let mut max_end = 0usize;
 				match *data.offset(4) {
 					c::ELFCLASS32 => {
-						let hdr = hdr as *const c::Elf32_Ehdr;
-						Ok((*hdr).e_ehsize as usize)
+						let ehdr = hdr as *const c::Elf32_Ehdr;
+						let e_phoff = (*ehdr).e_phoff as usize;
+						let e_phnum = (*ehdr).e_phnum as usize;
+						let phdr_ptr = (hdr as *const u8).add(e_phoff) as *const c::Elf32_Phdr;
+						for i in 0..e_phnum {
+							let ph = &(*phdr_ptr.add(i));
+							if ph.p_type == 1 {
+								// PT_LOAD
+								let vaddr = ph.p_vaddr as usize;
+								let end = vaddr.wrapping_add(ph.p_filesz as usize);
+								if vaddr < min_vaddr {
+									min_vaddr = vaddr;
+								}
+								if end > max_end {
+									max_end = end;
+								}
+							}
+						}
 					}
 					c::ELFCLASS64 => {
-						let hdr = hdr as *const c::Elf64_Ehdr;
-						Ok((*hdr).e_ehsize as usize)
+						let ehdr = hdr as *const c::Elf64_Ehdr;
+						let e_phoff = (*ehdr).e_phoff as usize;
+						let e_phnum = (*ehdr).e_phnum as usize;
+						let phdr_ptr = (hdr as *const u8).add(e_phoff) as *const c::Elf64_Phdr;
+						for i in 0..e_phnum {
+							let ph = &(*phdr_ptr.add(i));
+							if ph.p_type == 1 {
+								// PT_LOAD
+								let vaddr = ph.p_vaddr as usize;
+								let end = vaddr.wrapping_add(ph.p_filesz as usize);
+								if vaddr < min_vaddr {
+									min_vaddr = vaddr;
+								}
+								if end > max_end {
+									max_end = end;
+								}
+							}
+						}
 					}
-					_ => Err(io::Error::new(
+					_ => {
+						return Err(io::Error::new(
+							io::ErrorKind::InvalidData,
+							"invalid ELF file",
+						));
+					}
+				}
+				if min_vaddr != usize::MAX && max_end > min_vaddr {
+					Ok(max_end - min_vaddr)
+				} else {
+					Err(io::Error::new(
 						io::ErrorKind::InvalidData,
-						"invalid ELF file",
-					)),
+						"no PT_LOAD segments found",
+					))
 				}
 			}
 			_ => Err(io::Error::other("unknown header detected")),
