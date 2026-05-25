@@ -8,7 +8,6 @@ mod windows;
 
 use dylink::*;
 
-#[cfg(feature = "unstable")]
 #[test]
 fn test_leak() {
 	let lib = Library::this();
@@ -34,10 +33,10 @@ fn test_try_clone() {
 	let other_data = other.to_image().unwrap().to_bytes().unwrap();
 	assert_eq!(lib_data, other_data);
 	let t = std::thread::spawn(move || {
-		println!("other: {:?}", other);
+		println!("other: {other:?}");
 	});
 	t.join().unwrap();
-	println!("lib: {:?}", lib);
+	println!("lib: {lib:?}");
 }
 
 #[test]

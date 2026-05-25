@@ -176,6 +176,6 @@ fn to_bytes_returns_full_image_size() {
 				path.display()
 			);
 		}
-		lib.close();
+		let _ = lib.close();
 	}
 }
