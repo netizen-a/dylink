@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::img;
-use crate::sealed::Sealed;
 use std::marker;
 
 #[cfg(unix)]
@@ -15,7 +14,7 @@ pub struct Symbol {
 	_data: [u8; 0],
 	_marker: marker::PhantomData<(*mut u8, marker::PhantomPinned)>,
 }
-impl Sealed for Symbol {}
+impl crate::sealed::Sealed for Symbol {}
 
 impl Symbol {
 	/// Attempts to get the base address of the library.
