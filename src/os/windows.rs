@@ -48,16 +48,16 @@ impl InnerLibrary {
 	}
 
 	#[inline]
-	pub unsafe fn raw_symbol(&self, name: &ffi::CStr) -> *const Symbol {
+	pub fn raw_symbol(&self, name: &ffi::CStr) -> *const Symbol {
 		unsafe { c::GetProcAddress(self.0.as_ptr(), name.as_ptr()).cast() }
 	}
 
-	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<*const Symbol> {
+	pub fn symbol<'a>(&self, name: &str) -> io::Result<*const Symbol> {
 		let c_str = match ffi::CString::new(name) {
 			Ok(s) => s,
 			Err(err) => return Err(io::Error::new(io::ErrorKind::InvalidData, err)),
 		};
-		let addr = unsafe { self.raw_symbol(&c_str) };
+		let addr = self.raw_symbol(&c_str);
 		if addr.is_null() {
 			Err(io::Error::last_os_error())
 		} else {

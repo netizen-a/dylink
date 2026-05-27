@@ -151,18 +151,13 @@ impl Library {
 	#[doc(alias = "dlsym")]
 	#[inline]
 	pub fn symbol(&self, name: &str) -> io::Result<*const Symbol> {
-		unsafe { self.0.symbol(name) }
+		self.0.symbol(name)
 	}
 
-	/// Retrieves a symbol from the library if it exists. The difference from [`symbol`] is that this function accepts a raw c-string, which is
-	/// useful to avoid redundant string cloning.
-	///
-	/// [`symbol`]: Library::symbol
-	///
 	#[doc(alias = "dlsym")]
 	#[inline]
 	pub fn raw_symbol(&self, name: &std::ffi::CStr) -> *const Symbol {
-		unsafe { self.0.raw_symbol(name) }
+		self.0.raw_symbol(name)
 	}
 
 	/// Creates a new `Library` instance that shares the same underlying library handle as the

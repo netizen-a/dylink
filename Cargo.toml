@@ -3,7 +3,7 @@
 
 [package]
 name = "dylink"
-version = "0.14.0"
+version = "0.14.1"
 edition = "2024"
 authors = ["Jonathan Thomason"]
 license = "MIT OR Apache-2.0"

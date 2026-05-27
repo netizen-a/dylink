@@ -99,18 +99,17 @@ impl InnerLibrary {
 	}
 
 	#[inline]
-	pub unsafe fn raw_symbol(&self, name: &ffi::CStr) -> *const Symbol {
+	pub fn raw_symbol(&self, name: &ffi::CStr) -> *const Symbol {
 		unsafe { c::dlsym(self.0.as_ptr(), name.as_ptr()).cast() }
 	}
 
-	pub unsafe fn symbol(&self, name: &str) -> io::Result<*const Symbol> {
+	pub fn symbol(&self, name: &str) -> io::Result<*const Symbol> {
 		let _lock = dylib_guard();
+		let c_str = match ffi::CString::new(name) {
+			Ok(s) => s,
+			Err(err) => return Err(io::Error::new(io::ErrorKind::InvalidData, err)),
+		};
 		unsafe {
-			let c_str = match ffi::CString::new(name) {
-				Ok(s) => s,
-				Err(err) => return Err(io::Error::new(io::ErrorKind::InvalidData, err)),
-			};
-
 			let _ = c_dlerror(); // clear existing errors
 			let handle = self.raw_symbol(&c_str).cast_mut();
 

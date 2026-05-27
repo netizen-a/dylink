@@ -86,33 +86,6 @@ impl<'a> LibLock<'a> {
 		lib.symbol(name)
 	}
 
-	/// May block if another thread is currently attempting to initialize the cell. The difference
-	/// from [`symbol`] is that this function accepts a raw c-string, which is useful to avoid redundant string cloning.
-	///
-	/// This will lazily initialize the LibLock.
-	///
-	/// [`symbol`]: self::LibLock::symbol
-	///
-	/// # Errors
-	///
-	/// If [`LibLock`] failed to be initialized, then this call will return an error.
-	///
-	/// If the requested symbol does not exist in the dynamic library, then this call will return an error.
-	///
-	/// # Panics
-	///
-	/// Panics if library cannot be initialized
-	///
-	/// # Examples
-	///
-	/// ```no_run
-	/// use dylink::*;
-	/// use std::mem;
-	///
-	/// let kernel32 = sync::LibLock::new(&["foo.dll"]);
-	/// let sym = kernel32.symbol("my_symbol").unwrap();
-	/// let my_symbol: unsafe extern "C" fn() = unsafe {mem::transmute(sym)};
-	/// ```
 	pub fn raw_symbol(&self, name: &CStr) -> *const Symbol {
 		let lib = self.hlib.get_or_init(|| {
 			if self.libs.is_empty() {
