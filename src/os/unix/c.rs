@@ -46,7 +46,7 @@ pub struct Dl_info {
 
 pub const RTLD_LOCAL: ffi::c_int = 0;
 pub const RTLD_NOW: ffi::c_int = 0x2;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_env = "gnu"))]
 pub const RTLD_NOLOAD: ffi::c_int = 0x4;
 #[cfg(target_env = "gnu")]
 pub const RTLD_DI_LINKMAP: ffi::c_int = 2;
