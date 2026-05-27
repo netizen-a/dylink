@@ -77,11 +77,12 @@ fn dlopen_fname(fname: &ffi::CStr) -> *const ffi::c_char {
 pub(crate) struct InnerLibrary(pub ptr::NonNull<ffi::c_void>);
 
 impl InnerLibrary {
-	unsafe fn open_with_flags(path: &ffi::OsStr, flag: ffi::c_int) -> io::Result<Self> {
+	unsafe fn open_with_flags(path: Option<&ffi::OsStr>, flag: ffi::c_int) -> io::Result<Self> {
+		let _lock = dylib_guard();
 		unsafe {
-			let _lock = dylib_guard();
-			let c_str = ffi::CString::new(path.as_bytes())?;
-			let handle: *mut ffi::c_void = c::dlopen(c_str.as_ptr(), flag);
+			let c_str = path.map(|p| ffi::CString::new(p.as_bytes())).transpose()?;
+			let path_ptr = c_str.as_ref().map_or(ptr::null(), |s| s.as_ptr());
+			let handle = c::dlopen(path_ptr, flag);
 			if let Some(ret) = ptr::NonNull::new(handle) {
 				Ok(Self(ret))
 			} else {
@@ -91,21 +92,10 @@ impl InnerLibrary {
 		}
 	}
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {
-		unsafe {
-			Self::open_with_flags(path, c::RTLD_NOW | c::RTLD_LOCAL)
-		}
+		unsafe { Self::open_with_flags(Some(path), c::RTLD_NOW | c::RTLD_LOCAL) }
 	}
 	pub unsafe fn this() -> io::Result<Self> {
-		unsafe {
-			let _lock = dylib_guard();
-			let handle: *mut ffi::c_void = c::dlopen(ptr::null(), c::RTLD_NOW | c::RTLD_LOCAL);
-			if let Some(ret) = ptr::NonNull::new(handle) {
-				Ok(Self(ret))
-			} else {
-				let err = c_dlerror().unwrap();
-				Err(io::Error::other(err.to_string_lossy()))
-			}
-		}
+		unsafe { Self::open_with_flags(None, c::RTLD_NOW | c::RTLD_LOCAL) }
 	}
 
 	#[inline]
@@ -114,8 +104,8 @@ impl InnerLibrary {
 	}
 
 	pub unsafe fn symbol(&self, name: &str) -> io::Result<*const Symbol> {
+		let _lock = dylib_guard();
 		unsafe {
-			let _lock = dylib_guard();
 			let c_str = match ffi::CString::new(name) {
 				Ok(s) => s,
 				Err(err) => return Err(io::Error::new(io::ErrorKind::InvalidData, err)),
@@ -146,7 +136,7 @@ impl InnerLibrary {
 				#[cfg(not(any(target_os = "macos", target_env = "gnu")))]
 				const FLAGS: ffi::c_int = c::RTLD_NOW | c::RTLD_LOCAL;
 				let path = hdr.path()?;
-				Self::open_with_flags(path.as_os_str(), FLAGS)
+				Self::open_with_flags(Some(path.as_os_str()), FLAGS)
 			}
 		}
 	}
