@@ -48,12 +48,14 @@ fn test_sym_img() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let sym = lib.symbol("SetLastError").unwrap();
 	let base = Symbol::image(sym);
-	assert!(base.is_some())
+	assert!(base.is_some());
+	lib.close().unwrap();
 }
 
 #[test]
 fn test_path() {
 	let lib = Library::open("Kernel32.dll").unwrap();
 	let path = lib.to_image().unwrap().path();
-	assert!(path.is_ok())
+	assert!(path.is_ok());
+	lib.close().unwrap();
 }
