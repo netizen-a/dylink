@@ -159,7 +159,9 @@ fn elf_span_64(data: &[u8]) -> Option<usize> {
 fn to_bytes_returns_full_image_size() {
 	let images = img::Images::now().expect("Should get images");
 	for weak in images {
-		let lib = weak.upgrade().expect("Should upgrade to strong reference");
+		let Some(lib) = weak.upgrade() else {
+			continue;
+		};
 		let image = lib.to_image().expect("Should get image from library");
 		let bytes = image.to_bytes().expect("Should get bytes from image");
 

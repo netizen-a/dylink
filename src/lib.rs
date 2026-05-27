@@ -36,7 +36,7 @@ use std::{
 	path,
 };
 
-#[cfg(feature = "derive")]
+#[cfg(feature = "macro")]
 pub use dylink_macro::dylink;
 
 #[doc = include_str!("../README.md")]
