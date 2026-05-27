@@ -53,14 +53,16 @@ fn test_sym_hdr() {
 	let lib = Library::open("libX11.so.6").unwrap();
 	let sym = lib.symbol("XOpenDisplay").unwrap();
 	let base = Symbol::image(sym);
-	assert!(base.is_some())
+	assert!(base.is_some());
+	lib.close().unwrap();
 }
 
 #[test]
 fn test_path() {
 	let lib = Library::open("libX11.so.6").unwrap();
 	let path = lib.to_image().unwrap().path();
-	assert!(path.is_ok())
+	assert!(path.is_ok());
+	lib.close().unwrap();
 }
 
 /// Computes the byte span of an ELF file by finding the maximum offset+size
@@ -176,6 +178,6 @@ fn to_bytes_returns_full_image_size() {
 				path.display()
 			);
 		}
-		lib.close();
+		let _ = lib.close();
 	}
 }

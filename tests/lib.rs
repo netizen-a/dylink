@@ -8,7 +8,6 @@ mod windows;
 
 use dylink::*;
 
-#[cfg(feature = "unstable")]
 #[test]
 fn test_leak() {
 	let lib = Library::this();
@@ -34,10 +33,10 @@ fn test_try_clone() {
 	let other_data = other.to_image().unwrap().to_bytes().unwrap();
 	assert_eq!(lib_data, other_data);
 	let t = std::thread::spawn(move || {
-		println!("other: {:?}", other);
+		println!("other: {other:?}");
 	});
 	t.join().unwrap();
-	println!("lib: {:?}", lib);
+	println!("lib: {lib:?}");
 }
 
 #[test]
@@ -81,11 +80,27 @@ fn test_path_soundness() {
 			}
 		}
 		for lib in other_vlib.drain(0..) {
-			let _ = lib.try_clone().unwrap();
+			let cloned = lib.try_clone().unwrap();
+			let original_img = lib.to_image().unwrap().to_bytes().unwrap();
+			let cloned_img = cloned.to_image().unwrap().to_bytes().unwrap();
+			assert_eq!(
+				original_img, cloned_img,
+				"Cloned library image data mismatch"
+			);
+			lib.close().unwrap();
+			cloned.close().unwrap();
 		}
 	});
 	for lib in vlib.drain(0..) {
-		let _ = lib.try_clone().unwrap();
+		let cloned = lib.try_clone().unwrap();
+		let original_img = lib.to_image().unwrap().to_bytes().unwrap();
+		let cloned_img = cloned.to_image().unwrap().to_bytes().unwrap();
+		assert_eq!(
+			original_img, cloned_img,
+			"Cloned library image data mismatch"
+		);
+		lib.close().unwrap();
+		cloned.close().unwrap();
 	}
 	t.join().unwrap();
 }

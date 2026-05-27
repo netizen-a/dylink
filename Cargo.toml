@@ -3,7 +3,7 @@
 
 [package]
 name = "dylink"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2024"
 authors = ["Jonathan Thomason"]
 license = "MIT OR Apache-2.0"
@@ -26,7 +26,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
 
 [features]
-default = ["dylink_macro"]
-# features still being tested. marked items must not be relied upon between versions.
-unstable = []
-dylink_macro = ["dep:dylink_macro"]
+derive = ["dep:dylink_macro"]
+
+[dev-dependencies]
+dylink = { path = ".", features = ["derive"] }

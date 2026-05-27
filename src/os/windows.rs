@@ -31,7 +31,7 @@ pub(crate) struct InnerLibrary(pub std::ptr::NonNull<ffi::c_void>);
 impl InnerLibrary {
 	pub unsafe fn open(path: &ffi::OsStr) -> io::Result<Self> {
 		let wide_str: Vec<u16> = to_wide(path);
-		let handle = c::LoadLibraryExW(wide_str.as_ptr(), ptr::null_mut(), 0);
+		let handle = unsafe { c::LoadLibraryExW(wide_str.as_ptr(), ptr::null_mut(), 0) };
 		ptr::NonNull::new(handle)
 			.ok_or_else(io::Error::last_os_error)
 			.map(Self)
@@ -39,7 +39,9 @@ impl InnerLibrary {
 
 	pub unsafe fn this() -> io::Result<Self> {
 		let mut handle: *mut ffi::c_void = ptr::null_mut();
-		c::GetModuleHandleExW(0, ptr::null(), &mut handle);
+		unsafe {
+			c::GetModuleHandleExW(0, ptr::null(), &mut handle);
+		}
 		ptr::NonNull::new(handle)
 			.ok_or_else(io::Error::last_os_error)
 			.map(Self)
@@ -47,7 +49,7 @@ impl InnerLibrary {
 
 	#[inline]
 	pub unsafe fn raw_symbol(&self, name: &ffi::CStr) -> *const Symbol {
-		c::GetProcAddress(self.0.as_ptr(), name.as_ptr()).cast()
+		unsafe { c::GetProcAddress(self.0.as_ptr(), name.as_ptr()).cast() }
 	}
 
 	pub unsafe fn symbol<'a>(&self, name: &str) -> io::Result<*const Symbol> {
@@ -55,7 +57,7 @@ impl InnerLibrary {
 			Ok(s) => s,
 			Err(err) => return Err(io::Error::new(io::ErrorKind::InvalidData, err)),
 		};
-		let addr = self.raw_symbol(&c_str);
+		let addr = unsafe { self.raw_symbol(&c_str) };
 		if addr.is_null() {
 			Err(io::Error::last_os_error())
 		} else {
@@ -68,41 +70,45 @@ impl InnerLibrary {
 		const ERROR_INSUFFICIENT_BUFFER: i32 = 0x7A;
 
 		let mut file_name = vec![0u16; MAX_PATH];
-		loop {
-			let _ = c::GetModuleFileNameW(
-				self.0.as_ptr(),
-				file_name.as_mut_ptr(),
-				file_name.len() as c::DWORD,
-			);
-			let last_error = io::Error::last_os_error();
-			match last_error.raw_os_error().unwrap_unchecked() {
-				0 => {
-					// The function succeeded.
-					// Truncate the vector to remove unused zero bytes.
-					if let Some(new_len) = file_name.iter().rposition(|&a| a != 0) {
-						file_name.truncate(new_len + 1)
+		unsafe {
+			loop {
+				let _ = c::GetModuleFileNameW(
+					self.0.as_ptr(),
+					file_name.as_mut_ptr(),
+					file_name.len() as c::DWORD,
+				);
+				let last_error = io::Error::last_os_error();
+				match last_error.raw_os_error().unwrap_unchecked() {
+					0 => {
+						// The function succeeded.
+						// Truncate the vector to remove unused zero bytes.
+						if let Some(new_len) = file_name.iter().rposition(|&a| a != 0) {
+							file_name.truncate(new_len + 1)
+						}
+						let os_str = ffi::OsString::from_wide(&file_name);
+						break Ok(os_str.into());
 					}
-					let os_str = ffi::OsString::from_wide(&file_name);
-					break Ok(os_str.into());
-				}
-				ERROR_INSUFFICIENT_BUFFER => {
-					// The buffer is too small; double its size.
-					file_name.resize(file_name.len() * 2, 0)
-				}
-				_ => {
-					// An unexpected error occurred; return an error.
-					return Err(last_error);
+					ERROR_INSUFFICIENT_BUFFER => {
+						// The buffer is too small; double its size.
+						file_name.resize(file_name.len() * 2, 0)
+					}
+					_ => {
+						// An unexpected error occurred; return an error.
+						return Err(last_error);
+					}
 				}
 			}
 		}
 	}
 	pub(crate) unsafe fn try_clone(&self) -> io::Result<Self> {
 		let mut new_handle = ptr::null_mut();
-		let _ = c::GetModuleHandleExW(
-			c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-			self.0.as_ptr().cast(),
-			&mut new_handle,
-		);
+		unsafe {
+			let _ = c::GetModuleHandleExW(
+				c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+				self.0.as_ptr().cast(),
+				&mut new_handle,
+			);
+		}
 		ptr::NonNull::new(new_handle)
 			.ok_or_else(io::Error::last_os_error)
 			.map(Self)
@@ -110,7 +116,7 @@ impl InnerLibrary {
 	pub(crate) unsafe fn from_ptr(addr: *mut img::Image) -> Option<Self> {
 		if let Some(addr) = ptr::NonNull::new(addr.cast::<ffi::c_void>()) {
 			let new_lib = InnerLibrary(addr);
-			new_lib.try_clone().ok()
+			unsafe { new_lib.try_clone().ok() }
 		} else {
 			None
 		}
@@ -144,81 +150,87 @@ impl AsRawHandle for Library {
 
 pub(crate) unsafe fn base_addr(symbol: *const Symbol) -> *mut img::Image {
 	let mut handle = ptr::null_mut();
-	let _ = c::GetModuleHandleExW(
-		c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT | c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
-		symbol.cast(),
-		&mut handle,
-	);
+	unsafe {
+		let _ = c::GetModuleHandleExW(
+			c::GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT
+				| c::GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+			symbol.cast(),
+			&mut handle,
+		);
+	}
 	handle.cast()
 }
 
 pub(crate) unsafe fn load_objects() -> io::Result<Vec<weak::Weak>> {
 	const INITIAL_SIZE: usize = 1000;
-	let process_handle = c::GetCurrentProcess();
 	let mut module_handles = vec![ptr::null_mut::<img::Image>(); INITIAL_SIZE];
 	let mut len_needed: u32 = 0;
 	let mut prev_size = INITIAL_SIZE;
-
-	loop {
-		let cb = (module_handles.len() * mem::size_of::<c::HANDLE>()) as u32;
-		let result = c::EnumProcessModulesEx(
-			process_handle,
-			module_handles.as_mut_ptr().cast(),
-			cb,
-			&mut len_needed,
-			c::LIST_MODULES_ALL,
-		);
-		if result == 0 {
-			return Err(io::Error::last_os_error());
-		}
-		len_needed /= mem::size_of::<c::HANDLE>() as u32;
-		if len_needed as usize > module_handles.len() {
-			// We can't trust the next iteration to be bigger, so fill with null
-			module_handles.fill(ptr::null_mut());
-			// make the new size sufficiently bigger, and always grow instead of shrink.
-			let new_size: usize = (prev_size).max(len_needed as usize + 30);
-			prev_size = new_size;
-			module_handles.resize(new_size, ptr::null_mut());
-		} else {
-			// success, so truncate to the appropriate size
-			if let Some(new_len) = module_handles.iter().rposition(|a| !a.is_null()) {
-				module_handles.truncate(new_len)
+	unsafe {
+		let process_handle = c::GetCurrentProcess();
+		loop {
+			let cb = (module_handles.len() * mem::size_of::<c::HANDLE>()) as u32;
+			let result = c::EnumProcessModulesEx(
+				process_handle,
+				module_handles.as_mut_ptr().cast(),
+				cb,
+				&mut len_needed,
+				c::LIST_MODULES_ALL,
+			);
+			if result == 0 {
+				return Err(io::Error::last_os_error());
 			}
-			let module_handles = module_handles
-				.into_iter()
-				.map(|base_addr| {
-					let base_nonnull = ptr::NonNull::new_unchecked(base_addr.cast());
-					let hmodule = mem::ManuallyDrop::new(InnerLibrary(base_nonnull));
-					weak::Weak {
-						base_addr,
-						path_name: hmodule.path().ok(),
-					}
-				})
-				.collect::<Vec<weak::Weak>>();
-			// box and return the slice
-			return Ok(module_handles);
+			len_needed /= mem::size_of::<c::HANDLE>() as u32;
+			if len_needed as usize > module_handles.len() {
+				// We can't trust the next iteration to be bigger, so fill with null
+				module_handles.fill(ptr::null_mut());
+				// make the new size sufficiently bigger, and always grow instead of shrink.
+				let new_size: usize = (prev_size).max(len_needed as usize + 30);
+				prev_size = new_size;
+				module_handles.resize(new_size, ptr::null_mut());
+			} else {
+				// success, so truncate to the appropriate size
+				if let Some(new_len) = module_handles.iter().rposition(|a| !a.is_null()) {
+					module_handles.truncate(new_len)
+				}
+				let module_handles = module_handles
+					.into_iter()
+					.map(|base_addr| {
+						let base_nonnull = ptr::NonNull::new_unchecked(base_addr.cast());
+						let hmodule = mem::ManuallyDrop::new(InnerLibrary(base_nonnull));
+						weak::Weak {
+							base_addr,
+							path_name: hmodule.path().ok(),
+						}
+					})
+					.collect::<Vec<weak::Weak>>();
+				// box and return the slice
+				return Ok(module_handles);
+			}
 		}
 	}
 }
 
 pub(crate) unsafe fn hdr_size(hdr: *const img::Image) -> io::Result<usize> {
-	// checks if it's a PE header (fast)
-	let pe_hdr = c::ImageNtHeader(hdr as *const _ as *mut _);
-	// if it's PE we can skip all sys calls and return the size immediately.
-	if !pe_hdr.is_null() {
-		let pe_hdr32 = pe_hdr as *mut c::IMAGE_NT_HEADERS32;
-		return Ok((*pe_hdr32).optionalheader.sizeofimage as usize);
-	}
+	unsafe {
+		// checks if it's a PE header (fast)
+		let pe_hdr = c::ImageNtHeader(hdr as *const _ as *mut _);
+		// if it's PE we can skip all sys calls and return the size immediately.
+		if !pe_hdr.is_null() {
+			let pe_hdr32 = pe_hdr as *mut c::IMAGE_NT_HEADERS32;
+			return Ok((*pe_hdr32).optionalheader.sizeofimage as usize);
+		}
 
-	let hprocess = c::GetCurrentProcess();
-	let hmodule = hdr as *mut ffi::c_void;
-	let mut lpmodinfo = mem::MaybeUninit::zeroed();
-	let cb = mem::size_of::<c::MODULEINFO>();
-	let result = c::GetModuleInformation(hprocess, hmodule, lpmodinfo.as_mut_ptr(), cb as u32);
-	if result != 0 {
-		Ok(lpmodinfo.assume_init().sizeofimage as usize)
-	} else {
-		Err(io::Error::last_os_error())
+		let hprocess = c::GetCurrentProcess();
+		let hmodule = hdr as *mut ffi::c_void;
+		let mut lpmodinfo = mem::MaybeUninit::zeroed();
+		let cb = mem::size_of::<c::MODULEINFO>();
+		let result = c::GetModuleInformation(hprocess, hmodule, lpmodinfo.as_mut_ptr(), cb as u32);
+		if result != 0 {
+			Ok(lpmodinfo.assume_init().sizeofimage as usize)
+		} else {
+			Err(io::Error::last_os_error())
+		}
 	}
 }
 
@@ -227,7 +239,7 @@ pub(crate) unsafe fn hdr_path(hdr: *const img::Image) -> io::Result<PathBuf> {
 		return Err(io::Error::new(io::ErrorKind::Other, "invalid header"));
 	};
 	let lib = mem::ManuallyDrop::new(InnerLibrary(nonnull_hdr));
-	lib.path()
+	unsafe { lib.path() }
 }
 
 mod tests {

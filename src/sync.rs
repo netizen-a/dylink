@@ -131,7 +131,6 @@ impl<'a> LibLock<'a> {
 	///
 	/// Returns `None` if the cell is empty, or being initialized. This
 	/// method never blocks.
-	#[cfg(feature = "unstable")]
 	#[inline]
 	pub fn get(&self) -> Option<&Library> {
 		self.hlib.get()
@@ -146,14 +145,12 @@ impl<'a> LibLock<'a> {
 		self.hlib.take()
 	}
 
-	#[cfg(feature = "unstable")]
 	#[inline]
 	pub fn set(&self, value: Library) -> Result<(), Library> {
 		self.hlib.set(value)
 	}
 
 	/// Consumes the `LibLock`, returning the `Library`.
-	#[cfg(feature = "unstable")]
 	#[inline]
 	pub fn into_inner(self) -> Option<Library> {
 		self.hlib.into_inner()

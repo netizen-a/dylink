@@ -244,35 +244,38 @@ pub unsafe fn ImageNtHeader(base: *mut IMAGE_DOS_HEADER) -> *mut IMAGE_NT_HEADER
 	if base.is_null() {
 		return ptr::null_mut();
 	}
-	let dos_hdr = &mut *base;
 
-	// check if the DOS siginature
-	if dos_hdr.e_magic != IMAGE_DOS_SIGNATURE && (*base).e_magic != IMAGE_DOS_SIGNATURE2 {
-		return ptr::null_mut();
-	}
+	unsafe {
+		let dos_hdr = &mut *base;
 
-	// cache and get the dos size
-	let dos_size = DOS_SIZE.get_or_init(|| {
-		let mut sys_info = mem::MaybeUninit::<SYSTEM_INFO>::zeroed();
-		GetSystemInfo(sys_info.as_mut_ptr());
-		let sys_info = sys_info.assume_init();
-		let page_size = sys_info.dwpagesize;
-		dos_hdr.e_cp as u32 * page_size - dos_hdr.e_cblp as u32
-	});
+		// check if the DOS siginature
+		if dos_hdr.e_magic != IMAGE_DOS_SIGNATURE && (*base).e_magic != IMAGE_DOS_SIGNATURE2 {
+			return ptr::null_mut();
+		}
 
-	// check if the PE header offset is within bounds
-	if *dos_size + 4 < dos_hdr.e_lfanew as u32 {
-		return ptr::null_mut();
-	}
+		// cache and get the dos size
+		let dos_size = DOS_SIZE.get_or_init(|| {
+			let mut sys_info = mem::MaybeUninit::<SYSTEM_INFO>::zeroed();
+			GetSystemInfo(sys_info.as_mut_ptr());
+			let sys_info = sys_info.assume_init();
+			let page_size = sys_info.dwpagesize;
+			dos_hdr.e_cp as u32 * page_size - dos_hdr.e_cblp as u32
+		});
 
-	// calculate the new offset and return a pointer to the NT header
-	let pe_hdr = (base as *mut u8).offset(dos_hdr.e_lfanew as isize) as *mut IMAGE_NT_HEADERS;
+		// check if the PE header offset is within bounds
+		if *dos_size + 4 < dos_hdr.e_lfanew as u32 {
+			return ptr::null_mut();
+		}
 
-	// we need to check if it's really the PE header. If the magic matches then return a pointer to the header.
-	if (*pe_hdr).signature == IMAGE_NT_SIGNATURE {
-		pe_hdr
-	} else {
-		ptr::null_mut()
+		// calculate the new offset and return a pointer to the NT header
+		let pe_hdr = (base as *mut u8).offset(dos_hdr.e_lfanew as isize) as *mut IMAGE_NT_HEADERS;
+
+		// we need to check if it's really the PE header. If the magic matches then return a pointer to the header.
+		if (*pe_hdr).signature == IMAGE_NT_SIGNATURE {
+			pe_hdr
+		} else {
+			ptr::null_mut()
+		}
 	}
 }
 
