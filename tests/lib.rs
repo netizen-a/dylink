@@ -80,11 +80,17 @@ fn test_path_soundness() {
 			}
 		}
 		for lib in other_vlib.drain(0..) {
-			let _ = lib.try_clone().unwrap();
+			let cloned = lib.try_clone().unwrap();
+			let original_img = lib.to_image().unwrap().to_bytes().unwrap();
+			let cloned_img = cloned.to_image().unwrap().to_bytes().unwrap();
+			assert_eq!(original_img, cloned_img, "Cloned library image data mismatch");
 		}
 	});
 	for lib in vlib.drain(0..) {
-		let _ = lib.try_clone().unwrap();
+		let cloned = lib.try_clone().unwrap();
+		let original_img = lib.to_image().unwrap().to_bytes().unwrap();
+		let cloned_img = cloned.to_image().unwrap().to_bytes().unwrap();
+		assert_eq!(original_img, cloned_img, "Cloned library image data mismatch");
 	}
 	t.join().unwrap();
 }
