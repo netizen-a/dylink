@@ -3,7 +3,7 @@
 
 [package]
 name = "dylink"
-version = "0.13.1"
+version = "0.14.0"
 edition = "2024"
 authors = ["Jonathan Thomason"]
 license = "MIT OR Apache-2.0"
@@ -11,7 +11,6 @@ keywords = ["ffi", "dlopen", "load", "shared", "lazy"]
 categories = ["api-bindings"]
 description = "Run-time dynamic linking loader utilities"
 repository = "https://github.com/Razordor/dylink.git"
-publish = true
 
 [workspace]
 members = ["dylink_macro"]
@@ -26,7 +25,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
 
 [features]
-derive = ["dep:dylink_macro"]
+macro = ["dep:dylink_macro"]
 
 [dev-dependencies]
-dylink = { path = ".", features = ["derive"] }
+dylink = { path = ".", features = ["macro"] }
