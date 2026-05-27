@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["ffi", "macro", "macros", "attribute", "derive"]
 description = "Run-time dynamic linker loader attribute"
-repository = "https://github.com/Razordor/dylink.git"
+repository = "https://github.com/netizen-a/dylink.git"
 
 [lib]
 proc-macro = true
