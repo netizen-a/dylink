@@ -154,6 +154,25 @@ impl Library {
 		self.0.symbol(name)
 	}
 
+	/// Retrieves a raw symbol pointer from the library.
+	///
+	/// Unlike [`symbol`], this function accepts a [`CStr`] instead of a [`&str`], and returns
+	/// a raw pointer directly without error handling.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use std::ffi::CString;
+	/// use dylink::Library;
+	///
+	/// let lib = Library::open("libfoo.so").unwrap();
+	/// let name = CString::new("my_function").unwrap();
+	/// let sym = lib.raw_symbol(&name);
+	/// ```
+	/// 
+	/// [`&str`]: std::primitive::str
+	/// [`symbol`]: Self::symbol
+	/// [`CStr`]: std::ffi::CStr
 	#[doc(alias = "dlsym")]
 	#[inline]
 	pub fn raw_symbol(&self, name: &std::ffi::CStr) -> *const Symbol {

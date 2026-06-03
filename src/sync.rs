@@ -86,6 +86,33 @@ impl<'a> LibLock<'a> {
 		lib.symbol(name)
 	}
 
+	/// May block if another thread is currently attempting to initialize the cell.
+	///
+	/// This will lazily initialize the LibLock.
+	///
+	/// # Errors
+	///
+	/// If [`LibLock`] fails to be initialized, this call will panic.
+	///
+	/// Unlike [`symbol`], this does not return an error if the symbol is not found
+	/// (it returns the raw pointer directly).
+	///
+	/// # Panics
+	///
+	/// Panics if the library cannot be initialized.
+	///
+	/// # Examples
+	///
+	/// ```no_run
+	/// use std::ffi::CString;
+	/// use dylink::sync::LibLock;
+	///
+	/// static KERNEL32: LibLock = LibLock::new(&["foo.dll"]);
+	/// let name = CString::new("my_symbol").unwrap();
+	/// let sym = KERNEL32.raw_symbol(&name);
+	/// ```
+	/// 
+	/// [`symbol`]: Self::symbol
 	pub fn raw_symbol(&self, name: &CStr) -> *const Symbol {
 		let lib = self.hlib.get_or_init(|| {
 			if self.libs.is_empty() {
